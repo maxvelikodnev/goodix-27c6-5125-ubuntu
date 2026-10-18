@@ -9,7 +9,7 @@ Valutare e, se tecnicamente giustificato, sostituire SIGFM con il motore biometr
 
 **FALLBACK:** conservare SIGFM come implementazione ufficiale su `main` se Milan non supera i gate. Nessun matcher ibrido improvvisato e nessun doppio motore selezionabile dall'utente finale.
 
-Lavorare sul branch sperimentale `porting_milan_type_17`; la promozione su `main` è una decisione successiva, non un effetto automatico del completamento delle fasi. Il progetto upstream di riferimento è [FreshHomie/goodix521d-fprintd](https://github.com/FreshHomie/goodix521d-fprintd), con quesiti aperti nella sua [issue #1](https://github.com/FreshHomie/goodix521d-fprintd/issues/1). Le risposte possono orientare il porting ma non ne bloccano l'avvio.
+La promozione su `main` è una decisione successiva, non un effetto automatico del completamento delle fasi. Il progetto upstream di riferimento è [FreshHomie/goodix521d-fprintd](https://github.com/FreshHomie/goodix521d-fprintd), con quesiti aperti nella sua [issue #1](https://github.com/FreshHomie/goodix521d-fprintd/issues/1). Le risposte possono orientare il porting ma non ne bloccano l'avvio.
 
 ## State machine
 
