@@ -4,7 +4,7 @@
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
   "phase": "M0",
-  "phase_status": "NOT_STARTED",
+  "phase_status": "IN_PROGRESS",
   "completed_gates": [],
   "pending_gates": [
     "M0_SOURCE_BASELINE"
@@ -18,9 +18,11 @@
     "docs/LICENSING_AND_PROVENANCE.md",
     "docs/VALIDATION.md"
   ],
-  "current_blockers": [],
-  "next_action": "M0: identificare il profilo e l'algorithm type realmente selezionati dall'Engine Adapter Windows del 5125; poi fissare provenance/licenze e sorgenti Type 17 minimi usando C1/C2.",
-  "last_verified_head": null,
+  "current_blockers": [
+    "M0-B: il profilo engine selezionato a runtime non è osservabile offline; richiesta evidenza Windows live all'Utente (DLL Algo* residente in WbioSrvc e log Goodix-FingerprintProvider/Debug)"
+  ],
+  "next_action": "M0: completare analisi statica di EngineAdapter.dll (selezione AlgoMilan/AlgoChicago/AlgoChicagoT e algorithm type), baseline SIGFM e mappa licenze C1 v0.1.0-19; integrare con l'evidenza Windows live del gate M0-B prima di decidere PASS/NO_GO/BLOCKED.",
+  "last_verified_head": "e81c77a0d507891cdb8941d340194bdee23eb7fb",
   "relevant_corroborations": [
     "C1",
     "C2"
