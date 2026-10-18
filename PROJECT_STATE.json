@@ -3,11 +3,14 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
-  "phase": "M0",
-  "phase_status": "IN_PROGRESS",
-  "completed_gates": [],
+  "phase": "M1",
+  "phase_status": "GATE_REACHED",
+  "completed_gates": [
+    "M0_SOURCE_BASELINE",
+    "M1_NATIVE_ENGINE_OFFLINE"
+  ],
   "pending_gates": [
-    "M0_SOURCE_BASELINE"
+    "M2_IMAGE_COMPAT"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -19,10 +22,11 @@
     "docs/VALIDATION.md"
   ],
   "current_blockers": [
-    "M0-B: il profilo engine selezionato a runtime non è osservabile offline; richiesta evidenza Windows live all'Utente (DLL Algo* residente in WbioSrvc e log Goodix-FingerprintProvider/Debug)"
+    "Redistribuzione pubblica bloccata finché non è chiarita la grant di milan/match/candidate.c e milan/match/policy.c e valutata la provenienza delle trascrizioni MIT da RVA proprietari (decisione dell'Utente, separata dal giudizio tecnico)",
+    "Equivalenza fra il type17 interno di C1 e le tavole del build AlgoChicago.dll live rinviata a M2/M3 (binario 3.0.21.290 dell'autore non posseduto; RVA non risolvibili sui nostri DLL)"
   ],
-  "next_action": "M0: completare analisi statica di EngineAdapter.dll (selezione AlgoMilan/AlgoChicago/AlgoChicagoT e algorithm type), baseline SIGFM e mappa licenze C1 v0.1.0-19; integrare con l'evidenza Windows live del gate M0-B prima di decidere PASS/NO_GO/BLOCKED.",
-  "last_verified_head": "e81c77a0d507891cdb8941d340194bdee23eb7fb",
+  "next_action": "M1_NATIVE_ENGINE_OFFLINE=PASS registrato (resoconto in development/private-root/analysis/M1_engine_isolation/M1_engine_isolation_report.md). Attendere autorizzazione esplicita dell'Utente prima di avviare M2_IMAGE_COMPAT; nessuna attività M2 iniziata.",
+  "last_verified_head": "65a6ee6178afa2b5d454caa7096fc0ab16b8c24e",
   "relevant_corroborations": [
     "C1",
     "C2"
