@@ -1,128 +1,73 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ROADMAP.md — Fixed-21 enrollment
+# ROADMAP.md — Porting Milan Type 17 su Goodix 27c6:5125
 
-## Obiettivo
+## Obiettivo e percorso
 
-Implementare una policy di enrollment **fixed-21** per il Goodix
-`27c6:5125 / GF_ST411SEC_APP_12509`.
+Valutare e, se tecnicamente giustificato, sostituire SIGFM con il motore biometrico nativo Milan Type 17 nel driver Goodix `27c6:5125` per Fedora 44 KDE.
 
-## Specifica vincolante
+**PRIMARY:** porting mirato del motore (preprocessing, feature extraction, enrollment, matching, template) sulla cattura USB/TLS già funzionante del 5125.
 
-1. minimo **21 sample accettati**;
-2. **nessuna early completion**: completion esattamente al **21° sample valido accettato**;
-3. target normale **21**;
-4. massimo sample accettati **21**; massimo contatti fisici **non definito**;
-5. poor/unusable capture → **retry, non conta**;
-6. duplicate/near-duplicate valido → **accettato e conta**;
-7. duplicate/near-duplicate **non anticipa, non impedisce e non determina la completion**;
-8. matcher SIGFM e threshold VERIFY **40 invariati**.
+**FALLBACK:** conservare SIGFM come implementazione ufficiale su `main` se Milan non supera i gate. Nessun matcher ibrido improvvisato e nessun doppio motore selezionabile dall'utente finale.
 
-## Regola runtime
+Lavorare sul branch sperimentale `porting_milan_type_17`; la promozione su `main` è una decisione successiva, non un effetto automatico del completamento delle fasi. Il progetto upstream di riferimento è [FreshHomie/goodix521d-fprintd](https://github.com/FreshHomie/goodix521d-fprintd), con quesiti aperti nella sua [issue #1](https://github.com/FreshHomie/goodix521d-fprintd/issues/1). Le risposte possono orientare il porting ma non ne bloccano l'avvio.
 
-```text
-capture
-  |
-  +-- poor / unusable --> RETRY
-  |                      accepted_count invariato
-  |
-  +-- valid -----------> ACCEPT
-                         accepted_count++
-                         |
-                         +-- accepted_count < 21 --> continua
-                         |
-                         +-- accepted_count = 21 --> SUCCESS
-```
+## State machine
 
-Conseguenze obbligatorie:
+`M0 → M1 → M2 → M3 → M4 → M5 → M6 (opzionale) → valutazione finale`
 
-- 0..20 sample accettati non possono completare l'enrollment;
-- il 21° sample valido è terminale;
-- un 22° sample accettato non è raggiungibile;
-- i retry non incrementano `accepted_count`;
-- i contatti fisici possono superare 21;
-- non deve esistere un `max_physical_attempts` policy-side.
+I risultati di M2, M3 e M5 sono i punti decisionali principali: una incompatibilità non risolvibile in modo proporzionato, un matching insoddisfacente o una regressione critica determinano `NO_GO`. Prima di abbandonare una fase, verificare un adattamento minimo plausibile; non espandere il progetto con nuovi framework o algoritmi per aggirare un risultato negativo.
 
-## Poor/unusable
+### M0 — Baseline e provenienza
 
-Mantenere un gate separato per impedire che una cattura realmente inutilizzabile
-entri nel template.
+- **PURPOSE:** delimitare i moduli Type 17 indispensabili, le dipendenze, il commit upstream e le licenze per file; fissare il confronto con il SIGFM già qualificato.
+- **PRIMARY_ARTIFACT:** mappa compatta sorgente → funzione → provenienza/licenza, con snapshot upstream riproducibile.
+- **EXIT_GATE:** `M0_SOURCE_BASELINE=PASS` se il riuso è lecito e la superficie minima di porting è individuata; nessuna modifica al percorso biometrico installato.
+- **NEXT:** M1.
 
-Il gate poor/unusable non deve essere usato come criterio di diversity o di
-completion. Riutilizzare le metriche di qualità già disponibili senza introdurre
-nuove euristiche biometriche se non necessarie.
+### M1 — Motore nativo isolato
 
-## Diversity
+- **PURPOSE:** compilare e provare offline il motore Type 17 senza trasporto 521d, `fprintd` privato, servizi o installazione.
+- **PRIMARY_ARTIFACT:** sorgenti/lib minima e test offline riproducibile per estrazione, enrollment, identificazione e template.
+- **EXIT_GATE:** `M1_NATIVE_ENGINE_OFFLINE=PASS` se compilazione, test normali e controlli di memoria pertinenti passano, con ingressi/uscite e dipendenze tracciabili.
+- **NEXT:** M2.
 
-Le metriche di diversity già disponibili restano diagnostiche:
+### M2 — Immagini 5125 e fattibilità
 
-- SIGFM keypoints;
-- SIGFM coverage / aggregate coverage;
-- raster range / contrast;
-- MAD;
-- duplicate / near-duplicate.
+- **PURPOSE:** collegare offline il raster 5125 (80×64, raw 12-bit/baseline o U8 esistente) al preprocessing/feature extractor Milan. Verificare orientamento, contrasto, qualità/copertura e assunzioni di scala senza equiparare automaticamente le due famiglie Goodix.
+- **PRIMARY_ARTIFACT:** adattatore d'immagine minimo e confronto diagnostico ripetibile. Eventuali catture biometriche private rimangono sotto `development/` (gitignored).
+- **EXIT_GATE:** `M2_IMAGE_COMPAT=PASS` se le caratteristiche estratte sono valide, stabili e discriminanti; altrimenti `NO_GO` motivato.
+- **NEXT:** M3 solo con PASS.
 
-Non devono governare acceptance o completion, salvo il distinto gate
-poor/unusable.
+### M3 — Enrollment e matching comparati
 
-In particolare:
+- **PURPOSE:** creare template Milan da acquisizioni 5125, verificare stessa impronta e impronte diverse in sessioni/posizionamenti distinti e confrontare gli stessi input con SIGFM. Esaminare la semantica dei flag di matching senza imporre il learning.
+- **PRIMARY_ARTIFACT:** esito comparativo essenziale con fallimenti, falsi match osservati, retry e limiti del campione.
+- **EXIT_GATE:** `M3_MATCHING_VALUE=PASS` solo se Milan offre un vantaggio credibile o un potenziale tecnico chiaramente dimostrato senza falsi match noti; altrimenti `NO_GO`.
+- **NEXT:** M4 solo con PASS.
 
-- duplicate/near-duplicate valido → ACCEPT;
-- aggregate coverage non determina SUCCESS;
-- keypoint/contrast/MAD non possono produrre early completion.
+### M4 — Integrazione candidata in libfprint
 
-## Invarianti del task
+- **PURPOSE:** sostituire sperimentalmente SIGFM nel driver 5125 senza riscrivere USB, TLS, pairing o protocollo. Conservare preferibilmente `fprintd` stock; valutare modifiche aggiuntive solo se indispensabili. Separare i formati dei template e prevedere il nuovo enrollment, senza conversioni implicite.
+- **PRIMARY_ARTIFACT:** build Fedora/libfprint con enrollment, verify e identify Type 17 e rollback verificabile al driver SIGFM.
+- **EXIT_GATE:** `M4_LIBFPRINT_CANDIDATE=PASS` con test offline e regressioni pertinenti superati; nessuna installazione automatica.
+- **NEXT:** M5.
 
-Non modificare:
+### M5 — Qualificazione sul sensore reale
 
-- algoritmo SIGFM;
-- logica VERIFY/IDENTIFY;
-- threshold VERIFY = **40**;
-- preprocessing SIGFM già qualificato.
+- **PURPOSE:** verificare sul 5125 reale, con azioni esplicite dell'utente, enrollment, match/no-match, identify, autenticazione Fedora/KDE, password fallback, ciclo di riavvio/ripristino e coesistenza Windows. Confrontare l'uso quotidiano con SIGFM, non soltanto la riuscita di una build.
+- **PRIMARY_ARTIFACT:** esito live e decisione `GO/NO_GO` con regressioni, limiti e rollback.
+- **EXIT_GATE:** `M5_LIVE_QUALIFICATION=PASS` se affidabilità almeno comparabile alla baseline nel campione qualificato, nessun falso match osservato, nessuna regressione critica del login e ripristino praticabile; altrimenti `NO_GO`.
+- **NEXT:** M6 soltanto se l'apprendimento incrementale appare utile; altrimenti valutazione finale.
 
-Definire la policy fixed-21 con costanti semanticamente dedicate. Non riutilizzare
-il vecchio `GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u` come fonte normativa della
-nuova policy.
+### M6 — Apprendimento incrementale (opzionale)
 
-## Verifica offline
+- **PURPOSE:** verificare se aggiornare il template dopo un match affidabile migliori realmente il riconoscimento; esaminare persistenza, rischio di contaminazione e l'eventuale necessità di modificare `fprintd`.
+- **PRIMARY_ARTIFACT:** confronto con/senza apprendimento e decisione tecnica di inclusione o esclusione.
+- **EXIT_GATE:** `M6_LEARNING=PASS` se il beneficio è dimostrato e il costo/rischio accettabile; `M6_LEARNING=DEFERRED` se il motore statico è già soddisfacente o la modifica non conviene.
+- **NEXT:** valutazione finale.
 
-Dimostrare almeno:
+## Condizione di completamento
 
-1. 20 sample validi consecutivi → nessuna completion;
-2. 21° sample valido → completion;
-3. nessun 22° sample accettabile;
-4. poor/unusable intercalato → retry senza avanzamento;
-5. contatti fisici >21 consentiti quando esistono retry;
-6. duplicate valido → ACCEPT;
-7. near-duplicate valido → ACCEPT;
-8. duplicate/near-duplicate non anticipano la completion;
-9. duplicate/near-duplicate non impediscono la completion al 21° accepted;
-10. assenza di `max_physical_attempts` policy-side;
-11. metriche diversity presenti ma non decisionali;
-12. matcher SIGFM invariato;
-13. threshold VERIFY = 40 invariata;
-14. preprocessing invariato.
+Porting candidato quando `M0`–`M5` sono PASS e `M6` è PASS o DEFERRED. Il percorso pubblico definitivo deve usare **un solo motore**, Milan in sostituzione di SIGFM, senza opzione per l'utente nell'installer. Un passaggio a `main`, release o modifica dei componenti stock non è implicito in questa roadmap.
 
-Eseguire inoltre i test offline e i profili sanitizer già pertinenti al driver.
-
-## Verifica live
-
-Dopo il PASS offline, validare sul target reale:
-
-1. enrollment naturale → completion al 21° sample valido;
-2. enrollment con pressioni molto simili → i sample validi continuano ad avanzare fino a 21;
-3. enrollment con contatti poor/unusable → retry, con possibilità di superare 21 contatti fisici;
-4. VERIFY same-finger su placement differenti;
-5. VERIFY wrong-finger;
-6. IDENTIFY;
-7. raccolta dei punteggi SIGFM e degli eventuali `score=0`.
-
-## Exit gate
-
-`ENROLLMENT_FIXED_21=PASS` quando:
-
-- la policy runtime implementa esattamente la specifica fixed-21;
-- i test offline pertinenti sono PASS;
-- la verifica live è completata;
-- matcher SIGFM, threshold VERIFY=40 e preprocessing risultano invariati.
-
-`MILESTONE_COMPLETE: ENROLLMENT_FIXED_21`
+I criteri generali di sicurezza, Human Gate, disciplina Git, orchestrazione e documentazione rimangono nei rispettivi file canonici; qui sono definiti soltanto obiettivo, fasi e exit gate del porting.
