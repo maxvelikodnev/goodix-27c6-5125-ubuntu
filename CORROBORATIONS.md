@@ -1,0 +1,20 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+# CORROBORATIONS.md — Milan Type 17
+
+Indice di fonti esterne per la roadmap. **Nessuna delle due fonti prova la compatibilità del Goodix 27c6:5125.** Consultare i dettagli esterni solo quando pertinenti al task.
+
+## C1 | PRIMARY / UPSTREAM_SOURCE
+
+- **Fonte:** [FreshHomie/goodix521d-fprintd](https://github.com/FreshHomie/goodix521d-fprintd).
+- **Snapshot:** [v0.1.0-19](https://github.com/FreshHomie/goodix521d-fprintd/tree/v0.1.0-19), commit `4f48c482f35976ea4fac27d5e598730581c4f380`; dipendenza Milan pin `e68eb725b1a7845b401b1a3c9b0790921f12133e`.
+- **Claim:** sorgenti C ispezionabili del motore Type 17 (preprocessing, feature, enrollment, recognition, template e study) con API utilizzabili offline senza USB/fprintd privato.
+- **Limite:** algoritmi e configurazione qualificati sul 521d; compatibilità 5125 sconosciuta. Licenze prevalentemente LGPL/MIT con moduli terzi: provenienza e redistribuibilità dei **file effettivamente portati** da verificare.
+- **Rilevanza:** M0–M4.
+
+## C2 | PRIMARY / MAINTAINER_STATEMENT
+
+- **Fonte:** [Issue #1](https://github.com/FreshHomie/goodix521d-fprintd/issues/1), [risposta tecnica di FreshHomie](https://github.com/FreshHomie/goodix521d-fprintd/issues/1#issuecomment-6250360099).
+- **Claim:** ricostruzione dichiarata da `GoodixEngineAdapter.dll` Windows (`3.0.21.290`, SHA-256 DLL `5995d6565e602416cbe00f171ad4941203e345ccaddb490199274166adac4f5c`); confronti differenziali dichiarati su preprocessing, feature, template, enrollment, recognition e aggiornamenti per **riga parametri 12 / tipo algoritmo 17**.
+- **Indicazione prioritaria:** identificare **prima** l'algorithm type effettivo dell'Engine Adapter Windows del **5125**. Poi confrontare stessi input e output completi (pixel, quality/coverage, feature, maschere, metadati), non solo dimensioni o numero di feature. `flags=0` è il punto di partenza senza learning; il voto 3/10 è policy del controller Linux, non Windows dimostrato; il daemon stock è plausibile per enrollment e verifica.
+- **Limite:** testimonianza dell'**autore di C1**, non evidenza indipendente; oracle Windows e corpus della campagna non sono tutti pubblici. Nessuna certificazione di provenienza clean-room, compatibilità 5125, FAR o spoof resistance.
+- **Rilevanza:** M0, M2–M6.
