@@ -12,16 +12,17 @@
   "host_modified": false,
   "relevant_artifacts": [
     "ROADMAP.md",
-    "PROJECT_STATE.json",
-    "docs/LICENSING_AND_PROVENANCE.md",
+    "CORROBORATIONS.md",
+    "ARTIFACT_INDEX.json",
     "TECHNICAL_MANUAL.md",
-    "production/README.md",
-    "libfprint-driver/goodix_fpimage_device.c",
-    "Rockytkg/libfprint/libfprint/sigfm/"
+    "docs/LICENSING_AND_PROVENANCE.md",
+    "docs/VALIDATION.md"
   ],
-  "upstream_reference": "https://github.com/FreshHomie/goodix521d-fprintd",
-  "upstream_questions": "https://github.com/FreshHomie/goodix521d-fprintd/issues/1",
   "current_blockers": [],
-  "next_action": "M0: verificare commit upstream, licenze/provenienza e minimo insieme di moduli Milan portabili; fissare la baseline SIGFM prima di intervenire sull'algoritmo.",
-  "last_verified_head": null
+  "next_action": "M0: identificare il profilo e l'algorithm type realmente selezionati dall'Engine Adapter Windows del 5125; poi fissare provenance/licenze e sorgenti Type 17 minimi usando C1/C2.",
+  "last_verified_head": null,
+  "relevant_corroborations": [
+    "C1",
+    "C2"
+  ]
 }
