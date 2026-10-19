@@ -69,6 +69,7 @@ the technical manual remains the canonical specification.
 
 ## Documentation
 
+- [Contributing and pull-request policy](.github/CONTRIBUTING.md)
 - [Beginner learning guide](docs/learning/README.md)
 - [Installation and updates](docs/INSTALLATION.md)
 - [Uninstall and emergency recovery](docs/UNINSTALL.md)
