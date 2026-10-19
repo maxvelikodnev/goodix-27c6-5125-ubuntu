@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # CORROBORATIONS.md — Milan Type 17
 
-Indice di fonti esterne per la roadmap. **Nessuna delle due fonti prova la compatibilità del Goodix 27c6:5125.** Consultare i dettagli esterni solo quando pertinenti al task.
+Indice di fonti esterne per la roadmap. **Nessuna delle fonti prova da sola la compatibilità del Goodix 27c6:5125.** Consultare i dettagli esterni solo quando pertinenti al task.
 
 ## C1 | PRIMARY / UPSTREAM_SOURCE
 
@@ -18,3 +18,13 @@ Indice di fonti esterne per la roadmap. **Nessuna delle due fonti prova la compa
 - **Indicazione prioritaria:** identificare **prima** l'algorithm type effettivo dell'Engine Adapter Windows del **5125**. Poi confrontare stessi input e output completi (pixel, quality/coverage, feature, maschere, metadati), non solo dimensioni o numero di feature. `flags=0` è il punto di partenza senza learning; il voto 3/10 è policy del controller Linux, non Windows dimostrato; il daemon stock è plausibile per enrollment e verifica.
 - **Limite:** testimonianza dell'**autore di C1**, non evidenza indipendente; oracle Windows e corpus della campagna non sono tutti pubblici. Nessuna certificazione di provenienza clean-room, compatibilità 5125, FAR o spoof resistance.
 - **Rilevanza:** M0, M2–M6.
+
+## C3 | PRIMARY / OPEN-SOURCE CHICAGO BACKEND
+
+- **Fonte:** [berkekbgz/libfprint-goodix-spi](https://github.com/berkekbgz/libfprint-goodix-spi/tree/main); [architettura](https://github.com/berkekbgz/libfprint-goodix-spi/blob/main/docs/ARCHITECTURE.md), [dispositivi supportati](https://github.com/berkekbgz/libfprint-goodix-spi/blob/main/docs/SUPPORTED_DEVICES.md), [parity record](https://github.com/berkekbgz/libfprint-goodix-spi/blob/main/re/PARITY.md), [provenienza](https://github.com/berkekbgz/libfprint-goodix-spi/blob/main/PROVENANCE.md).
+- **Snapshot di ricognizione:** branch `main`, commit `010a665f54089a1632b1ab7be588b316ace934e2` (19 ottobre 2026). Per qualsiasi esperimento fissare e verificare lo snapshot effettivamente utilizzato.
+- **Claim del progetto:** backend biometrico ChicagoHS senza I/O in `lib/goodix/chicago/`, distinto dal trasporto SPI `drivers/gdix51c0/`; codice per calibrazione, preprocessing, feature, enrollment, template, identify e `templateStudy`, ricostruito con confronti dichiarati rispetto alla stack Windows `AlgoChicago.dll`.
+- **Indizi di rilevanza per il 5125:** il GDIX51C0 documenta chip ID `0x2504`, sensor type 12 (ChicagoHS), geometria 80×64 e payload calibrazione `0x224b0`, valori sovrapponibili a quelli osservati sul nostro 5125. Il 5125 Windows carica `AlgoChicago.dll`.
+- **Limiti:** il solo dispositivo hardware qualificato dall'autore è **GDIX51C0 su SPI**, non il Goodix **27c6:5125 USB**. Identità parziale di profilo/DLL/formati non prova equivalenza di frame, orientamento/regroup, OTP, ImageBase, preprocessing, template o accuratezza del matching sul 5125. I test di parità Windows sono dichiarati dall'autore e non sono un nostro risultato.
+- **Licenza/provenienza:** README/LICENSE indicano LGPL-2.1-or-later per i sorgenti originali, salvo eccezioni. Verificare `PROVENANCE.md` e gli header/licenze **dei file effettivamente riusati** prima di eventuale import o pubblicazione; nessuna presunzione di compatibilità licenze.
+- **Rilevanza:** M3 (audit Chicago, eventuale harness e confronto decisionale); M4–M6 soltanto se Chicago risulta il candidato selezionato. Nessuna installazione o provisioning SPI.
