@@ -3,8 +3,8 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
-  "phase": "M2",
-  "phase_status": "GATE_REACHED",
+  "phase": "M3",
+  "phase_status": "READY_FOR_HUMAN_GATE",
   "completed_gates": [
     "M0_SOURCE_BASELINE",
     "M1_NATIVE_ENGINE_OFFLINE",
@@ -20,15 +20,21 @@
     "ARTIFACT_INDEX.json",
     "TECHNICAL_MANUAL.md",
     "docs/LICENSING_AND_PROVENANCE.md",
-    "docs/VALIDATION.md"
+    "docs/VALIDATION.md",
+    "development/private-root/analysis/M3_matching/M3_matching_report.md",
+    "development/private-root/analysis/M3_matching/offline_matching.py",
+    "development/private-root/analysis/M3_matching/collector/collect.py",
+    "development/private-root/analysis/M3_matching/collector/build_record.json"
   ],
   "current_blockers": [
     "Trascrizioni MIT/reconstruction RVA del layer nativo FreshHomie: catena e autorizzazione distinte dalla decisione LGPL, da gestire nel relativo gate di pubblicazione; non bloccanti per il lavoro tecnico offline (decisione Utente 2026-10-18)",
-    "M2_IMAGE_COMPAT=PASS; avvio M3 non autorizzato. Attendere nuovo Human Gate esplicito prima di enrollment/matching comparati o altre attività della fase successiva."
+    "READY_FOR_HUMAN_GATE / AWAITING_OPERATOR: collector multi-contatto preparato e verificato esclusivamente offline. Nessuna autorizzazione o esecuzione live/sudo/PSK/pausa fprintd. M3_MATCHING_VALUE resta non superato: manca corpus autentico indipendente.",
+    "Confronto SIGFM: occorrono baseline raw autentiche per sessione; la gallery offline 18/21 campioni non riproduce da sola l’intera ammissione enrollment produttiva.",
+    "Collector: disponibilità/attualità dello store legacy protetto non verificata senza consenso; se assente o incompatibile STOP, nessun fallback a pairing o provisioning."
   ],
   "license_notes": "Decisione Utente 2026-10-18: milan/match/candidate.c (blob c416e882b73c9d564d5a5d91ac08e5eb73bd12d3) e policy.c (blob b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455) considerati LGPL-2.1-or-later con catena documentale seaweeduk PR#28 -> AndyHazz e68eb725 -> FreshHomie v0.1.0-19; blocker 'assenza grant' rimosso. Tracciabilità da riportare nella futura importazione pubblica.",
-  "next_action": "M2_IMAGE_COMPAT=PASS registrato nel rapporto privato development/private-root/analysis/M2_image_compat/M2_image_compat_report.md: sei frame della stessa contact sostengono coerenza e plausibilità della pipeline; capienza 120, maschere e auxiliary spiegati dal codice. Equivalenza esatta vendor, PPI e accuratezza non dimostrati e non trasformati in prerequisiti ulteriori di M2. Attendere autorizzazione esplicita per avviare M3; nessuna attività M3 o live avviata.",
-  "last_verified_head": "772cc6933928adae74a837950246c418f0161d40",
+  "next_action": "Attendere consenso specifico al gate M3_INDEPENDENT_CONTACT_COLLECTION per sudo, lettura PSK/materiale protetto già esistente, pausa/ripristino fprintd e lettura USB live. Procedura unica con comandi senza placeholder nel rapporto privato M3; collector/collect.py --offline-check PASS, build C/selftest e 14 test Python sintetici PASS con review indipendente. Raccolta one-shot: 2 sessioni, massimo 35 contatti incluse riserve / 20 minuti, output privato capture_001, STOP senza retry se insufficiente. Nessuna run operatore eseguita; nessun M3 PASS o M4 avviato.",
+  "last_verified_head": "836c2fca8a6f0db9bdd6dc557d13686383dee3dd",
   "relevant_corroborations": [
     "C1",
     "C2"
