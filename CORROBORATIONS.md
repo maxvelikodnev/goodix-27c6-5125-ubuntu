@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# CORROBORATIONS.md — Milan Type 17
+# CORROBORATIONS.md — Motori biometrici nativi (Milan e Chicago)
 
 Indice di fonti esterne per la roadmap. **Nessuna delle fonti prova da sola la compatibilità del Goodix 27c6:5125.** Consultare i dettagli esterni solo quando pertinenti al task.
 
