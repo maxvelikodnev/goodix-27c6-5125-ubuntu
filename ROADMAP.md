@@ -1,21 +1,21 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ROADMAP.md — Porting Milan Type 17 su Goodix 27c6:5125
+# ROADMAP.md — Valutazione motori biometrici nativi per Goodix 27c6:5125
 
 ## Obiettivo e percorso
 
-Valutare e, se tecnicamente giustificato, sostituire SIGFM con il motore biometrico nativo Milan Type 17 nel driver Goodix `27c6:5125` per Fedora 44 KDE.
+Valutare se sostituire il matcher SIGFM sul Goodix `27c6:5125` Fedora 44 KDE con **un solo motore biometrico nativo** che dimostri valore, affidabilità e compatibilità sul sensore reale. Milan Type 17 resta il candidato già in prova (M0–M3); ChicagoHS è una **nuova ipotesi** da studiare offline dopo la raccolta M3, non una compatibilità acquisita.
 
-**PRIMARY:** porting mirato del motore (preprocessing, feature extraction, enrollment, matching, template) sulla cattura USB/TLS già funzionante del 5125.
+**Vincolo architetturale:** conservare il trasporto USB/TLS, il pairing e la cattura del driver attuale; non portare il trasporto SPI del progetto Chicago. Non introdurre matcher ibridi, switch Milan/Chicago/SIGFM nell'installer o modifiche ai servizi stock senza gate separato.
 
-**FALLBACK:** conservare SIGFM come implementazione ufficiale su `main` se Milan non supera i gate. Nessun matcher ibrido improvvisato e nessun doppio motore selezionabile dall'utente finale.
+**Baseline e rollback:** SIGFM resta funzionante sul branch `main`. L'eventuale candidato è scelto solo dopo confronto motivato. La promozione su `main` non è automatica.
 
-La promozione su `main` è una decisione successiva. Consultare `CORROBORATIONS.md` per C1 (codice upstream) e C2 (risposte del manutentore); usare il tag verificato `v0.1.0-19`, commit `4f48c482f35976ea4fac27d5e598730581c4f380`. I test differenziali sono **dichiarati dall'autore**, non riprodotti indipendentemente; non dimostrano compatibilità con il 5125.
+Fonti: `CORROBORATIONS.md` C1/C2 (Milan) e C3 (Chicago). I test differenziali dichiarati dagli autori non sono parità verificata sul 5125; la condivisione di chip ID, sensor type e dimensioni non basta. L'analisi di provenienza/licenze è specifica ai sorgenti eventualmente importati.
 
 ## State machine
 
-`M0 → M1 → M2 → M3 → M4 → M5 → M6 (opzionale) → valutazione finale`
+`M0 (Milan) → M1 (Milan) → M2 (Milan) → M3 (raccolta + confronto Milan/SIGFM + audit/prova Chicago + decisione) → M4 (candidato scelto) → M5 (live) → M6 (learning opzionale) → valutazione finale`
 
-**M0 è il primo gate di fattibilità:** identificare il tipo di algoritmo selezionato dall'Engine Adapter Windows del 5125; riga di parametri 12 e tipo di algoritmo 17 sono identificatori diversi. Risoluzione 80×64, firmware APP12508/APP12509 e provisioning ChicagoHS/Type 12 non provano compatibilità Type 17. Seguono gate M2 (immagini), M3 (matching) e M5 (uso live). Incompatibilità comprovata o regressione critica → `NO_GO`; tentare solo adattamenti minimi tecnicamente motivati, non algoritmi ibridi.
+M0–M2 sono **già conclusi per la fattibilità Milan**: non reinterpretarli come PASS di Chicago né rieseguirli per la sola scoperta di C3. Chicago è valutato come candidato indipendente dentro M3 prima di scegliere l'eventuale motore di M4. Ogni nuovo accesso live o modifica del sistema richiede un distinto Human Gate; incompatibilità comprovata o regressione critica comportano `NO_GO` per il candidato interessato.
 
 ### M0 — Baseline e provenienza
 
@@ -38,36 +38,43 @@ La promozione su `main` è una decisione successiva. Consultare `CORROBORATIONS.
 - **EXIT_GATE:** `M2_IMAGE_COMPAT=PASS` se output coerenti e biometricamente utilizzabili; altrimenti `NO_GO` motivato.
 - **NEXT:** M3 solo con PASS.
 
-### M3 — Enrollment e matching comparati
+### M3 — Corpus, matching comparato e scelta del candidato
 
-- **PURPOSE:** confrontare Milan e SIGFM sugli stessi input con impronte autentiche, placements/sessioni distinti, dita diverse e catture vuote/scadenti; verificare serializzazione e ripresa. Partire con `flags=0`, senza learning; `flags=1` modifica anche logica di matching. Valutare prima decisioni a singolo frame: il voto 3/10 di FreshHomie è una policy del controller Linux, non una regola Windows dimostrata.
-- **PRIMARY_ARTIFACT:** confronto minimo di decisioni, diagnostica, errori, falsi match osservati e limiti dei campioni, senza dichiarare FAR/FRR certificati.
-- **EXIT_GATE:** `M3_MATCHING_VALUE=PASS` solo con vantaggio credibile o potenziale tecnico dimostrato e nessun falso match osservato; altrimenti `NO_GO`.
-- **NEXT:** M4 solo con PASS.
+- **PURPOSE:** utilizzare contatti reali indipendenti del 5125 per qualificare Milan contro SIGFM e, **dopo la raccolta live già predisposta**, valutare Chicago in modo isolato prima della decisione di integrazione. La scoperta Chicago **non modifica** il kit, i budget, le autorizzazioni o i criteri di sicurezza dell'acquisizione M3 già preparata.
+- **M3.A — Human Gate e raccolta:** collector esistente, massimo **35 contatti / 20 minuti**, due sessioni, dita A/B, sollevamento completo; solo dopo consenso separato a USB reale, sudo, lettura PSK/materiale esistente e pausa/ripristino `fprintd`. Rispettare il pin del collector, `--offline-check`, one-shot e i limiti del report M3 privato; nessun altro test live implicito. I campioni restano sotto `development/` gitignored.
+- **M3.B — Milan vs SIGFM:** sugli stessi raw raccolti, pipeline native corrette e baseline autentica `FDT_B0` per SIGFM; enrollment reale, template export/load e ripresa in processo nuovo, probe genuine/sessioni distinte, dito impostor B, frame parziali e classificazione di retry, errore e NO_MATCH. Milan parte con `flags=0` senza learning; il voto 3/10 di FreshHomie non è comportamento Windows dimostrato.
+- **M3.C — Audit tecnico Chicago (offline):** fissare revisione C3, esaminare esclusivamente il backend `lib/goodix/chicago/`, contratti d'ingresso/uscita, dipendenze, formati frame e template, calibrazione/OTP/ImageBase, regroup/orientamento, license headers e provenienza. Confrontare con le evidenze Windows/5125 già acquisite senza presumere equivalenza solo da `0x2504`, sensor type 12 e 80×64. Esito `FEASIBLE / NO_GO / BLOCKED`, con motivazione sintetica. Nessun driver, dispositivo o servizio toccato.
+- **M3.D — Prova Chicago sui campioni M3 (offline, solo se FEASIBLE):** adattatore/harness minimo privato e reversibile; riutilizzare il corpus con preprocessing e policy di enrollment propri di Chicago (senza duplicazioni, rilassamento soglie o sostituzione dei frame). Verificare calibrazione, inizializzazione, template save/reload, genuine e impostor e i fallimenti, senza learning iniziale. Se mancano OTP/ImageBase o altri prerequisiti, dichiarare `BLOCKED` per Chicago; **non** forzare compatibilità o avviare nuova cattura senza ulteriore consenso.
+- **M3.E — Confronto e decisione:** confrontare SIGFM, Milan e Chicago **solo su prove omogenee o con limiti esplicitati**, distinguendo errori di cattura/preprocessing da NO_MATCH del matcher; non equiparare `score=0` SIGFM a score Chicago/Milan. Riportare conteggi e incertezze, falsi match osservati e costi di integrazione. Il corpus ridotto non certifica FAR/FRR. Ogni falso match osservato è stop per analisi del candidato.
+- **PRIMARY_ARTIFACT:** unico rapporto privato M3 con esito Milan/SIGFM, audit Chicago, eventuale prova Chicago, confronto e proposta motivata di `candidate=Milan / Chicago / none`. Le informazioni pubbliche sono solo conclusioni non biometriche, senza PSK, template o raw.
+- **EXIT_GATE:** `M3_MATCHING_VALUE=PASS` soltanto se **almeno un candidato** mostra un vantaggio credibile o potenziale tecnico concreto rispetto a SIGFM, senza falsi match osservati, e la decisione è documentata. `NO_GO` se nessun candidato soddisfa il criterio; `BLOCKED` se mancano evidenze essenziali per decidere. Un `NO_GO`/`BLOCKED` di Chicago non annulla automaticamente un Milan qualificato, e viceversa. Non confondere M3 PASS con autorizzazione a modificare `libfprint`.
+- **NEXT:** M4 sul **solo candidato selezionato**, previo nuovo Human Gate.
 
-### M4 — Integrazione candidata in libfprint
+### M4 — Integrazione del candidato selezionato in libfprint
 
-- **PURPOSE:** sostituire sperimentalmente SIGFM nel driver 5125 mantenendo USB/TLS/pairing/acquisizione esistenti. Per enrollment/verify/identify usare preferibilmente `libfprint` standard e `fprintd` stock: l'autore non segnala necessità intrinseca di un daemon modificato per le funzioni base. Distinguere i template Milan da GSF1/SIGFM e prevedere nuovo enrollment, senza conversioni implicite. Persistenza del learning fuori scope fino a M6.
-- **PRIMARY_ARTIFACT:** build candidata Fedora/libfprint, test offline e rollback al driver SIGFM.
+- **PURPOSE:** integrare sperimentalmente **Milan oppure Chicago**, non entrambi, in sostituzione di SIGFM per il 5125, mantenendo USB/TLS/pairing/cattura esistenti. Nessun porting del trasporto SPI e nessuna sostituzione preventiva del `fprintd` stock; eventuali necessità aggiuntive richiedono motivazione e consenso specifico. Distinguere i nuovi template da GSF1/SIGFM; non convertire template implicitamente e prevedere enrollment nuovo.
+- **PRIMARY_ARTIFACT:** una sola build candidata Fedora/libfprint, test offline pertinenti e rollback al driver SIGFM. Learning persistente non rientra in M4.
 - **EXIT_GATE:** `M4_LIBFPRINT_CANDIDATE=PASS` se enrollment, verify, identify e regressioni pertinenti passano offline; nessuna installazione automatica.
-- **NEXT:** M5.
+- **NEXT:** M5 solo con PASS e autorizzazione live separata.
 
 ### M5 — Qualificazione sul sensore reale
 
-- **PURPOSE:** verificare con l'Utente sul sensore 5125 enrollment, match/no-match (anche altre dita/persone), identify, catture scadenti, login Fedora/KDE, password fallback, riavvio, ripristino e coesistenza Windows. Confrontare uso quotidiano con SIGFM. La configurazione upstream ha liveness disabilitata e non prova resistenza allo spoofing.
-- **PRIMARY_ARTIFACT:** esito live e decisione `GO/NO_GO`, con regressioni, limiti del campione e rollback.
-- **EXIT_GATE:** `M5_LIVE_QUALIFICATION=PASS` se affidabilità almeno comparabile a SIGFM nel campione qualificato, nessun falso match osservato, nessuna regressione critica del login e rollback praticabile; altrimenti `NO_GO`.
-- **NEXT:** M6 solo se il learning mostra valore potenziale; altrimenti valutazione finale.
+- **PURPOSE:** verificare con l'Utente il **solo candidato M4** sul 5125: enrollment, match/no-match con dita/persone diverse, identify, catture scadenti, login Fedora/KDE, password fallback, riavvio, ripristino, coesistenza Windows e stabilità nell'uso reale rispetto a SIGFM. Non assumere liveness o spoof resistance dal repository sorgente.
+- **PRIMARY_ARTIFACT:** esito live, regressioni, limiti del campione, rollback e decisione `GO/NO_GO`.
+- **EXIT_GATE:** `M5_LIVE_QUALIFICATION=PASS` soltanto se affidabilità almeno comparabile a SIGFM nel campione qualificato, nessun falso match osservato, nessuna regressione critica del login e rollback praticabile; altrimenti `NO_GO`.
+- **NEXT:** M6 solo se il learning del motore scelto promette un beneficio giustificabile; altrimenti valutazione finale.
 
 ### M6 — Apprendimento incrementale (opzionale)
 
-- **PURPOSE:** verificare se aggiornare il template dopo un match affidabile migliori realmente il riconoscimento; esaminare persistenza, rischio di contaminazione e l'eventuale necessità di modificare `fprintd`.
-- **PRIMARY_ARTIFACT:** confronto con/senza apprendimento e decisione tecnica di inclusione o esclusione.
-- **EXIT_GATE:** `M6_LEARNING=PASS` se il beneficio è dimostrato e il costo/rischio accettabile; `M6_LEARNING=DEFERRED` se il motore statico è già soddisfacente o la modifica non conviene.
+- **PURPOSE:** verificare **solo sul candidato selezionato** se l'aggiornamento dei template dopo match affidabili migliori davvero il riconoscimento. Studiare persistenza, rischio contaminazione e compatibilità con `fprintd`; le patch e il comportamento `templateStudy` del progetto Chicago non sono automaticamente autorizzati per Fedora.
+- **PRIMARY_ARTIFACT:** confronto con/senza apprendimento, valutazione dei rischi e decisione documentata.
+- **EXIT_GATE:** `M6_LEARNING=PASS` se beneficio dimostrato e costo/rischio accettabile; `M6_LEARNING=DEFERRED` se non necessario o non giustificato.
 - **NEXT:** valutazione finale.
 
 ## Condizione di completamento
 
-Porting candidato quando `M0`–`M5` sono PASS e `M6` è PASS o DEFERRED. Il percorso pubblico definitivo deve usare **un solo motore**, Milan in sostituzione di SIGFM, senza opzione per l'utente nell'installer. Un passaggio a `main`, release o modifica dei componenti stock non è implicito in questa roadmap.
+Candidato qualificato quando `M0`–`M2` attestano la fattibilità **Milan iniziale**, `M3` seleziona motivatamente **Milan o Chicago**, `M4`–`M5` passano per quel candidato e `M6` è PASS oppure DEFERRED. I PASS M0–M2 non costituiscono attestazione tecnica Chicago.
 
-I criteri generali di sicurezza, Human Gate, disciplina Git, orchestrazione e documentazione rimangono nei rispettivi file canonici; qui sono definiti soltanto obiettivo, fasi e exit gate del porting.
+La release pubblica può adottare **un solo motore**. La conservazione di SIGFM su `main` è il rollback, non un fallback ibrido nell'installer. Merge, installazione, aggiornamento di `fprintd` o passaggio a `main` richiedono decisioni ulteriori.
+
+I criteri generali di sicurezza, Human Gate, disciplina Git, orchestrazione e documentazione rimangono nei file canonici; `TECHNICAL_MANUAL.md` contiene conoscenza tecnica stabile, **non** cronaca di prove o task agentici. I report operativi restano privati in `development/`.
