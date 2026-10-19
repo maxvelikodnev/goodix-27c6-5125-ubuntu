@@ -749,6 +749,17 @@ production_start_pairing_activation (
   GoodixPairingActivationPaths paths;
   GoodixPairingActivationPolicy policy;
 
+  /* Pairing activation is the only writer of persistent sensor pairing state.
+   * An operator epoch is a host-tool session that must never be able to reach
+   * it, whatever the live reconciliation decides; it fails closed instead.
+   * begin_operator_epoch() is compiled only under GOODIX_ENABLE_TEST_SEAMS, so
+   * no production action can observe this refusal. */
+  if (ctx->operator_epoch)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+                           "pairing activation is unavailable in an operator epoch");
+      return FALSE;
+    }
   if (ctx->runtime_material != NULL || ctx->pairing_activation != NULL)
     {
       g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
