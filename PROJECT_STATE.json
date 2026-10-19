@@ -4,13 +4,14 @@
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
   "phase": "M2",
-  "phase_status": "BLOCKED",
+  "phase_status": "GATE_REACHED",
   "completed_gates": [
     "M0_SOURCE_BASELINE",
-    "M1_NATIVE_ENGINE_OFFLINE"
+    "M1_NATIVE_ENGINE_OFFLINE",
+    "M2_IMAGE_COMPAT"
   ],
   "pending_gates": [
-    "M2_IMAGE_COMPAT"
+    "M3_MATCHING_VALUE"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -23,12 +24,11 @@
   ],
   "current_blockers": [
     "Trascrizioni MIT/reconstruction RVA del layer nativo FreshHomie: catena e autorizzazione distinte dalla decisione LGPL, da gestire nel relativo gate di pubblicazione; non bloccanti per il lavoro tecnico offline (decisione Utente 2026-10-18)",
-    "Equivalenza fra il type17 interno di C1 e le tavole del build AlgoChicago.dll live rinviata a M2/M3 (binario 3.0.21.290 dell'autore non posseduto; RVA non risolvibili sui nostri DLL)",
-    "M2_IMAGE_COMPAT=BLOCKED: copia calidata Windows importata con successo in C1; preprocess e feature su 3 dei 43 frame della stessa contact completati (quality 9..85, coverage 100, feature 120/120, maschere interamente valide). Usabilità biometrica e convenzioni immagine 5125 non ancora validate indipendentemente; serve confronto degli output completi con riferimento qualificato, senza dedurre NO_GO dall'assenza di prova."
+    "M2_IMAGE_COMPAT=PASS; avvio M3 non autorizzato. Attendere nuovo Human Gate esplicito prima di enrollment/matching comparati o altre attività della fase successiva."
   ],
   "license_notes": "Decisione Utente 2026-10-18: milan/match/candidate.c (blob c416e882b73c9d564d5a5d91ac08e5eb73bd12d3) e policy.c (blob b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455) considerati LGPL-2.1-or-later con catena documentale seaweeduk PR#28 -> AndyHazz e68eb725 -> FreshHomie v0.1.0-19; blocker 'assenza grant' rimosso. Tracciabilità da riportare nella futura importazione pubblica.",
-  "next_action": "Verifica privata del goodix_calib.dat reale conclusa: codec/import C1 e preprocess su f00/f21/f42 PASS come esecuzione; M2_IMAGE_COMPAT resta BLOCKED/pending. Dettagli in development/private-root/analysis/M2_image_compat/M2_image_compat_report.md. Arresto al risultato corrente; nessun nuovo export/live o M3 avviato. Minimo discriminante residuo: validazione indipendente degli output completi con input/calibrazione identici e convenzioni immagine qualificate.",
-  "last_verified_head": "89cd7dfadb6ae86a2f234604e3c00bcaf1e0fab9",
+  "next_action": "M2_IMAGE_COMPAT=PASS registrato nel rapporto privato development/private-root/analysis/M2_image_compat/M2_image_compat_report.md: sei frame della stessa contact sostengono coerenza e plausibilità della pipeline; capienza 120, maschere e auxiliary spiegati dal codice. Equivalenza esatta vendor, PPI e accuratezza non dimostrati e non trasformati in prerequisiti ulteriori di M2. Attendere autorizzazione esplicita per avviare M3; nessuna attività M3 o live avviata.",
+  "last_verified_head": "772cc6933928adae74a837950246c418f0161d40",
   "relevant_corroborations": [
     "C1",
     "C2"
