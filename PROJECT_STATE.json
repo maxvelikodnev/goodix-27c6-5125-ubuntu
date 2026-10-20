@@ -3,8 +3,8 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
-  "phase": "M5.A",
-  "phase_status": "M5A_READY_AWAITING_M5B_LIVE_AUTHORIZATION",
+  "phase": "M5.B",
+  "phase_status": "M5B_CAPTURE_PIPELINE_PASS__CALIBRATION_AUDIT_COMPLETE__M5_LIVE_QUALIFICATION_OPEN__CALIBRATION_BINDING_BLOCKED",
   "completed_gates": [
     "M0_SOURCE_BASELINE",
     "M1_NATIVE_ENGINE_OFFLINE",
@@ -22,21 +22,44 @@
     "production/milan-diagnostic.c",
     "production/prepare-milan-diagnostic.py",
     "libfprint-driver/goodix_milan.c",
+    "libfprint-driver/goodix_config90.c",
+    "libfprint-driver/goodix_runtime_inputs.c",
     "deployment/install.py",
     "deployment/recovery/remove.py",
     "docs/INSTALLATION.md",
+    "docs/UNINSTALL.md",
+    "docs/VALIDATION.md",
     "docs/LICENSING_AND_PROVENANCE.md",
     "development/private-root/analysis/M5_milan/m5a-public-qualification.json",
     "development/private-root/analysis/M5_milan/review-public-rc.json",
-    "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md"
+    "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md",
+    "development/private-root/analysis/M5_milan/M5B_SESSION_RECORD_2026-10-20.md",
+    "development/private-root/analysis/M5_milan/M5B_CALIBRATION_PROVENANCE_AND_BINDING_2026-10-20.md",
+    "development/private-root/analysis/M5_milan/m5b_calib_binding_analysis.py",
+    "development/private-root/analysis/M5_milan/M5B_CALIBRATION_AUDIT_REVIEW_2026-10-20.md",
+    "development/private-root/analysis/M5_milan/m5b-otp-prefix-binding.patch"
   ],
+  "m5b_status": {
+    "capture_pipeline": "PASS",
+    "replay_offline_comparison": "PASS_OPERATOR_ATTESTED_NOT_REVERIFIED_BY_PM",
+    "calibration_prefix_identity": "PROVEN_CALIB_0_16_EQUALS_TARGET_OTP_A6_0_16",
+    "calibration_binding_per_unit": "BLOCKED_OTP_PREFIX_UNIQUENESS_UNKNOWN",
+    "prefix_field_semantics": "UNKNOWN",
+    "calibration_payload_provenance": "WINDOWS_SIDE_MUTABLE_PER_MACHINE_STATE",
+    "live_qualification": "OPEN",
+    "ordinary_milan_authentication": "NO_GO_FAIL_CLOSED_INTACT",
+    "capture_budget_session_20261020_02": "CONSUMED_DO_NOT_REUSE"
+  },
   "current_blockers": [
-    "M5.B capture requires separate explicit authorization in the operator-selected Fedora for canonical installation, root, exclusive real USB, only the pinned protected goodix_calib.dat input, and already-valid local Linux pairing. Optional result transfer and M3 analysis require later specific consent.",
-    "Calibration acquisition/physical binding and original16-byte prefix semantics remain UNKNOWN. Ordinary authentication stays closed; explicit diagnostic-only path is ready."
+    "Per-unit physical binding of goodix_calib.dat stays BLOCKED: association with this reader's OTP A6 prefix is PROVEN over two independent chains, but per-unit uniqueness of OTP[0:16] is UNKNOWN and is not decidable offline with a single unit. Ordinary Milan authentication stays fail-closed.",
+    "M5.B comparator outputs live in root:root 0700 session directories; sudo requires a password here, so comparison.json 13/13 PASS is operator-attested and was not re-executed by AI PM.",
+    "Reproducible calibration source is the mutable Windows-side file C:\\ProgramData\\Goodix\\goodix_calib.dat. Two documented states exist (2026-07-11 snapshot df5fb5ef... and the pinned b7fafd60...), with identical 16-byte prefix, identical model constants and different accumulated gain/setup maps and counters. A fresh extraction would fail the pinned payload hash, so criterion C3 must pin prefix plus structural validation and treat the payload hash as a snapshot identifier.",
+    "Runtime state of the M5.B Fedora VM after session-20261020-02 is not re-verified (Milan runtime installed, fprintd suspension status unknown). Verify and roll back to SIGFM before any further live step.",
+    "Offline M5.B to M3 corpus comparison stays BLOCKED on permissions; the finger that produced the M5.B image is unknown, so no genuine/impostor label, MATCH claim or accuracy rate is permitted."
   ],
   "license_notes": "User decisions: 2026-10-18 candidate.c/policy.c LGPL-2.1-or-later grant settled through seaweeduk PR28 -> AndyHazz e68eb725 -> C1. 2026-10-20 examined native MIT/RVA portions approved for redistribution under established upstream MIT/LGPL provenance; original notices, recipe and hashes preserved. Repository-owner distribution decision, not independent legal certification; no reader data, firmware or OEM binary publication authorized.",
-  "next_action": "Request the single M5_B_LIVE_CALIDATA_AND_AUTHORIZATION gate: pinned local SIGFM recovery, unchanged RC, only protected goodix_calib.dat, one 30s diagnostic capture without E0, local integrity and clean-close checks, then STOP. Historical M3 tools stay solely in the existing analysis environment; transfer only four new outputs plus private integrity manifest if indispensable and separately authorized. No live PASS or ordinary authentication authorized.",
-  "last_verified_head": "388e47e1b8a950d900fe7acd0857eca980e904d1",
+  "next_action": "Owner decision on a single proposed experiment: gate M5B_LIVE_OTP_PREFIX_ATTESTATION, read-only, reusing the already prepared one-capture M5.B diagnostic session, with the minimal fail-closed patch that compares the retained 16-byte envelope prefix against the live OTP A6 evidence inside production_live_preflight_finish and records device_binding=OTP_A6_PREFIX_MATCH. Patch is proposed as a diff in the private audit report and is NOT applied. Its PASS attests fresh per-device association only; it does not prove per-unit uniqueness, does not qualify authentication, FAR/FRR or liveness. No live activity is authorized by this cache.",
+  "last_verified_head": "eb3d094b30520e2eba88c46b73dfa39acefbd018",
   "relevant_corroborations": [
     "C1",
     "C2",
@@ -44,14 +67,14 @@
   ],
   "candidate": "Milan",
   "current_task": {
-    "GOAL": "Separate the portable M5.B Fedora capture from optional historical M3 analysis without changing the RC",
-    "STATE_DELTA": "HEAD 388e47e is documentation/cache-only after RC 1103a49. Gate corrected: capture needs only RC, pinned private caldata and accessible reader with valid local pairing; no historical tools in capture Fedora; no live actions.",
-    "SCOPE": "Existing private M5.B operational gate and minimal non-authoritative state cache",
-    "REQUIRED_WORK": "Document capture-local integrity and STOP; only if indispensable and specifically authorized, transfer four new outputs plus private manifest to existing M3 environment and compare with local reference/caldata; retain canonical install/removal and pinned SIGFM recovery",
-    "VERIFY": "Independent delta review, Bash-block syntax, inline Python AST, JSON and diff checks; accepted RC offline evidence reused, no rebuild",
-    "STOP_IF": "Before root/install/USB/protected caldata/capture without separate specific authorization, and before any later result transfer or M3 analysis without its own specific consent."
+    "GOAL": "Close the calibration provenance/binding question offline and prepare exactly one discriminating gate for the owner",
+    "STATE_DELTA": "M5.B capture and offline replay accepted as documented fact; calibration prefix identified as the target reader's OTP A6 first 16 bytes over two independent chains; per-unit uniqueness still unknown; source shown to be mutable Windows-side state; no tracked file modified by the audit.",
+    "SCOPE": "Private M5 audit report, private M5.B session record, helper script, this non-authoritative cache",
+    "REQUIRED_WORK": "Owner decision on the proposed minimal prefix==live-OTP enforcement patch and on gate M5B_LIVE_OTP_PREFIX_ATTESTATION; separately, decision on criterion C3 pin strategy and on how to obtain a per-unit uniqueness datum",
+    "VERIFY": "Independent review of report, helper and patch premise; recomputation of the prefix/OTP/snapshot equalities; git status clean on the operational branch",
+    "STOP_IF": "Before any USB, root, installation, protected calidata use or capture without separate specific authorization; before any change to AGENTS.md, START.md or ROADMAP.md; before any weakening of the fail-closed ordinary authentication path."
   },
-  "independent_review": "ACCEPT_AND_CONTINUE (public RC offline; live NOT_RUN)",
+  "independent_review": "CORRECTIVE_2026-10-20 CLOSED: reviewer recomputed 8/8 decisive equalities (MATCH) and confirmed the patch premise on 7/7 points; blocking defect was a non-applicable section 6.2 diff, plus an overstated independence claim (evidence rows E3 and E4 are two views of the same wire packet 75; the genuinely independent second channel is the D255 Windows-side capture) and nine qualification defects. Corrective applied and re-verified by AI PM: regenerated patch m5b-otp-prefix-binding.patch passes git apply --check rc 0 (6 hunks, 3 files) and is NOT applied; overclaim wording removed; verdicts unchanged. Report is fit as the decision basis for the binding verdicts and the revised pin strategy, and is not an implementation basis until two known gaps are decided: a MISMATCH poisons the context before metrics.ini is written, and no test seam sets envelope_prefix.",
   "m5a_status": "READY",
   "rc_source_id": "75d611ba175a1375142c4347465c7075a5e9b7a5d4f94bd55b14ad46d42393b8"
 }
