@@ -3,7 +3,7 @@
 
 ## Obiettivo e percorso
 
-Valutare se sostituire il matcher SIGFM sul Goodix `27c6:5125` Fedora 44 KDE con **un solo motore biometrico nativo** che dimostri valore, affidabilità e compatibilità sul sensore reale. Milan Type 17 resta il candidato già in prova (M0–M3); ChicagoHS è una **nuova ipotesi** da studiare offline dopo la raccolta M3, non una compatibilità acquisita.
+Valutare se sostituire il matcher SIGFM sul Goodix `27c6:5125` Fedora 44 KDE con **un solo motore biometrico nativo** che dimostri valore, affidabilità e compatibilità sul sensore reale. Milan Type 17 è il candidato scelto per l'integrazione sperimentale; ChicagoHS è stato valutato come alternativa in M3, ma non entra nella build Milan. Nessun candidato è qualificato per uso produttivo prima dell'esito M5.
 
 **Vincolo architetturale:** conservare il trasporto USB/TLS, il pairing e la cattura del driver attuale; non portare il trasporto SPI del progetto Chicago. Non introdurre matcher ibridi, switch Milan/Chicago/SIGFM nell'installer o modifiche ai servizi stock senza gate separato.
 
@@ -13,7 +13,7 @@ Fonti: `CORROBORATIONS.md` C1/C2 (Milan) e C3 (Chicago). I test differenziali di
 
 ## State machine
 
-`M0 (Milan) → M1 (Milan) → M2 (Milan) → M3 (raccolta + confronto Milan/SIGFM + audit/prova Chicago + decisione) → M4 (candidato scelto) → M5 (live) → M6 (learning opzionale) → valutazione finale`
+`M0 (Milan) → M1 (Milan) → M2 (Milan) → M3 (raccolta + confronto + scelta) → M4 (libfprint candidato offline) → M5 (RC autonoma dal ramo → live su host Fedora) → M6 (learning opzionale) → valutazione finale`
 
 M0–M2 sono **già conclusi per la fattibilità Milan**: non reinterpretarli come PASS di Chicago né rieseguirli per la sola scoperta di C3. Chicago è valutato come candidato indipendente dentro M3 prima di scegliere l'eventuale motore di M4. Ogni nuovo accesso live o modifica del sistema richiede un distinto Human Gate; incompatibilità comprovata o regressione critica comportano `NO_GO` per il candidato interessato.
 
@@ -55,13 +55,16 @@ M0–M2 sono **già conclusi per la fattibilità Milan**: non reinterpretarli co
 - **PURPOSE:** integrare sperimentalmente **Milan oppure Chicago**, non entrambi, in sostituzione di SIGFM per il 5125, mantenendo USB/TLS/pairing/cattura esistenti. Nessun porting del trasporto SPI e nessuna sostituzione preventiva del `fprintd` stock; eventuali necessità aggiuntive richiedono motivazione e consenso specifico. Distinguere i nuovi template da GSF1/SIGFM; non convertire template implicitamente e prevedere enrollment nuovo.
 - **PRIMARY_ARTIFACT:** una sola build candidata Fedora/libfprint, test offline pertinenti e rollback al driver SIGFM. Learning persistente non rientra in M4.
 - **EXIT_GATE:** `M4_LIBFPRINT_CANDIDATE=PASS` se enrollment, verify, identify e regressioni pertinenti passano offline; nessuna installazione automatica.
-- **NEXT:** M5 solo con PASS e autorizzazione live separata.
+- **NEXT:** M5 solo con PASS: prima RC autonoma e installabile dal ramo operativo, poi live sul sensore reale soltanto con autorizzazioni protette separate.
 
-### M5 — Qualificazione sul sensore reale
+### M5 — Release candidate installabile e qualificazione live sul Fedora host
 
-- **PURPOSE:** verificare con l'Utente il **solo candidato M4** sul 5125: enrollment, match/no-match con dita/persone diverse, identify, catture scadenti, login Fedora/KDE, password fallback, riavvio, ripristino, coesistenza Windows e stabilità nell'uso reale rispetto a SIGFM. Non assumere liveness o spoof resistance dal repository sorgente.
-- **PRIMARY_ARTIFACT:** esito live, regressioni, limiti del campione, rollback e decisione `GO/NO_GO`.
-- **EXIT_GATE:** `M5_LIVE_QUALIFICATION=PASS` soltanto se affidabilità almeno comparabile a SIGFM nel campione qualificato, nessun falso match osservato, nessuna regressione critica del login e rollback praticabile; altrimenti `NO_GO`.
+- **PURPOSE:** portare il candidato Milan già integrato in M4 dal solo ambiente privato di sviluppo a **sorgenti autonomi sul ramo Milan**, clonabili e compilabili con il percorso canonico. Qualificare poi sul Fedora host il software effettivamente installabile dagli utenti, non una `.so` copiata manualmente. La RC sperimentale del ramo non è una release ufficiale né una promozione su `main`.
+- **M5.A — RC dal ramo, prima del live:** promuovere esclusivamente codice redistribuibile e necessario dai risultati M4 ai percorsi tracciati del ramo; adeguare **il builder canonico** `production/build-public.py`, Meson, sorgenti/ledger/hash, provenance, manifest, licenze e la documentazione utente pertinente. Un clone pulito del ramo deve poter eseguire il normale `./install.sh` e generare Milan-only, **senza dipendere da `development/`, dalla build M4 privata, da dati biometrici/PSK/calidata privati o da SIGFM/OpenCV/C++**, se questi sono stati rimossi. Non creare installer paralleli, selettori ibridi o workaround manuali. Conservare `fprintd` stock, PAM/KDE/SELinux e la superficie di integrazione esistente. Riusare `deployment/install.py`, `goodix-uninstall` e `goodix-force-remove` con identica semantica: rimozione ordinaria e di emergenza **del solo software**, senza factory reset e senza cancellare pairing o template; reinstallazione SIGFM dal ramo `main` praticabile. Verificare offline build da clone, ABI/dipendenze, integrità e fixture di install/update/rimozione/rollback con review indipendente. Rispettare i vincoli di provenienza/licenza per i file effettivamente importati: **nessun push di sorgenti con redistribuibilità irrisolta**.
+- **M5.A — Prerequisito calidata:** definire e verificare per quanto possibile offline una sorgente e un lifecycle **riproducibili e vincolati al dispositivo** per il calidata Milan corretto. M4 ha escluso l'equivalenza con `FDT_B0`; non incorporare calidata M3/M4, non assumere un binding non provato e non aggirare il fail-closed. Dove la verifica richiede hardware, privilegi o materiale protetto, preparare il minimo Human Gate per M5.B, senza anticiparne l'esecuzione.
+- **M5.B — Test live sul sistema reale:** **solo dopo** una RC autonoma con install/recovery qualificati offline, preparazione del ritorno a SIGFM e autorizzazione esplicita separata per installazione host, privilegi e USB/biometria. Preservare lo stato pairing preesistente; niente nuovo `E0` nella riapertura ordinaria, niente provisioning speculativo e nessuna modifica factory. Verificare prima enrollment/verify/identify Milan, dita differenti, contatti parziali e scadenti; poi KScreenLocker, sudo, PolicyKit, login KDE/password fallback, riavvio, rimozione e reinstallazione SIGFM, coesistenza Windows e stabilità rispetto alla baseline. Arrestarsi su falso match, calibrazione/binding ambiguo, modifica persistente non qualificata o regressione critica. Non assumere liveness o spoof resistance.
+- **PRIMARY_ARTIFACT:** RC Milan tracciabile e installabile dal clone del ramo, recupero canonico dimostrato, evidenze live con limiti del campione e decisione `GO/NO_GO`. Dati sensibili e report operativi restano privati in `development/`.
+- **EXIT_GATE:** `M5_LIVE_QUALIFICATION=PASS` solo se RC realmente autonoma e installabile, calibrazione/binding qualificati, affidabilità almeno comparabile a SIGFM nel campione osservato, nessun falso match osservato, nessuna regressione critica di login e rollback SIGFM concretamente praticabile. In caso contrario `NO_GO` o `BLOCKED` quando mancano prove essenziali; il solo PASS dei test offline o di un'installazione non conclude M5.
 - **NEXT:** M6 solo se il learning del motore scelto promette un beneficio giustificabile; altrimenti valutazione finale.
 
 ### M6 — Apprendimento incrementale (opzionale)
@@ -75,6 +78,6 @@ M0–M2 sono **già conclusi per la fattibilità Milan**: non reinterpretarli co
 
 Candidato qualificato quando `M0`–`M2` attestano la fattibilità **Milan iniziale**, `M3` seleziona motivatamente **Milan o Chicago**, `M4`–`M5` passano per quel candidato e `M6` è PASS oppure DEFERRED. I PASS M0–M2 non costituiscono attestazione tecnica Chicago.
 
-La release pubblica può adottare **un solo motore**. La conservazione di SIGFM su `main` è il rollback, non un fallback ibrido nell'installer. Merge, installazione, aggiornamento di `fprintd` o passaggio a `main` richiedono decisioni ulteriori.
+La release ufficiale su `main` può adottare **un solo motore**. La RC del ramo Milan è sperimentale, clonabile soltanto dopo le verifiche di redistribuibilità; SIGFM su `main` resta il percorso di ripristino, non un fallback ibrido nell'installer. Merge, tag/release ufficiale, installazione host, modifiche a `fprintd` o passaggio a `main` richiedono le rispettive decisioni/autorizzazioni.
 
 I criteri generali di sicurezza, Human Gate, disciplina Git, orchestrazione e documentazione rimangono nei file canonici; `TECHNICAL_MANUAL.md` contiene conoscenza tecnica stabile, **non** cronaca di prove o task agentici. I report operativi restano privati in `development/`.
