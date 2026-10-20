@@ -6,9 +6,9 @@ This page describes the experimental, installable Milan-only RC on
 versioned sources without private development files, reader data or prebuilt
 libraries. It validates source completeness and integrity before requesting sudo.
 
-Milan calibration acquisition and device binding are under study. The explicitly
-controlled M5 diagnostic capture path requires separate authorization; ordinary
-authentication stays closed until calibration is qualified. The private M3 blob
+Milan calibration and live authentication remain experimental. The M5.B capture
+client and the separate M5.C enrollment/verify/identify mode require explicit
+authorization; ordinary authentication stays closed until it is qualified. The private M3 blob
 is not shipped or required to install the software. Host installation and
 real-reader testing require separate consent for M5. SIGFM hardware results in
 [validation](VALIDATION.md) do not qualify Milan.
@@ -34,9 +34,11 @@ You need Git, network access for the public clone and Fedora packages, and disk
 space for a native source build. The software builder needs no private development tree, precompiled library,
 Windows files, PSK, calibration or template. It builds only Milan C sources and
 does not require OpenCV or a C++ compiler. Reader-specific Milan calibration is
-a separate runtime prerequisite under investigation. Do not substitute `FDT_B0`
-or provision private calibration through ordinary installation. The protected
-M5 diagnostic procedure is separate from installation. The installer does not
+a separate runtime prerequisite. The experimental M5.C path uses the qualified
+Windows snapshot and requires its envelope prefix to match the current preflight
+OTP. Background initialization is a separate offline investigation; do not
+substitute it for the snapshot or provision private calibration through ordinary
+installation. The protected M5 procedure is separate from installation. The installer does not
 open USB.
 
 ## Install, update or reinstall
@@ -138,12 +140,31 @@ An ordinary reopen with a valid Linux pairing performs no `E0`. Every qualified
 transaction retains the one-write limit, durable journal, byte-for-byte
 `BB010002` preservation, readback/hash/TLS proof and fail-closed behavior.
 Ordinary Milan authentication stops while calibration remains unqualified.
-The separately authorized diagnostic path permits only controlled capture;
+The separately authorized M5.B diagnostic path permits only controlled capture;
 it does not grant enrollment, verify, identify or PAM access. Stock libfprint
 may already have opened a USB handle before an ordinary action is refused.
 
 Advanced users may clone elsewhere: the installer resolves its own location.
 The standard procedure above needs no override.
+
+### Private M5.C experiment
+
+After a separately approved operator gate, the installed
+`goodix-milan-diagnostic --m5c enroll|verify|identify --session PRIVATE_DIRECTORY`
+uses an explicit process-local experimental capability. Prepare a new root-only
+session with `prepare-milan-diagnostic.py --experimental-enrollment` and the
+qualified snapshot's expected hashes. A consumed M5.B session is not an M5.C
+authorization. The preparation help describes the required arguments.
+
+The driver validates private file ownership/modes, calibration structure and
+the envelope's 16-byte equality with the existing live OTP preflight. Any failure
+stops the action. This association does not establish universal OTP uniqueness
+or biometric safety. Existing active pairing is required; this private mode
+cannot provision pairing. The session allows one enrollment and at most three
+verify/identify attempts combined, stopping at the first match. Its new Milan
+template remains in the private session, outside the stock fprintd gallery.
+This mode does not enable KDE/PAM/login authentication. Both helpers support
+`--offline-check` without opening protected data or enumerating USB.
 
 ## Enrollment and basic verification
 

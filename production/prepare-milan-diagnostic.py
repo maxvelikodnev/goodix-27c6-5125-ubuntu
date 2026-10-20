@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Prepare one private M5.B diagnostic session; never USB, pairing or auth."""
+"""Prepare a private M5.B capture or M5.C enrollment session; never USB or pairing."""
 import argparse
 import hashlib
 import os
@@ -48,7 +48,7 @@ def open_directory(path):
         raise
 
 
-def read_source(path):
+def read_source(path, require_private=False):
     directory_fd = open_directory(path.parent)
     try:
         fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK, dir_fd=directory_fd)
@@ -56,6 +56,8 @@ def read_source(path):
             before = os.fstat(fd)
             if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size != 140480:
                 raise ValueError('source must be a single regular exact-size M3 envelope')
+            if require_private and (before.st_uid != 0 or stat.S_IMODE(before.st_mode) != 0o600):
+                raise ValueError('M5.C source must already be root-owned mode0600')
             data = bytearray()
             while len(data) < 140481:
                 part = os.read(fd, 140481 - len(data))
@@ -97,9 +99,11 @@ def main():
     parser.add_argument('--expected-sha256', help='M3 envelope hash from the private qualification report')
     parser.add_argument('--expected-payload-sha256', help='M3 payload hash from the private qualification report')
     parser.add_argument('--ack-binding-unknown', action='store_true')
+    parser.add_argument('--experimental-enrollment', action='store_true',
+                        help='explicit M5.C private session; current OTP equality remains mandatory at runtime')
     args = parser.parse_args()
     if args.offline_check:
-        if args.source or args.session or args.ack_binding_unknown or args.expected_sha256 or args.expected_payload_sha256:
+        if args.source or args.session or args.ack_binding_unknown or args.experimental_enrollment or args.expected_sha256 or args.expected_payload_sha256:
             parser.error('--offline-check does not accept protected-data options')
         payload = bytearray(140464)
         payload[0x22490:0x22490 + 20] = b'Preprocess_v_1.01.01'
@@ -125,7 +129,7 @@ def main():
     os.umask(0o077)
     if not args.source.is_absolute() or not args.session.is_absolute() or 'development' not in args.session.parts:
         parser.error('source/session must be absolute; session must be inside private development/')
-    data = read_source(args.source)
+    data = read_source(args.source, require_private=args.experimental_enrollment)
     try:
         full_hash, payload_hash = validate(data, args.expected_sha256, args.expected_payload_sha256)
         parent_fd = open_directory(args.session.parent)
@@ -137,7 +141,8 @@ def main():
             fd = os.open(args.session.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent_fd)
             try:
                 write_private(fd, 'calidata.dat', data)
-                receipt = ('[M5B]\nschema=1\npurpose=M5.B_CAPTURE_ONLY\n'
+                purpose = 'M5.C_PRIVATE_ENROLL_VERIFY' if args.experimental_enrollment else 'M5.B_CAPTURE_ONLY'
+                receipt = (f'[M5B]\nschema=1\npurpose={purpose}\n'
                            'source=M3_USER_DECLARED_WINDOWS_COPY\ndevice_binding=UNKNOWN\nprefix_semantics=UNKNOWN\n'
                            f'envelope_sha256={full_hash}\npayload_sha256={payload_hash}\n')
                 write_private(fd, 'receipt.ini', receipt.encode())
@@ -149,7 +154,9 @@ def main():
             os.close(parent_fd)
     finally:
         data[:] = bytes(len(data))
-    print('M5B_PREPARED=PASS BINDING=UNKNOWN CAPTURE_BUDGET=1 SOURCE_UNCHANGED=true')
+    print('M5C_PREPARED=PASS OTP_BINDING=REQUIRED ENROLL_BUDGET=1 PROBE_BUDGET=3 SOURCE_UNCHANGED=true'
+          if args.experimental_enrollment else
+          'M5B_PREPARED=PASS BINDING=UNKNOWN CAPTURE_BUDGET=1 SOURCE_UNCHANGED=true')
 
 
 if __name__ == '__main__':

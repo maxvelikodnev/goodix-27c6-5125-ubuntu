@@ -8,15 +8,18 @@
 #include "fpi-print.h"
 #include "file_storage.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <glib/gstdio.h>
 #include <string.h>
 #include <math.h>
 #include <unistd.h>
 #include "521d-calidata.h"
+#include "goodix_config90.h"
 
 typedef struct {
   gchar *root, *development, *directory, *data_path, *receipt_path;
   guint8 *envelope;
+  gboolean experimental;
 } SyntheticSession;
 
 static void
@@ -25,8 +28,9 @@ write_synthetic_session (SyntheticSession *session)
   g_autofree gchar *full = g_compute_checksum_for_data (G_CHECKSUM_SHA256, session->envelope, GOODIX_MILAN_CALIDATA_ENVELOPE);
   g_autofree gchar *payload = g_compute_checksum_for_data (G_CHECKSUM_SHA256, session->envelope + 16, GOODIX_MILAN_CALIDATA_ENVELOPE - 16);
   g_autofree gchar *receipt = g_strdup_printf (
-    "[M5B]\nschema=1\npurpose=M5.B_CAPTURE_ONLY\nsource=M3_USER_DECLARED_WINDOWS_COPY\n"
-    "device_binding=UNKNOWN\nprefix_semantics=UNKNOWN\nenvelope_sha256=%s\npayload_sha256=%s\n", full, payload);
+    "[M5B]\nschema=1\npurpose=%s\nsource=M3_USER_DECLARED_WINDOWS_COPY\n"
+    "device_binding=UNKNOWN\nprefix_semantics=UNKNOWN\nenvelope_sha256=%s\npayload_sha256=%s\n",
+    session->experimental ? "M5.C_PRIVATE_ENROLL_VERIFY" : "M5.B_CAPTURE_ONLY", full, payload);
   g_assert_true (g_file_set_contents (session->data_path, (const gchar *) session->envelope, GOODIX_MILAN_CALIDATA_ENVELOPE, NULL));
   g_assert_cmpint (g_chmod (session->data_path, 0600), ==, 0);
   g_assert_true (g_file_set_contents (session->receipt_path, receipt, -1, NULL));
@@ -57,7 +61,7 @@ synthetic_session (void)
 static void
 clear_synthetic_session (SyntheticSession *session)
 {
-  const gchar *names[] = { "calidata.dat", "receipt.ini", "capture.started", "capture.raw-u16le", "capture.preprocessed-u8", "metrics.ini" };
+  const gchar *names[] = { "calidata.dat", "receipt.ini", "capture.started", "capture.raw-u16le", "capture.preprocessed-u8", "metrics.ini", "enroll.started", "probe-1.started", "probe-2.started", "probe-3.started", "match.stop" };
   for (guint i = 0; i < G_N_ELEMENTS (names); i++)
     { g_autofree gchar *path = g_build_filename (session->directory, names[i], NULL); g_unlink (path); }
   g_assert_cmpint (g_rmdir (session->directory), ==, 0);
@@ -71,20 +75,22 @@ static void
 assert_synthetic_rejected (SyntheticSession *session)
 {
   g_autoptr(GError) error = NULL;
-  g_assert_null (goodix_milan_test_load (session->directory, &error));
+  g_assert_null (session->experimental ? goodix_milan_test_load_experimental (session->directory, &error) : goodix_milan_test_load (session->directory, &error));
   g_assert_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID);
 }
 
 static void
-test_experimental_loader (void)
+test_experimental_loader_mode (gboolean experimental)
 {
   SyntheticSession session = synthetic_session ();
+  session.experimental = experimental; write_synthetic_session (&session);
   g_autoptr(GError) error = NULL;
-  GoodixMilan *milan = goodix_milan_test_load (session.directory, &error);
+  GoodixMilan *milan = experimental ? goodix_milan_test_load_experimental (session.directory, &error) : goodix_milan_test_load (session.directory, &error);
   g_assert_nonnull (milan); g_assert_no_error (error);
-  g_assert_true (goodix_milan_is_diagnostic (milan));
-  g_assert_false (goodix_milan_enroll_start (milan, &error));
-  g_assert_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID); g_clear_error (&error);
+  g_assert_cmpint (goodix_milan_is_diagnostic (milan), ==, !experimental);
+  g_assert_cmpint (goodix_milan_is_experimental (milan), ==, experimental);
+  g_assert_cmpint (goodix_milan_enroll_start (milan, &error), ==, experimental);
+  if (!experimental) { g_assert_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID); g_clear_error (&error); }
   goodix_milan_free (milan);
   g_assert_cmpint (g_chmod (session.directory, 0755), ==, 0); assert_synthetic_rejected (&session);
   g_assert_cmpint (g_chmod (session.directory, 0700), ==, 0);
@@ -94,6 +100,7 @@ test_experimental_loader (void)
   g_assert_cmpint (g_chmod (session.receipt_path, 0600), ==, 0);
   g_autofree gchar *saved = g_strconcat (session.data_path, ".saved", NULL);
   g_assert_cmpint (g_rename (session.data_path, saved), ==, 0);
+  assert_synthetic_rejected (&session); /* absent */
   g_assert_cmpint (symlink (saved, session.data_path), ==, 0); assert_synthetic_rejected (&session);
   g_assert_cmpint (g_unlink (session.data_path), ==, 0);
   g_assert_cmpint (g_rename (saved, session.data_path), ==, 0);
@@ -119,6 +126,70 @@ test_experimental_loader (void)
   if (geteuid () != 0) { g_assert_null (goodix_milan_load (session.directory, &error)); g_assert_nonnull (error); g_clear_error (&error); }
   clear_synthetic_session (&session);
   g_print ("MILAN_M5B_LOADER synthetic_valid=1 permissions=1 symlink=1 hardlink=1 truncation=1 drift_hash=1 version=1 both_CRC=1 range=1 classifier=1 provenance=1 no_private_data=1\n");
+}
+
+static void test_experimental_loader (void) { test_experimental_loader_mode (FALSE); }
+static void test_m5c_loader (void) { test_experimental_loader_mode (TRUE); }
+
+static void
+test_otp_binding_and_budgets (void)
+{
+  SyntheticSession session = synthetic_session ();
+  session.experimental = TRUE;
+  for (guint i = 0; i < 16; i++) session.envelope[i] = (guint8) (i + 1);
+  write_synthetic_session (&session);
+  guint8 otp[GOODIX_CONFIG90_OTP_LENGTH] = { 0 };
+  memcpy (otp, session.envelope, 16);
+  g_autoptr(GError) error = NULL;
+  /* Neither purpose can be silently upgraded/downgraded. */
+  g_assert_null (goodix_milan_test_load (session.directory, &error)); g_clear_error (&error);
+  GoodixMilan *milan = goodix_milan_test_load_experimental (session.directory, &error);
+  g_assert_nonnull (milan); g_assert_no_error (error);
+  g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "UNKNOWN");
+  int same = open (session.directory, O_RDONLY | O_DIRECTORY), other = open (session.root, O_RDONLY | O_DIRECTORY);
+  g_assert_true (goodix_milan_uses_directory (milan, same));
+  g_assert_false (goodix_milan_uses_directory (milan, other));
+  g_assert_false (goodix_milan_uses_directory (milan, -1));
+  close (same); close (other);
+  g_assert_null (goodix_milan_test_load_experimental (session.directory, &error)); g_clear_error (&error);
+  g_assert_true (goodix_milan_bind_to_otp (milan, otp, sizeof otp));
+  g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "OTP_A6_PREFIX_MATCH");
+  g_assert_false (goodix_milan_bind_to_otp (milan, NULL, sizeof otp));
+  g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "UNKNOWN");
+  g_assert_true (goodix_milan_bind_to_otp (milan, otp, sizeof otp));
+  g_assert_false (goodix_milan_bind_to_otp (milan, otp, 16));
+  g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "UNKNOWN");
+  otp[0] ^= 1; g_assert_false (goodix_milan_bind_to_otp (milan, otp, sizeof otp)); otp[0] ^= 1;
+  guint16 raw[GOODIX_MILAN_PIXELS] = { 0 }; GoodixMilanSample sample;
+  g_assert_false (goodix_5125_milan_preprocess (milan, raw, GOODIX_MILAN_PIXELS, &sample, &error));
+  g_assert_nonnull (strstr (error->message, "OTP binding")); g_clear_error (&error);
+  g_assert_true (goodix_milan_begin_experimental_action (milan, FPI_DEVICE_ACTION_ENROLL, &error));
+  g_assert_true (goodix_milan_enroll_start (milan, &error)); goodix_milan_enroll_clear (milan);
+  g_assert_false (goodix_milan_begin_experimental_action (milan, FPI_DEVICE_ACTION_ENROLL, &error)); g_clear_error (&error);
+  for (guint attempt = 0; attempt < 3; attempt++)
+    {
+      g_assert_true (goodix_milan_begin_experimental_action (milan, attempt == 1 ? FPI_DEVICE_ACTION_IDENTIFY : FPI_DEVICE_ACTION_VERIFY, &error));
+      g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "UNKNOWN");
+      g_assert_true (goodix_milan_bind_to_otp (milan, otp, sizeof otp));
+    }
+  goodix_milan_free (milan);
+  milan = goodix_milan_test_load_experimental (session.directory, &error);
+  g_assert_nonnull (milan);
+  g_assert_false (goodix_milan_begin_experimental_action (milan, FPI_DEVICE_ACTION_VERIFY, &error)); g_clear_error (&error);
+  goodix_milan_free (milan); clear_synthetic_session (&session);
+
+  session = synthetic_session (); session.experimental = TRUE; write_synthetic_session (&session);
+  memset (otp, 0, sizeof otp);
+  milan = goodix_milan_test_load_experimental (session.directory, &error);
+  g_assert_true (goodix_milan_begin_experimental_action (milan, FPI_DEVICE_ACTION_VERIFY, &error));
+  g_assert_true (goodix_milan_bind_to_otp (milan, otp, sizeof otp));
+  g_assert_true (goodix_milan_record_match (milan, &error));
+  goodix_milan_free (milan);
+  milan = goodix_milan_test_load_experimental (session.directory, &error);
+  g_assert_false (goodix_milan_begin_experimental_action (milan, FPI_DEVICE_ACTION_IDENTIFY, &error)); g_clear_error (&error);
+  g_assert_false (goodix_milan_begin_experimental_action (milan, FPI_DEVICE_ACTION_ENROLL, &error)); g_clear_error (&error);
+  goodix_milan_free (milan); clear_synthetic_session (&session);
+  g_print ("M5C_OTP_AND_BUDGET MATCH=1 MISMATCH=1 stale_binding_reset=1 lock=1 purpose=1 max3_combined_persistent=1 stop_match=1 no_private_data=1\n");
 }
 
 typedef struct { gboolean done; FpImage *image; GError *error; } Capture;
@@ -175,6 +246,8 @@ test_experimental_capture_and_auth_gate (void)
   g_test_expect_message ("libfprint-image_device", G_LOG_LEVEL_WARNING, "*ACTIVATING to FPI_IMAGE_DEVICE_STATE_ACTIVATING*");
   fp_device_capture (FP_DEVICE (device), TRUE, NULL, capture_done, &capture);
   g_test_assert_expected_messages ();
+  guint8 otp[GOODIX_CONFIG90_OTP_LENGTH] = { 0 };
+  g_assert_true (goodix_device_context_test_milan_bind (ctx, otp, sizeof otp));
   goodix_device_context_emit_arm_complete (ctx, NULL);
   uint16_t raw[GOODIX_MILAN_PIXELS];
   for (guint i = 0; i < GOODIX_MILAN_PIXELS; i++)
@@ -240,6 +313,112 @@ test_experimental_cancel (void)
   g_assert_no_error (error); g_assert_null (goodix_fpimage_device_get_context (device));
   clear_synthetic_session (&session);
   g_print ("MILAN_M5B_CANCEL terminal_once=1 no_rearm=1 close_released=1\n");
+}
+
+typedef struct { gboolean done; FpPrint *print; GError *error; } Enrollment;
+static void enrollment_done (GObject *object, GAsyncResult *result, gpointer data)
+{
+  Enrollment *enrollment = data;
+  enrollment->print = fp_device_enroll_finish (FP_DEVICE (object), result, &enrollment->error);
+  enrollment->done = TRUE;
+}
+
+static void
+test_m5c_preflight_lifecycle (void)
+{
+  for (guint mismatch = 0; mismatch < 2; mismatch++)
+    {
+      SyntheticSession session = synthetic_session (); session.experimental = TRUE; write_synthetic_session (&session);
+      g_autoptr(GError) error = NULL;
+      g_autoptr(GoodixFpImageDevice) device = goodix_fpimage_device_new ();
+      g_autoptr(GCancellable) cancel = g_cancellable_new ();
+      g_assert_true (fp_device_open_sync (FP_DEVICE (device), NULL, &error));
+      GoodixDeviceContext *ctx = goodix_fpimage_device_get_context (device);
+      gboolean armed = TRUE;
+      g_signal_emit_by_name (device, "goodix-milan-experimental-arm", session.directory, -1, &armed);
+      g_assert_false (armed); /* production signal does not accept fake transport */
+      g_assert_true (goodix_device_context_test_milan_experimental_arm (ctx, session.directory, &error));
+      g_assert_false (goodix_device_context_test_milan_pairing_activation (ctx, &error));
+      g_assert_nonnull (strstr (error->message, "active pairing")); g_clear_error (&error);
+      g_assert_cmpuint (goodix_device_context_get_backend_command_count (ctx), ==, 0);
+      g_autoptr(FpPrint) print = g_object_ref_sink (fp_print_new (FP_DEVICE (device)));
+      Enrollment result = { 0 };
+      fp_device_enroll (FP_DEVICE (device), print, cancel, NULL, NULL, NULL, enrollment_done, &result);
+      guint8 otp[GOODIX_CONFIG90_OTP_LENGTH] = { 0 }; otp[0] = (guint8) mismatch;
+      g_assert_cmpint (goodix_device_context_test_milan_bind (ctx, otp, sizeof otp), ==, !mismatch);
+      if (!mismatch)
+        {
+          goodix_device_context_emit_arm_complete (ctx, NULL);
+          g_cancellable_cancel (cancel);
+        }
+      gint64 until = g_get_monotonic_time () + 3000000;
+      while (!result.done && g_get_monotonic_time () < until)
+        { while (g_main_context_pending (NULL)) g_main_context_iteration (NULL, FALSE); g_usleep (1000); }
+      g_assert_true (result.done); g_assert_null (result.print);
+      if (mismatch) g_assert_error (result.error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID);
+      else g_assert_error (result.error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+      g_clear_error (&result.error);
+      g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (ctx), ==, 0);
+      g_assert_true (fp_device_close_sync (FP_DEVICE (device), NULL, &error)); g_assert_no_error (error);
+      g_assert_null (goodix_fpimage_device_get_context (device));
+      g_autofree gchar *metrics = g_build_filename (session.directory, "metrics.ini", NULL);
+      g_assert_false (g_file_test (metrics, G_FILE_TEST_EXISTS)); /* never invent terminal-error metrics */
+      g_assert_true (fp_device_open_sync (FP_DEVICE (device), NULL, &error));
+      ctx = goodix_fpimage_device_get_context (device);
+      g_assert_false (goodix_device_context_test_milan_experimental_arm (ctx, session.directory, &error));
+      g_assert_cmpuint (goodix_device_context_get_backend_command_count (ctx), ==, 0);
+      g_assert_true (fp_device_close_sync (FP_DEVICE (device), NULL, &error));
+      clear_synthetic_session (&session);
+    }
+  g_print ("M5C_PREFLIGHT positive_reaches_enrollment=1 mismatch_terminal=1 cancel_cleanup=1 no_pairing=1 no_metrics_claim=1 close_reopen_closed=1\n");
+}
+
+static void
+test_m5c_gsf1_and_admission (void)
+{
+  for (guint identify = 0; identify < 2; identify++)
+    {
+      SyntheticSession session = synthetic_session (); session.experimental = TRUE; write_synthetic_session (&session);
+      g_autoptr(GoodixFpImageDevice) device = goodix_fpimage_device_new ();
+      g_autoptr(GError) error = NULL;
+      g_assert_true (fp_device_open_sync (FP_DEVICE (device), NULL, &error));
+      GoodixDeviceContext *ctx = goodix_fpimage_device_get_context (device);
+      g_assert_true (goodix_device_context_test_milan_experimental_arm (ctx, session.directory, &error));
+      g_autoptr(GBytes) gsf = g_bytes_new_static ("GSF1not-a-milan-template", 23);
+      /* Even forged Milan outer identity cannot admit a legacy payload. */
+      g_autoptr(FpPrint) print = g_object_ref_sink (goodix_milan_template_print (FP_DEVICE (device), gsf));
+      gboolean matched = FALSE;
+      if (!identify)
+        g_assert_false (fp_device_verify_sync (FP_DEVICE (device), print, NULL, NULL, NULL, &matched, NULL, &error));
+      else
+        {
+          g_autoptr(GPtrArray) gallery = g_ptr_array_new ();
+          g_ptr_array_add (gallery, print);
+          g_assert_false (fp_device_identify_sync (FP_DEVICE (device), gallery, NULL, NULL, NULL, NULL, NULL, &error));
+        }
+      g_assert_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID); g_clear_error (&error);
+      g_assert_false (matched);
+      g_assert_cmpuint (goodix_device_context_get_backend_command_count (ctx), ==, 0);
+      g_assert_true (fp_device_close_sync (FP_DEVICE (device), NULL, &error));
+      clear_synthetic_session (&session);
+    }
+  SyntheticSession session = synthetic_session ();
+  g_autoptr(GError) error = NULL;
+  GoodixMilan *milan = goodix_milan_new (session.envelope + 16, GOODIX_MILAN_CALIDATA_ENVELOPE - 16, &error);
+  g_assert_nonnull (milan); g_assert_no_error (error);
+  g_assert_true (goodix_milan_enroll_start (milan, &error));
+  GoodixMilanSample sample = { .quality = 80, .coverage = 100, .feature_count = 0 };
+  g_autoptr(GBytes) bytes = NULL;
+  g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
+  sample.feature_count = 10; sample.tag = 1;
+  g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
+  sample.tag = 0; sample.quality = 24;
+  g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
+  sample.quality = 80; sample.coverage = 64;
+  g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
+  g_assert_cmpuint (goodix_milan_enroll_progress (milan), ==, 0);
+  goodix_milan_free (milan); clear_synthetic_session (&session);
+  g_print ("M5C_GSF1 verify_identify_reject_before_acquire=1 forged_identity_rejected=1 admission_thresholds_unchanged=1\n");
 }
 
 static void
@@ -388,5 +567,9 @@ main (int argc, char **argv)
   g_test_add_func ("/milan-contract/experimental-loader", test_experimental_loader);
   g_test_add_func ("/milan-contract/experimental-capture-auth-gate", test_experimental_capture_and_auth_gate);
   g_test_add_func ("/milan-contract/experimental-cancel", test_experimental_cancel);
+  g_test_add_func ("/milan-contract/m5c-loader", test_m5c_loader);
+  g_test_add_func ("/milan-contract/otp-binding-and-budgets", test_otp_binding_and_budgets);
+  g_test_add_func ("/milan-contract/m5c-preflight-lifecycle", test_m5c_preflight_lifecycle);
+  g_test_add_func ("/milan-contract/m5c-gsf1-admission", test_m5c_gsf1_and_admission);
   return g_test_run ();
 }

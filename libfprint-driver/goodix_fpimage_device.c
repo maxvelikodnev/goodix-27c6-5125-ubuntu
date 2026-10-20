@@ -179,7 +179,7 @@ typedef struct
   gboolean last_production_audit_logged;
 #ifdef GOODIX_LIBFPRINT_MILAN
   /* Stays set across context disposal/close/reopen. Never a daemon opt-in. */
-  gboolean milan_diagnostic_only;
+  gboolean milan_diagnostic_only, milan_experimental_only;
 #endif
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeCoordinatorAcquireSeam acquire_material;
@@ -769,10 +769,10 @@ production_start_pairing_activation (
 #ifdef GOODIX_LIBFPRINT_MILAN
   /* This refusal precedes key generation, local journals and the only E0
    * writer. Diagnostic binding evidence cannot authorize a pairing change. */
-  if (goodix_milan_is_diagnostic (ctx->milan))
+  if (goodix_milan_is_diagnostic (ctx->milan) || goodix_milan_is_experimental (ctx->milan))
     {
       g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-                           "M5.B diagnostic capture requires active pairing; restore pairing separately before retrying");
+                           "M5 private session requires active pairing; restore pairing separately before retrying");
       return FALSE;
     }
 #endif
@@ -836,6 +836,23 @@ goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx, G
 }
 #endif
 
+#ifdef GOODIX_LIBFPRINT_MILAN
+static gboolean
+context_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size)
+{
+  if (ctx->milan && !goodix_milan_bind_to_otp (ctx->milan, otp, size))
+    {
+      goodix_live_preflight_free (ctx->live_preflight);
+      ctx->live_preflight = NULL;
+      context_protocol_failure (ctx, g_error_new_literal (
+        FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
+        "Milan calibration is not bound to this reader's OTP"));
+      return FALSE;
+    }
+  return TRUE;
+}
+#endif
+
 static void
 production_live_preflight_finish (GoodixDeviceContext *ctx)
 {
@@ -853,6 +870,11 @@ production_live_preflight_finish (GoodixDeviceContext *ctx)
     }
   goodix_fpi_usb_backend_set_out_completed_callback (ctx->fpi_usb_backend,
                                                       NULL, NULL);
+#ifdef GOODIX_LIBFPRINT_MILAN
+  /* Existing A6 evidence only; bind before material acquisition, TLS or E0. */
+  if (!context_milan_bind (ctx, evidence.otp, sizeof evidence.otp))
+    { OPENSSL_cleanse (&evidence, sizeof evidence); return; }
+#endif
   if (ctx->runtime_material != NULL)
     {
       ready = production_live_preflight_validate_legacy_target (
@@ -2432,6 +2454,9 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
       return;
     }
+  if (goodix_milan_is_experimental (ctx->milan) &&
+      !goodix_milan_begin_experimental_action (ctx->milan, action, &error))
+    goto milan_activation_failed;
   if (action == FPI_DEVICE_ACTION_ENROLL && !goodix_milan_enroll_start (ctx->milan, &error))
     goto milan_activation_failed;
   if (action == FPI_DEVICE_ACTION_VERIFY)
@@ -2882,7 +2907,7 @@ login_prepare (GoodixFpImageDevice *self)
   g_autoptr(GError) error = NULL;
 #ifdef GOODIX_LIBFPRINT_MILAN
   GoodixFpImageDevicePrivate *priv = goodix_fpimage_device_get_instance_private (self);
-  if (priv->milan_diagnostic_only) return FALSE;
+  if (priv->milan_diagnostic_only || priv->milan_experimental_only) return FALSE;
 #endif
 
   if (!goodix_fpimage_device_is_production_usb (self) || ctx == NULL ||
@@ -2918,7 +2943,7 @@ milan_diagnostic_arm (GoodixFpImageDevice *self, const gchar *directory)
   GoodixFpImageDevicePrivate *priv = goodix_fpimage_device_get_instance_private (self);
   g_autoptr(GError) error = NULL;
   if (!goodix_fpimage_device_is_production_usb (self) || !ctx || !fp_device_is_open (FP_DEVICE (self)) ||
-      priv->milan_diagnostic_only || ctx->milan || ctx->production_action_consumed ||
+      priv->milan_diagnostic_only || priv->milan_experimental_only || ctx->milan || ctx->production_action_consumed ||
       ctx->production_logical_action_attempt_count || ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
       ctx->login_preparing || ctx->login_series || ctx->poisoned || ctx->usb_interface_claimed ||
       fpi_device_get_current_action (FP_DEVICE (self)) != FPI_DEVICE_ACTION_NONE)
@@ -2926,6 +2951,28 @@ milan_diagnostic_arm (GoodixFpImageDevice *self, const gchar *directory)
   ctx->milan = goodix_milan_load (directory, &error);
   if (!ctx->milan) { g_warning ("M5.B diagnostic arm rejected: %s", error->message); return FALSE; }
   priv->milan_diagnostic_only = TRUE;
+  return TRUE;
+}
+
+static gboolean
+milan_experimental_arm (GoodixFpImageDevice *self, const gchar *directory, gint directory_fd)
+{
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
+  GoodixFpImageDevicePrivate *priv = goodix_fpimage_device_get_instance_private (self);
+  g_autoptr(GError) error = NULL;
+  if (!goodix_fpimage_device_is_production_usb (self) || !ctx || !fp_device_is_open (FP_DEVICE (self)) ||
+      priv->milan_diagnostic_only || priv->milan_experimental_only || ctx->milan || ctx->production_action_consumed ||
+      ctx->production_logical_action_attempt_count || ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
+      ctx->login_preparing || ctx->login_series || ctx->poisoned || ctx->usb_interface_claimed ||
+      fpi_device_get_current_action (FP_DEVICE (self)) != FPI_DEVICE_ACTION_NONE)
+    return FALSE;
+  ctx->milan = goodix_milan_load_experimental (directory, &error);
+  if (!ctx->milan) { g_warning ("M5.C arm rejected: %s", error->message); return FALSE; }
+  /* Client template I/O must use the exact retained directory inode, even if a
+   * user-owned ancestor was renamed while resolving either path. */
+  if (!goodix_milan_uses_directory (ctx->milan, directory_fd))
+    { goodix_milan_free (ctx->milan); ctx->milan = NULL; return FALSE; }
+  priv->milan_experimental_only = TRUE;
   return TRUE;
 }
 
@@ -2939,7 +2986,17 @@ milan_raw_match (FpImageDevice *dev, FpPrint *reference, FpPrint *probe, GError 
                            "M5.B diagnostic calibration cannot authenticate");
       return FPI_MATCH_ERROR;
     }
-  return goodix_milan_match (dev, reference, probe, error);
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (GOODIX_FPIMAGE_DEVICE (dev));
+  if (priv->milan_experimental_only &&
+      (!ctx || strcmp (goodix_milan_device_binding (ctx->milan), "OTP_A6_PREFIX_MATCH")))
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID, "M5.C current OTP binding required");
+      return FPI_MATCH_ERROR;
+    }
+  FpiMatchResult result = goodix_milan_match (dev, reference, probe, error);
+  if (result == FPI_MATCH_SUCCESS && priv->milan_experimental_only && !goodix_milan_record_match (ctx->milan, error))
+    return FPI_MATCH_ERROR;
+  return result;
 }
 #endif
 
@@ -2959,6 +3016,9 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
 #ifdef GOODIX_LIBFPRINT_MILAN
   /* Explicit process-local call by the diagnostic client. No environment,
    * process-name checks or fprintd policy enables this signal automatically. */
+  g_signal_new_class_handler ("goodix-milan-experimental-arm", G_TYPE_FROM_CLASS (klass),
+                              G_SIGNAL_RUN_LAST, G_CALLBACK (milan_experimental_arm),
+                              NULL, NULL, NULL, G_TYPE_BOOLEAN, 2, G_TYPE_STRING, G_TYPE_INT);
   g_signal_new_class_handler ("goodix-milan-diagnostic-arm", G_TYPE_FROM_CLASS (klass),
                               G_SIGNAL_RUN_LAST, G_CALLBACK (milan_diagnostic_arm),
                               NULL, NULL, NULL, G_TYPE_BOOLEAN, 1, G_TYPE_STRING);
@@ -3246,12 +3306,29 @@ goodix_device_context_test_milan_diagnostic_arm (GoodixDeviceContext *ctx, const
   GoodixFpImageDevicePrivate *priv;
   if (!ctx || ctx->milan || ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE) return FALSE;
   priv = goodix_fpimage_device_get_instance_private (ctx->device);
-  if (priv->milan_diagnostic_only) return FALSE;
+  if (priv->milan_diagnostic_only || priv->milan_experimental_only) return FALSE;
   ctx->milan = goodix_milan_test_load (directory, error);
   if (!ctx->milan) return FALSE;
   priv->milan_diagnostic_only = TRUE;
   return TRUE;
 }
+
+gboolean
+goodix_device_context_test_milan_experimental_arm (GoodixDeviceContext *ctx, const gchar *directory, GError **error)
+{
+  GoodixFpImageDevicePrivate *priv;
+  if (!ctx || ctx->milan || ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE) return FALSE;
+  priv = goodix_fpimage_device_get_instance_private (ctx->device);
+  if (priv->milan_diagnostic_only || priv->milan_experimental_only) return FALSE;
+  ctx->milan = goodix_milan_test_load_experimental (directory, error);
+  if (!ctx->milan) return FALSE;
+  priv->milan_experimental_only = TRUE;
+  return TRUE;
+}
+
+gboolean
+goodix_device_context_test_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size)
+{ return context_milan_bind (ctx, otp, size); }
 
 gboolean
 goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,

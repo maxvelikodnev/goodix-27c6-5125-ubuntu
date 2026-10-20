@@ -397,6 +397,9 @@ gboolean goodix_device_context_test_milan_pairing_activation (GoodixDeviceContex
 /* Offline inert-byte seam; no file, key, sensor or privileged operation. */
 gboolean goodix_device_context_test_milan_diagnostic_arm (GoodixDeviceContext *ctx,
                                                         const gchar *directory, GError **error);
+gboolean goodix_device_context_test_milan_experimental_arm (GoodixDeviceContext *ctx,
+                                                           const gchar *directory, GError **error);
+gboolean goodix_device_context_test_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size);
 gboolean goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,
                                                        const guint8 *payload,
                                                        gsize size, GError **error);

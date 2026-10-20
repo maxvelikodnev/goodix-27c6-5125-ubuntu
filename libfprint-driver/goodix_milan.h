@@ -30,7 +30,16 @@ GoodixMilan *goodix_milan_new (const guint8 *payload, gsize size, GError **error
  * A private directory is accepted only for explicit root-only M5.B capture.
  * This reads the original envelope unchanged; it never provisions the sensor. */
 GoodixMilan *goodix_milan_load (const gchar *directory, GError **error);
+/* Separate private M5.C opt-in. Ordinary load(NULL) always stays closed. */
+GoodixMilan *goodix_milan_load_experimental (const gchar *directory, GError **error);
 gboolean goodix_milan_is_diagnostic (GoodixMilan *milan);
+gboolean goodix_milan_is_experimental (GoodixMilan *milan);
+gboolean goodix_milan_uses_directory (GoodixMilan *milan, int directory_fd);
+gboolean goodix_milan_bind_to_otp (GoodixMilan *milan, const guint8 *otp, gsize size);
+void goodix_milan_clear_binding (GoodixMilan *milan);
+const gchar *goodix_milan_device_binding (const GoodixMilan *milan);
+gboolean goodix_milan_begin_experimental_action (GoodixMilan *milan, FpiDeviceAction action, GError **error);
+gboolean goodix_milan_record_match (GoodixMilan *milan, GError **error);
 gboolean goodix_milan_begin_capture (GoodixMilan *milan, GError **error);
 gboolean goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
                                      const GoodixMilanSample *sample,
@@ -38,6 +47,7 @@ gboolean goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 /* Same validator and inode-safe reader, current UID and synthetic hashes only. */
 GoodixMilan *goodix_milan_test_load (const gchar *directory, GError **error);
+GoodixMilan *goodix_milan_test_load_experimental (const gchar *directory, GError **error);
 #endif
 void goodix_milan_free (GoodixMilan *milan);
 gboolean goodix_milan_enroll_start (GoodixMilan *milan, GError **error);

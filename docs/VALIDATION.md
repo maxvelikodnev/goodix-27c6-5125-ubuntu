@@ -10,21 +10,31 @@ owner has closed the native MIT/RVA distribution gate. These software checks do
 not qualify live Fedora/KDE authentication or biometric safety.
 
 The qualified M3 preprocessing and fresh `FDT_B0` differed in all 35 compared
-frames; `FDT_B0` is not a substitute for Milan calidata. The existing M3 blob has
-validated payload format/integrity and user-declared Windows provenance. The
-meaning of its 16-byte prefix and its independent binding to the reader remain
-unknown. No private calibration, template, key or image is shipped.
+frames; they are not equivalent calibration states. `FDT_B0` is a decoded
+80×64 no-finger raster, distinct from the 12-byte FDT channel tables. The imported
+FreshHomie API can initialize Milan directly from a background: offline
+initialization with both existing 5125 session baselines succeeds without a
+Windows blob. This does not qualify preprocessing, matching or an autonomous
+Linux runtime using that route.
 
-A controlled capture-only M5 diagnostic path can investigate that association
-after separate authorization. It does not permit ordinary enrollment, verify,
-identify or PAM with unqualified calibration. Milan uses a separate
-driver/template identity and requires new enrollment when live use is qualified.
+The existing M3 snapshot has validated structure/integrity and Windows
+provenance; equality of its 16-byte envelope prefix with this reader's OTP A6
+prefix is established. The prefix's internal meaning and universal uniqueness
+remain unknown. The driver enforces that equality against the existing preflight
+on every private action. No private calibration, template, key or image is shipped.
+
+M5.B remains capture-only. A distinct root-only M5.C session permits experimental
+enrollment, verify and identify after separate authorization, using the qualified
+snapshot and active pairing. Session budgets and successful stop-on-match markers
+persist across client restarts; any journal error requires STOP without relaunch.
+Ordinary enrollment, verify, identify and PAM remain closed.
+Milan uses a separate driver/template identity and requires new enrollment.
 Stock libfprint may open a USB handle before a driver action is refused.
 
 All hardware, Windows and installation lifecycle evidence below concerns the
 SIGFM baseline on `main`. Milan M5 live qualification is pending on the Goodix
 reader in the supported Fedora environment chosen by the operator, with exclusive
-USB access; a successful diagnostic alone does not demonstrate device binding,
+USB access; a successful diagnostic and OTP-prefix association do not demonstrate
 FAR/FRR, liveness or general-use suitability.
 
 ## Tested configuration

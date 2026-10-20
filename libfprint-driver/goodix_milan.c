@@ -4,6 +4,7 @@
  * worker-api.c and goodix_worker_test.c; USB and worker transports are not used.
  */
 #include "goodix_milan.h"
+#include "goodix_config90.h"
 #include "521d-calidata-image.h"
 #include "521d-enrollment-session.h"
 #include "fpi-image.h"
@@ -12,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 
 #define MAX_TEMPLATE (384u * 1024u)
@@ -24,7 +26,8 @@ int gx_worker_identify (void *, const uint8_t *, int, int, int, int32_t[4]);
 struct _GoodixMilan {
   guint8 calibration[GX521D_CALIDATA_BYTES];
   Gx521dEnrollmentSession *enrollment;
-  gboolean diagnostic, capture_started, capture_recorded;
+  gboolean diagnostic, experimental, capture_started, capture_recorded, otp_bound;
+  guint8 envelope_prefix[16];
   int directory_fd;
 };
 
@@ -133,7 +136,7 @@ receipt_value (GKeyFile *receipt, const gchar *key, const gchar *expected)
 }
 
 static GoodixMilan *
-load_experiment (const gchar *directory, uid_t uid, GError **error)
+load_experiment (const gchar *directory, uid_t uid, gboolean experimental, GError **error)
 {
   GoodixMilan *milan = NULL;
   g_autoptr(GKeyFile) receipt = g_key_file_new ();
@@ -143,12 +146,14 @@ load_experiment (const gchar *directory, uid_t uid, GError **error)
   gsize metadata_size = 0, size = 0;
   int fd = open_private_directory (directory, uid, error);
   if (fd < 0) return NULL;
+  if (flock (fd, LOCK_EX | LOCK_NB))
+    { invalid (error, "Milan private session is already in use"); close (fd); return NULL; }
   metadata = read_private_file (fd, "receipt.ini", uid, 1, 2048, &metadata_size, error);
   if (!metadata) goto out;
   if (memchr (metadata, 0, metadata_size) ||
       !g_key_file_load_from_data (receipt, (const gchar *) metadata, metadata_size, G_KEY_FILE_NONE, NULL) ||
       !receipt_value (receipt, "schema", "1") ||
-      !receipt_value (receipt, "purpose", "M5.B_CAPTURE_ONLY") ||
+      !receipt_value (receipt, "purpose", experimental ? "M5.C_PRIVATE_ENROLL_VERIFY" : "M5.B_CAPTURE_ONLY") ||
       !receipt_value (receipt, "source", "M3_USER_DECLARED_WINDOWS_COPY") ||
       !receipt_value (receipt, "device_binding", "UNKNOWN") ||
       !receipt_value (receipt, "prefix_semantics", "UNKNOWN"))
@@ -167,7 +172,9 @@ load_experiment (const gchar *directory, uid_t uid, GError **error)
    * is preserved byte-for-byte and deliberately never interpreted as an ID. */
   milan = goodix_milan_new (envelope + 16, size - 16, error);
   if (!milan) goto out;
-  milan->diagnostic = TRUE;
+  milan->diagnostic = !experimental;
+  milan->experimental = experimental;
+  memcpy (milan->envelope_prefix, envelope, sizeof milan->envelope_prefix);
   milan->directory_fd = fd;
   fd = -1;
 out:
@@ -187,16 +194,55 @@ goodix_milan_load (const gchar *directory, GError **error)
     }
   if (geteuid () != 0)
     { invalid (error, "Milan diagnostic capture requires explicit root authorization"); return NULL; }
-  return load_experiment (directory, 0, error);
+  return load_experiment (directory, 0, FALSE, error);
+}
+
+GoodixMilan *
+goodix_milan_load_experimental (const gchar *directory, GError **error)
+{
+  if (geteuid () != 0 || !directory)
+    { invalid (error, "M5.C requires explicit root authorization and private session"); return NULL; }
+  return load_experiment (directory, 0, TRUE, error);
 }
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
+GoodixMilan *goodix_milan_test_load_experimental (const gchar *directory, GError **error)
+{ return load_experiment (directory, geteuid (), TRUE, error); }
 GoodixMilan *goodix_milan_test_load (const gchar *directory, GError **error)
-{ return load_experiment (directory, geteuid (), error); }
+{ return load_experiment (directory, geteuid (), FALSE, error); }
 #endif
 
 gboolean goodix_milan_is_diagnostic (GoodixMilan *milan)
 { return milan && milan->diagnostic; }
+
+gboolean goodix_milan_is_experimental (GoodixMilan *milan)
+{ return milan && milan->experimental; }
+
+gboolean goodix_milan_uses_directory (GoodixMilan *milan, int directory_fd)
+{
+  struct stat held, caller;
+  return milan && milan->directory_fd >= 0 && directory_fd >= 0 &&
+    !fstat (milan->directory_fd, &held) && !fstat (directory_fd, &caller) &&
+    held.st_dev == caller.st_dev && held.st_ino == caller.st_ino;
+}
+
+void goodix_milan_clear_binding (GoodixMilan *milan)
+{ if (milan) milan->otp_bound = FALSE; }
+
+gboolean
+goodix_milan_bind_to_otp (GoodixMilan *milan, const guint8 *otp, gsize size)
+{
+  goodix_milan_clear_binding (milan);
+  /* Only the full, already validated preflight evidence can bind a loaded
+   * envelope; a payload-only synthetic object has no device identity. */
+  if (!milan || milan->directory_fd < 0 || !otp || size != GOODIX_CONFIG90_OTP_LENGTH)
+    return FALSE;
+  milan->otp_bound = CRYPTO_memcmp (milan->envelope_prefix, otp, sizeof milan->envelope_prefix) == 0;
+  return milan->otp_bound;
+}
+
+const gchar *goodix_milan_device_binding (const GoodixMilan *milan)
+{ return milan && milan->otp_bound ? "OTP_A6_PREFIX_MATCH" : "UNKNOWN"; }
 
 static gboolean write_private_result (int directory_fd, const gchar *name,
                                        const guint8 *bytes, gsize size);
@@ -211,6 +257,7 @@ gboolean goodix_milan_begin_capture (GoodixMilan *milan, GError **error)
   if (!write_private_result (milan->directory_fd, "capture.started", marker, sizeof marker - 1) ||
       fsync (milan->directory_fd))
     return invalid (error, "Milan diagnostic capture budget already consumed or marker not durable");
+  goodix_milan_clear_binding (milan);
   milan->capture_started = TRUE;
   return TRUE;
 }
@@ -234,6 +281,48 @@ write_private_result (int directory_fd, const gchar *name, const guint8 *bytes, 
   return ok;
 }
 
+/* Durable per-session budget, shared by verify and identify across processes.
+ * A failed/cancelled action consumes its reservation. No automatic retries. */
+gboolean
+goodix_milan_begin_experimental_action (GoodixMilan *milan, FpiDeviceAction action, GError **error)
+{
+  static const guint8 marker[] = "M5.C explicit action consumed; never retry automatically\n";
+  struct stat st;
+  if (!goodix_milan_is_experimental (milan)) return invalid (error, "M5.C session required");
+  goodix_milan_clear_binding (milan);
+  if (fstatat (milan->directory_fd, "match.stop", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+    return invalid (error, "M5.C stopped after MATCH or ambiguous session state");
+  if (action == FPI_DEVICE_ACTION_ENROLL)
+    {
+      if (write_private_result (milan->directory_fd, "enroll.started", marker, sizeof marker - 1) &&
+          fsync (milan->directory_fd) == 0) return TRUE;
+    }
+  else if (action == FPI_DEVICE_ACTION_VERIFY || action == FPI_DEVICE_ACTION_IDENTIFY)
+    {
+      for (guint attempt = 1; attempt <= 3; attempt++)
+        {
+          g_autofree gchar *name = g_strdup_printf ("probe-%u.started", attempt);
+          if (fstatat (milan->directory_fd, name, &st, AT_SYMLINK_NOFOLLOW) == 0) continue;
+          if (errno != ENOENT) break;
+          /* Do not retry even an exclusive-create race/partial write. */
+          if (write_private_result (milan->directory_fd, name, marker, sizeof marker - 1) &&
+              fsync (milan->directory_fd) == 0) return TRUE;
+          break;
+        }
+    }
+  return invalid (error, "M5.C action unsupported, budget exhausted or journal failed");
+}
+
+gboolean
+goodix_milan_record_match (GoodixMilan *milan, GError **error)
+{
+  static const guint8 marker[] = "MATCH: M5.C session stopped\n";
+  if (!goodix_milan_is_experimental (milan) || !milan->otp_bound ||
+      !write_private_result (milan->directory_fd, "match.stop", marker, sizeof marker - 1) ||
+      fsync (milan->directory_fd)) return invalid (error, "M5.C MATCH stop could not be recorded");
+  return TRUE;
+}
+
 gboolean
 goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
                              const GoodixMilanSample *sample,
@@ -249,8 +338,8 @@ goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
     { raw_le[2 * i] = (guint8) (raw[i] & 0xff); raw_le[2 * i + 1] = (guint8) (raw[i] >> 8); }
   raw_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, raw_le, sizeof raw_le);
   image_hash = sample ? g_compute_checksum_for_data (G_CHECKSUM_SHA256, sample->pixels, sizeof sample->pixels) : g_strdup ("unavailable");
-  metrics = g_strdup_printf ("[M5B]\ndevice_binding=UNKNOWN\nprefix_semantics=UNKNOWN\nauthentication_qualified=false\nraw_sha256=%s\nimage_sha256=%s\nfeature_sha256=%s\npreprocess_sha256=%s\npreprocess=%s\nquality=%d\ncoverage=%d\nfeature_count=%d\ntag=%d\nerror_domain=%s\nerror_code=%d\n",
-    raw_hash, image_hash, sample ? sample->feature_sha256 : "unavailable", sample ? sample->preprocess_sha256 : "unavailable",
+  metrics = g_strdup_printf ("[M5B]\ndevice_binding=%s\nprefix_semantics=UNKNOWN\nauthentication_qualified=false\nraw_sha256=%s\nimage_sha256=%s\nfeature_sha256=%s\npreprocess_sha256=%s\npreprocess=%s\nquality=%d\ncoverage=%d\nfeature_count=%d\ntag=%d\nerror_domain=%s\nerror_code=%d\n",
+    goodix_milan_device_binding (milan), raw_hash, image_hash, sample ? sample->feature_sha256 : "unavailable", sample ? sample->preprocess_sha256 : "unavailable",
     sample ? "PASS" : "REJECTED", sample ? sample->quality : -1,
     sample ? sample->coverage : -1, sample ? sample->feature_count : -1, sample ? sample->tag : -1,
     capture_error ? g_quark_to_string (capture_error->domain) : "none", capture_error ? capture_error->code : 0);
@@ -297,6 +386,8 @@ gboolean goodix_5125_milan_preprocess (GoodixMilan *milan, const uint16_t *raw,
   gboolean ok = FALSE;
   if (!milan || !raw || !sample || count != GOODIX_MILAN_PIXELS)
     return invalid (error, "Milan sample geometry invalid");
+  if (milan->directory_fd >= 0 && !milan->otp_bound)
+    return invalid (error, "Milan calibration has no current OTP binding");
   for (gsize i = 0; i < count; i++)
     if (raw[i] > 4095) return invalid (error, "Milan sample range invalid");
   memset (sample, 0, sizeof *sample);

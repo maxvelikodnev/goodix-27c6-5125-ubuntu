@@ -40,12 +40,14 @@ per-file source digests and original notices, validated before building. See
 
 ## Runtime boundary
 
-Reproducible calibration acquisition and device binding remain under study.
+Linux-native calibration quality/matching remain to be qualified on 5125.
 Ordinary authentication stays closed until those requirements are qualified.
 The explicit M5 diagnostic path allows protected calibration validation and
 capture in a separate controlled process after live authorization; it cannot
-activate ordinary enrollment, verify, identify or PAM authentication with
-unqualified calibration. Stock libfprint may open a USB handle before a driver
+activate ordinary enrollment, verify, identify or PAM authentication. The separate
+M5.C private opt-in permits experimental enrollment and matching with the existing
+qualified snapshot after equality against the current preflight OTP prefix;
+prefix semantics and universal uniqueness remain unknown. Stock libfprint may open a USB handle before a driver
 action is refused.
 
 The private M3 calibration is neither a payload asset nor an installation
@@ -62,3 +64,44 @@ permits one capture with a 30-second acquisition deadline, then closes; it does
 not retry or provision pairing. A new trusted session and explicit root action
 are required. These helpers are covered by the ordinary runtime receipt and
 removal tools.
+
+## Private M5.C operator gate (not executed by the build)
+
+After explicit USB/root/biometric authorization, prepare a **new** session using
+`prepare-milan-diagnostic.py --experimental-enrollment --ack-binding-unknown`
+with the existing `--source`, `--session` and both qualified expected SHA256
+options. The source must already be root-owned mode0600. The existing snapshot
+is unchanged; no new M5.B capture is required. The session parent is root-owned
+mode0700 inside private `development/`, and source/session paths are symlink-free.
+
+Use the canonical RC's colocated `goodix-milan-diagnostic`:
+
+```text
+goodix-milan-diagnostic --m5c enroll --session ABSOLUTE_PRIVATE_SESSION
+goodix-milan-diagnostic --m5c verify --session ABSOLUTE_PRIVATE_SESSION
+```
+
+`identify` is also available as a single-probe alternative to `verify`. Each
+invocation closes the device. The driver permits one enrollment and at most
+three verify/identify attempts **combined across processes**, counting failures
+and cancellation; a successfully journaled MATCH prevents further attempts.
+Any journal/cleanup error requires STOP without relaunch, even if no stop marker
+could be created. The client never
+retries. Enrollment uses unchanged 18-stage admission, at most 36 contacts and
+600 seconds; a probe has one contact and 30 seconds. Wait for APPOGGIA/SOLLEVA.
+The dedicated `milan-template.fp` is mode0600 in that session, never in stock
+fprintd storage. An exclusive session lock prevents simultaneous clients, and
+template I/O uses the same directory inode retained by the driver.
+
+PASS requires enrollment, a later probe MATCH with `OTP_PREFIX=MATCH`, and
+`M5_CLOSE=PASS`. On mismatch, missing/corrupt/untrusted calibration or template,
+USB error, ambiguous pairing, cancellation or timeout: STOP, keep the consumed
+budget, inspect only non-sensitive results, and do not auto-repeat. A quality
+rejection consumes a probe attempt. An error may leave **no** `metrics.ini`;
+M5.C never writes capture raw/image files. The private path requires already
+active pairing and cannot issue E0. A fresh process without the explicit M5.C
+signal cannot authenticate; fprintd/PAM and password fallback are unchanged.
+
+Rollback is to close the client and use the canonical software removal/SIGFM
+reinstallation procedures, with no factory reset or automatic biometric deletion.
+A successful M5.C gate is experimental evidence, not ordinary-auth qualification.

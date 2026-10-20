@@ -64,7 +64,11 @@
       "production/milan-diagnostic.c",
       "production/prepare-milan-diagnostic.py",
       "development/private-root/analysis/M5_milan/m5a-public-qualification.json",
-      "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md"
+      "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md",
+      "production/test_milan_background.c",
+      "production/run_milan_background_test.py",
+      "development/private-root/analysis/M5_milan/M5C_ALIGNMENT_REPORT_2026-10-20.md",
+      "development/private-root/analysis/M5_milan/m5c-background-init.json"
     ],
     "M6": [
       "CORROBORATIONS.md",
