@@ -1,0 +1,9 @@
+ChicagoHS computational backend
+Upstream: https://github.com/berkekbgz/libfprint-goodix-spi
+Revision: 010a665f54089a1632b1ab7be588b316ace934e2
+All imported files are byte-for-byte upstream sources, LGPL-2.1-or-later.
+Copyright (C) 2026 Berke Kabagöz; individual headers retain authoritative
+third-party notices. See LICENSE and PROVENANCE.md.
+Only lib/goodix/chicago, goodix-crc/image computational helpers and synthetic
+unit tests are imported. No SPI driver, OEM binary, firmware, credential,
+private biometric data or fprintd patches are included.

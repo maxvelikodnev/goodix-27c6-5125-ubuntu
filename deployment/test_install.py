@@ -62,7 +62,7 @@ class Installer(unittest.TestCase):
         self.ctx.enter_context(patch.object(m.r, 'command', side_effect=self.command))
         self.ctx.enter_context(patch.object(m, 'supported_system'))
         self.ctx.enter_context(patch.object(m, 'prerequisites'))
-        self.ctx.enter_context(patch.object(m.builder, 'validate_milan_sources', return_value={}))
+        self.ctx.enter_context(patch.object(m.builder, 'validate_chicago_sources', return_value={}))
         self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
         self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
         self.ctx.enter_context(patch.object(m, 'label_materials', side_effect=self.labels))
@@ -169,8 +169,7 @@ class Installer(unittest.TestCase):
 
     def make_payload(self, directory):
         directory.mkdir()
-        names = {'runtime/libfprint-2.so.2.0.0', 'runtime/Milan-NOTICES.txt',
-                 'runtime/goodix-milan-diagnostic', 'runtime/prepare-milan-diagnostic.py',
+        names = {'runtime/libfprint-2.so.2.0.0', 'runtime/ChicagoHS-NOTICES.txt',
                  'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
                  'runtime/build-provenance.json', 'login/' + m.r.MODULE,
                  'login/plasmalogin.pam', 'check-material',
@@ -182,7 +181,7 @@ class Installer(unittest.TestCase):
             data = (self.clone / 'deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes() \
                 if name == 'login/plasmalogin.pam' else b'SYNTHETIC PUBLIC PAYLOAD ' + name.encode()
             target.write_bytes(data)
-            target.chmod(0o755 if name in ('check-material', 'runtime/goodix-milan-diagnostic') else 0o644)
+            target.chmod(0o755 if name == 'check-material' else 0o644)
             manifest['files'][name] = m.r.digest(data)
         for name, target in m.r.LINKS.items():
             (directory / 'runtime' / name).symlink_to(target)
@@ -197,11 +196,9 @@ class Installer(unittest.TestCase):
         self.apply()
         self.assertIn('GOODIX_INSTALL_MODE=FIRST_INSTALL', self.stdout.getvalue())
         receipt = json.loads((m.r.RUNTIME / 'installation.json').read_bytes())
-        self.assertEqual(receipt['matcher'], 'milan-type17')
+        self.assertEqual(receipt['matcher'], 'chicago-type24')
         self.assertFalse(any('opencv' in name.lower() for name in receipt['files']))
         self.assertIn('new enrollment for every finger/user', self.stdout.getvalue())
-        self.assertEqual(stat.S_IMODE((m.r.RUNTIME / 'goodix-milan-diagnostic').stat().st_mode), 0o755)
-        self.assertEqual(stat.S_IMODE((m.r.RUNTIME / 'prepare-milan-diagnostic.py').stat().st_mode), 0o644)
         for value in self.bundle.files.values():
             self.assertNotIn(value.decode(), self.stdout.getvalue() + self.stderr.getvalue())
 
@@ -311,8 +308,28 @@ class Installer(unittest.TestCase):
         m.r.normal_preflight()
         self.apply()
         receipt = json.loads(path.read_bytes())
-        self.assertEqual(receipt['matcher'], 'milan-type17')
+        self.assertEqual(receipt['matcher'], 'chicago-type24')
         self.assertFalse(any(name.startswith('libopencv_') for name in receipt['files']))
+        m.r.normal_preflight()
+        self.assert_preserved()
+
+    def test_update_from_milan_removes_diagnostic_and_preserves_data(self):
+        self.apply()
+        path = m.r.RUNTIME / 'installation.json'
+        receipt = json.loads(path.read_bytes())
+        receipt['matcher'] = 'milan-type17'
+        for name in ('Milan-NOTICES.txt', 'goodix-milan-diagnostic',
+                     'prepare-milan-diagnostic.py'):
+            data = b'SYNTHETIC LEGACY MILAN ' + name.encode()
+            (m.r.RUNTIME / name).write_bytes(data)
+            receipt['files'][name] = m.r.digest(data)
+        path.write_text(json.dumps(receipt))
+        m.r.normal_preflight()
+        self.apply()
+        receipt = json.loads(path.read_bytes())
+        self.assertEqual(receipt['matcher'], 'chicago-type24')
+        self.assertFalse(any('milan' in name.lower() for name in receipt['files']))
+        self.assertFalse(any('milan' in p.name.lower() for p in m.r.RUNTIME.iterdir()))
         m.r.normal_preflight()
         self.assert_preserved()
 
@@ -532,11 +549,11 @@ class Installer(unittest.TestCase):
     def test_missing_native_sources_stop_before_sudo_or_dependencies(self):
         with patch.object(m.os, 'geteuid', return_value=1000), \
                 patch.object(sys, 'argv', ['install.py', '--install-dependencies']), \
-                patch.object(m.builder, 'validate_milan_sources',
-                             side_effect=RuntimeError('incomplete Milan native source set')), \
+                patch.object(m.builder, 'validate_chicago_sources',
+                             side_effect=RuntimeError('incomplete ChicagoHS native source set')), \
                 patch.object(m.subprocess, 'run') as run, \
                 patch.object(m.builder, 'build_payload') as build, \
-                self.assertRaisesRegex(RuntimeError, 'incomplete Milan native source set'):
+                self.assertRaisesRegex(RuntimeError, 'incomplete ChicagoHS native source set'):
             m.main()
         run.assert_not_called()
         build.assert_not_called()

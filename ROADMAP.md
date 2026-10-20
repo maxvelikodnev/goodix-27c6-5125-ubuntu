@@ -1,85 +1,71 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ROADMAP.md — Valutazione motori biometrici nativi per Goodix 27c6:5125
+# ROADMAP.md — ChicagoHS per Goodix 27c6:5125
 
-## Obiettivo e percorso
+## Obiettivo
 
-Valutare se sostituire il matcher SIGFM sul Goodix `27c6:5125` Fedora 44 KDE con **un solo motore biometrico nativo** che dimostri valore, affidabilità e compatibilità sul sensore reale. Milan Type 17 è il candidato scelto per l'integrazione sperimentale; ChicagoHS è stato valutato come alternativa in M3, ma non entra nella build Milan. Nessun candidato è qualificato per uso produttivo prima dell'esito M5.
+Consegnare sul solo ramo `porting_ChicagoHS` un driver ChicagoHS nativo,
+autonomo e installabile con `./install.sh` per Fedora 44 KDE. Il mandato REV3
+del 21 ottobre 2026 autorizza l'intera sequenza software, review e correzioni,
+commit e push ordinari su questo ramo. I checkpoint software non richiedono
+ulteriori autorizzazioni. `main`, `development` e `porting_milan_type_17`
+rimangono invariati. Gli invarianti di AGENTS.md restano applicabili.
 
-**Vincolo architetturale:** conservare trasporto USB/TLS, cattura, protocollo e normale lifecycle di pairing del driver `main`; non imporre l'immutabilità della PSK corrente né portare il trasporto SPI del progetto Chicago. Non introdurre matcher ibridi, switch Milan/Chicago/SIGFM nell'installer o modifiche ai servizi stock senza gate separato.
+Trasporto USB/TLS, firmware APP12509/APP12508, pairing, stock fprintd,
+integrazione KDE e password fallback conservano il comportamento della baseline.
+Chicago sostituisce il solo motore biometrico: nessun fallback Milan/SIGFM,
+trasporto SPI, DLL, calibrazione Windows o dati privati necessari alla build.
+SIGFM su `main` resta il percorso di recupero mediante rimozione e reinstallazione.
 
-**Baseline e rollback:** SIGFM resta funzionante sul branch `main`. Milan è il solo candidato dell'integrazione in corso; promozione su `main` e conversioni tra template non sono automatiche.
+## Percorso software autorizzato
 
-Fonti: `CORROBORATIONS.md` C1/C2 (Milan) e C3 (Chicago). I test differenziali dichiarati dagli autori non sono parità verificata sul 5125; la condivisione di chip ID, sensor type e dimensioni non basta. L'analisi di provenienza/licenze è specifica ai sorgenti eventualmente importati.
+1. **CH0 — Baseline.** Verificare pin upstream
+   `010a665f54089a1632b1ab7be588b316ace934e2`, provenienza per file e contratti
+   rispetto alle evidenze offline già esistenti. EXIT_GATE: fonti computazionali
+   necessarie identificabili, redistribuibili e riproducibili senza materiale OEM.
+2. **CH1 — Backend e identità.** Importare le unità necessarie; calibrazione
+   generate dal background U16 80×64 12-bit, stato temporale originale,
+   preprocessing/feature/enrollment 12-stage/type24/verify/identify originali.
+   Nessun tuning o learning. Contenitore versionato legato al sensore ottenuto
+   nel normale preflight qualificato; verificare la semantica, non presumere
+   unicità universale di un prefisso OTP. EXIT_GATE: test positivi/negativi,
+   corruzione, incompatibilità e cleanup; replay privato CH0 equivalente.
+3. **CH2 — Runtime libfprint.** Collegare le azioni ordinarie e il lifecycle,
+   retry/error mapping, FpPrint e gallerie di stock fprintd; nuovo enrollment
+   obbligatorio, nessuna conversione/cancellazione di template storici.
+   EXIT_GATE: azioni implementate e regressioni offline; ogni dipendenza
+   realmente non qualificata deve fallire chiusa ed essere dichiarata.
+4. **CH3 — Distribuzione.** Adeguare il solo percorso canonico
+   `install.sh → deployment/install.py → production/build-public.py`;
+   inventario/hash/licenze, payload Chicago-only, update/reinstall e transizione
+   da Milan/SIGFM/installazioni parziali. Conservare i soli `goodix-uninstall`
+   e `goodix-force-remove`, anche senza clone/rete/USB/receipt integra.
+   Entrambi preservano pairing, PSK, template e stato persistente. Nessun purge.
+   EXIT_GATE: build da snapshot privo di development, ABI/dependency checks,
+   fixture install/update/rollback/recovery e documentazione coerente.
+5. **CH4 — Review e consegna.** Review indipendente di codice, diff, licenze,
+   segreti, parità con main e prove. Correggere e ripetere i controlli pertinenti.
+   EXIT_GATE: tutti i requisiti software dimostrati, commit/push ordinario solo
+   Chicago, rapporto privato con SHA, PASS/NOT_RUN e istruzioni VM/rollback.
 
-## State machine
+## Accettazione finale
 
-`M0 (Milan) → M1 (Milan) → M2 (Milan) → M3 (raccolta + confronto + scelta) → M4 (libfprint candidato offline) → M5 (RC autonoma dal ramo → qualificazione live sul Goodix in Fedora) → M6 (learning opzionale) → valutazione finale`
+`CHICAGOHS_SOFTWARE_RC_READY_FOR_VM=PASS` richiede tutti gli EXIT_GATE software,
+un runtime completo e sorgenti pubblicabili autosufficienti. Il corpus CH0 deve
+riprodurre 35/35 admissions, 12/12 stadi, 3 genuine MATCH, 3 impostor NO_MATCH
+e 2 partial NO_MATCH senza tuning. Documentare la parità con main per trasporto,
+pairing, firmware, multiutente, integrazione desktop e recovery, distinguendo
+sempre prove offline da prove reali. Una limitazione reale non risolta produce
+BLOCKED, mai un PASS presunto; proseguire comunque sulle attività indipendenti.
 
-M0–M2 sono **già conclusi per la fattibilità Milan**: non reinterpretarli come PASS di Chicago né rieseguirli per la sola scoperta di C3. Chicago è valutato come candidato indipendente dentro M3 prima di scegliere l'eventuale motore di M4. Ogni nuovo accesso live o modifica del sistema richiede un distinto Human Gate; incompatibilità comprovata o regressione critica comportano `NO_GO` per il candidato interessato.
+## Qualificazione successiva, fuori dal mandato software
 
-### M0 — Baseline e provenienza
+`CHICAGOHS_VM_LIVE_QUALIFICATION=NOT_RUN` fino a prove osservate di enrollment,
+verify/identify, negativi, KDE login/locker, sudo/PolicyKit, reboot e Windows.
+Nessun accesso USB reale, nuova acquisizione, installazione sull'host o operazione
+persistente sul dispositivo durante questo mandato. Una VM già accessibile e
+isolata senza USB può validare il software; se non disponibile indicare NOT_RUN.
+Il primo live richiede un mandato separato, offline pertinenti completati,
+PASS/FAIL/STOP e rollback. Nessuna promozione su main o release è autorizzata.
 
-- **PURPOSE:** identificare nel software Windows **effettivamente usato dal 5125** l'Engine Adapter e il profilo biometrico selezionato: DLL/versione, riga parametri, algorithm type/configurazione dopo inizializzazione e, se possibile, tipo nel template. Confrontare con il profilo Type 17 di C1/C2. Fissare baseline SIGFM, snapshot e provenance/licenze dei soli sorgenti da portare.
-- **PRIMARY_ARTIFACT:** risultato sintetico del profilo Windows del 5125 e mappa minima sorgente → funzione → licenza.
-- **EXIT_GATE:** `M0_SOURCE_BASELINE=PASS` solo con evidenza concreta che giustifichi un esperimento Type 17 e sorgenti riutilizzabili. Profilo incompatibile → `NO_GO`; profilo irrisolto → `BLOCKED`/decisione dell'Utente, non compatibilità presunta.
-- **NEXT:** M1 solo con PASS.
-
-### M1 — Motore nativo isolato
-
-- **PURPOSE:** compilare offline dal tag fissato il motore Type 17, senza trasporto USB 521d, worker Python, servizi o `fprintd` privato. Usare preferibilmente l'API C `gx_worker_load/identify/export/delete`, con `gx_worker_enroll`; livello inferiore solo se necessario.
-- **PRIMARY_ARTIFACT:** libreria/adattatore minimo e test riproducibile per feature, enrollment, matching e template.
-- **EXIT_GATE:** `M1_NATIVE_ENGINE_OFFLINE=PASS` con build, test offline e controlli di memoria pertinenti, dipendenze tracciate.
-- **NEXT:** M2.
-
-### M2 — Immagini 5125 e fattibilità
-
-- **PURPOSE:** verificare compatibilità fra cattura 5125 e pipeline Milan: input raw 5.120 campioni U16 con valori a 12 bit più background, oppure U8 80×64 già elaborato. Confrontare orientamento, polarità, scala fisica (500 PPI upstream non misurati), pixels, quality/coverage, feature, maschere e metadati nei bit bassi. Non azzerare tag di classificazione per forzare un match.
-- **PRIMARY_ARTIFACT:** adattatore minimo con confronto diagnostico degli **output completi**, non solo conteggi di feature. Le catture biometriche reali restano in `development/` gitignored.
-- **EXIT_GATE:** `M2_IMAGE_COMPAT=PASS` se output coerenti e biometricamente utilizzabili; altrimenti `NO_GO` motivato.
-- **NEXT:** M3 solo con PASS.
-
-### M3 — Corpus, matching comparato e scelta del candidato
-
-- **PURPOSE:** utilizzare contatti reali indipendenti del 5125 per qualificare Milan contro SIGFM e, **dopo la raccolta live già predisposta**, valutare Chicago in modo isolato prima della decisione di integrazione. La scoperta Chicago **non modifica** il kit, i budget, le autorizzazioni o i criteri di sicurezza dell'acquisizione M3 già preparata.
-- **M3.A — Human Gate e raccolta:** collector esistente, massimo **35 contatti / 20 minuti**, due sessioni, dita A/B, sollevamento completo; solo dopo consenso separato a USB reale, sudo, lettura PSK/materiale esistente e pausa/ripristino `fprintd`. Rispettare il pin del collector, `--offline-check`, one-shot e i limiti del report M3 privato; nessun altro test live implicito. I campioni restano sotto `development/` gitignored.
-- **M3.B — Milan vs SIGFM:** sugli stessi raw raccolti, pipeline native corrette e baseline autentica `FDT_B0` per SIGFM; enrollment reale, template export/load e ripresa in processo nuovo, probe genuine/sessioni distinte, dito impostor B, frame parziali e classificazione di retry, errore e NO_MATCH. Milan parte con `flags=0` senza learning; il voto 3/10 di FreshHomie non è comportamento Windows dimostrato.
-- **M3.C — Audit tecnico Chicago (offline):** fissare revisione C3, esaminare esclusivamente il backend `lib/goodix/chicago/`, contratti d'ingresso/uscita, dipendenze, formati frame e template, calibrazione/OTP/ImageBase, regroup/orientamento, license headers e provenienza. Confrontare con le evidenze Windows/5125 già acquisite senza presumere equivalenza solo da `0x2504`, sensor type 12 e 80×64. Esito `FEASIBLE / NO_GO / BLOCKED`, con motivazione sintetica. Nessun driver, dispositivo o servizio toccato.
-- **M3.D — Prova Chicago sui campioni M3 (offline, solo se FEASIBLE):** adattatore/harness minimo privato e reversibile; riutilizzare il corpus con preprocessing e policy di enrollment propri di Chicago (senza duplicazioni, rilassamento soglie o sostituzione dei frame). Verificare calibrazione, inizializzazione, template save/reload, genuine e impostor e i fallimenti, senza learning iniziale. Se mancano OTP/ImageBase o altri prerequisiti, dichiarare `BLOCKED` per Chicago; **non** forzare compatibilità o avviare nuova cattura senza ulteriore consenso.
-- **M3.E — Confronto e decisione:** confrontare SIGFM, Milan e Chicago **solo su prove omogenee o con limiti esplicitati**, distinguendo errori di cattura/preprocessing da NO_MATCH del matcher; non equiparare `score=0` SIGFM a score Chicago/Milan. Riportare conteggi e incertezze, falsi match osservati e costi di integrazione. Il corpus ridotto non certifica FAR/FRR. Ogni falso match osservato è stop per analisi del candidato.
-- **PRIMARY_ARTIFACT:** unico rapporto privato M3 con esito Milan/SIGFM, audit Chicago, eventuale prova Chicago, confronto e proposta motivata di `candidate=Milan / Chicago / none`. Le informazioni pubbliche sono solo conclusioni non biometriche, senza PSK, template o raw.
-- **EXIT_GATE:** `M3_MATCHING_VALUE=PASS` soltanto se **almeno un candidato** mostra un vantaggio credibile o potenziale tecnico concreto rispetto a SIGFM, senza falsi match osservati, e la decisione è documentata. `NO_GO` se nessun candidato soddisfa il criterio; `BLOCKED` se mancano evidenze essenziali per decidere. Un `NO_GO`/`BLOCKED` di Chicago non annulla automaticamente un Milan qualificato, e viceversa. Non confondere M3 PASS con autorizzazione a modificare `libfprint`.
-- **NEXT:** M4 sul **solo candidato selezionato**, previo nuovo Human Gate.
-
-### M4 — Integrazione del candidato selezionato in libfprint
-
-- **PURPOSE:** integrare sperimentalmente **Milan oppure Chicago**, non entrambi, in sostituzione di SIGFM per il 5125, mantenendo USB/TLS/cattura e il lifecycle di pairing già qualificato. Nessun porting del trasporto SPI e nessuna sostituzione preventiva del `fprintd` stock; eventuali necessità aggiuntive richiedono motivazione e consenso specifico. Distinguere i nuovi template da GSF1/SIGFM; non convertire template implicitamente e prevedere enrollment nuovo.
-- **PRIMARY_ARTIFACT:** una sola build candidata Fedora/libfprint, test offline pertinenti e rollback al driver SIGFM. Learning persistente non rientra in M4.
-- **EXIT_GATE:** `M4_LIBFPRINT_CANDIDATE=PASS` se enrollment, verify, identify e regressioni pertinenti passano offline; nessuna installazione automatica.
-- **NEXT:** M5 solo con PASS: prima RC autonoma e installabile dal ramo operativo, poi live sul sensore reale soltanto con autorizzazioni protette separate.
-
-### M5 — Release candidate installabile e qualificazione live sul Goodix in Fedora
-
-- **PURPOSE:** portare il candidato Milan già integrato in M4 dal solo ambiente privato di sviluppo a **sorgenti autonomi sul ramo Milan**, clonabili e compilabili con il percorso canonico. Qualificare poi sul sensore Goodix reale il software effettivamente installabile dagli utenti nell'ambiente Fedora supportato scelto dall'operatore, non una `.so` copiata manualmente. Il percorso di build/installazione, la procedura M5 e i criteri PASS/FAIL/STOP sono identici indipendentemente da dove Fedora venga eseguito; l'eventuale assegnazione esclusiva del dispositivo USB è soltanto un requisito operativo esterno. La RC sperimentale del ramo non è una release ufficiale né una promozione su `main`.
-- **M5.A — RC dal ramo, prima del live:** promuovere esclusivamente codice redistribuibile e necessario dai risultati M4 ai percorsi tracciati del ramo; adeguare **il builder canonico** `production/build-public.py`, Meson, sorgenti/ledger/hash, provenance, manifest, licenze e la documentazione utente pertinente. Un clone pulito del ramo deve poter eseguire il normale `./install.sh` e generare Milan-only, **senza dipendere da `development/`, dalla build M4 privata, da dati biometrici/PSK/calidata privati o da SIGFM/OpenCV/C++**, se questi sono stati rimossi. Non creare installer paralleli, selettori ibridi o workaround manuali. Conservare `fprintd` stock, PAM/KDE/SELinux e la superficie di integrazione esistente. Riusare `deployment/install.py`, `goodix-uninstall` e `goodix-force-remove` con identica semantica del ramo `main`: rimozione ordinaria e di emergenza **del solo software**, mai factory reset; non introdurre cancellazioni biometriche automatiche o nuovi vincoli speciali sui vecchi template. La reinstallazione SIGFM dal ramo `main` deve restare praticabile, con nuovo enrollment se effettivamente necessario. Verificare offline build da clone, ABI/dipendenze, integrità e fixture di install/update/rimozione/rollback con review indipendente. Rispettare i vincoli di provenienza/licenza per i file effettivamente importati: **nessun push di sorgenti con redistribuibilità irrisolta**.
-- **M5.A — Prerequisito calidata:** definire e verificare per quanto possibile offline una sorgente e un lifecycle **riproducibili e vincolati al dispositivo** per il calidata Milan corretto. M4 ha escluso l'equivalenza con `FDT_B0`; non incorporare calidata M3/M4, non assumere un binding non provato e non aggirare il fail-closed. Dove la verifica richiede hardware, privilegi o materiale protetto, preparare il minimo Human Gate per M5.B, senza anticiparne l'esecuzione.
-- **M5.A — Identità dei template:** Milan riconosce **solo** template Milan e richiede obbligatoriamente un **nuovo enrollment** per ogni dito/utente. Nessuna conversione implicita o riconoscimento di template `GSF1`/SIGFM; la loro presenza non deve impedire la registrazione Milan, causare falsi esiti o essere interpretata come enrollment valido. Non imporre cancellazione preventiva o automatica dei file SIGFM; mantenere i comportamenti canonici di disinstallazione senza aggiungere obblighi speciali di conservazione durante la migrazione. Verificare gestione di template misti/storici con i test pertinenti.
-- **M5.A/B — Pairing come su `main`:** Milan eredita **senza modifiche di policy** il provisioning iniziale quando qualificato e necessario, il riuso della PSK Linux già valida e il ripristino dopo sostituzione esterna (inclusa Windows), con il normale comportamento Linux ↔ Linux e Linux ↔ Windows. **Nessun requisito di mantenere invariata la PSK attualmente presente sul sensore.** Restano vincolanti le garanzie di `AGENTS.md`: transazioni `E0` soltanto nelle condizioni già qualificate e autorizzate, massimo un `E0` logico, nessun retry automatico, conservazione byte-per-byte di `BB010002`, journaling, verifica readback/hash/TLS e fail-closed. Nessun `E0` per una normale riapertura Linux con pairing valido, nessun reset speculativo e nessuna modifica factory.
-- **M5.B — Qualificazione live sul sensore Goodix:** **solo dopo** una RC autonoma con install/recovery qualificati offline, un percorso di ripristino funzionante nell'ambiente Fedora scelto e autorizzazione esplicita separata per installazione, privilegi, accesso USB/biometria/materiale protetto e, se necessarie, transazioni di pairing previste dal contratto consolidato. La prima prova è la **singola cattura diagnostica controllata** già preparata, con confronto offline rispetto a M3: nessun enrollment, MATCH o accesso PAM prima della valutazione dei risultati e di un distinto via libera. Se l'evidenza consente di qualificare la calibrazione e il suo binding, proseguire poi con enrollment Milan obbligatorio, verify/identify, dita differenti, contatti parziali e scadenti; quindi KScreenLocker, sudo, PolicyKit, login KDE/password fallback, riavvio, rimozione e reinstallazione SIGFM, coesistenza Windows e stabilità rispetto alla baseline. Nessun test o codice deve selezionare comportamenti diversi in base alla virtualizzazione dell'ambiente Fedora. Arrestarsi su falso match, calibrazione/binding ambiguo, transazione persistente non qualificata o regressione critica. Non assumere liveness o spoof resistance.
-- **PRIMARY_ARTIFACT:** RC Milan tracciabile e installabile dal clone del ramo, recupero canonico dimostrato, evidenze live con limiti del campione e decisione `GO/NO_GO`. Dati sensibili e report operativi restano privati in `development/`.
-- **EXIT_GATE:** `M5_LIVE_QUALIFICATION=PASS` solo se RC realmente autonoma e installabile, calibrazione/binding qualificati, nuovo enrollment Milan realmente imposto senza riutilizzo di SIGFM, normale lifecycle di pairing equivalente a `main`, affidabilità almeno comparabile a SIGFM nel campione osservato, nessun falso match osservato, nessuna regressione critica di login e ripristino SIGFM concretamente praticabile. In caso contrario `NO_GO` o `BLOCKED` quando mancano prove essenziali; il solo PASS dei test offline o di un'installazione non conclude M5.
-- **NEXT:** M6 solo se il learning del motore scelto promette un beneficio giustificabile; altrimenti valutazione finale.
-
-### M6 — Apprendimento incrementale (opzionale)
-
-- **PURPOSE:** verificare **solo sul candidato selezionato** se l'aggiornamento dei template dopo match affidabili migliori davvero il riconoscimento. Studiare persistenza, rischio contaminazione e compatibilità con `fprintd`; le patch e il comportamento `templateStudy` del progetto Chicago non sono automaticamente autorizzati per Fedora.
-- **PRIMARY_ARTIFACT:** confronto con/senza apprendimento, valutazione dei rischi e decisione documentata.
-- **EXIT_GATE:** `M6_LEARNING=PASS` se beneficio dimostrato e costo/rischio accettabile; `M6_LEARNING=DEFERRED` se non necessario o non giustificato.
-- **NEXT:** valutazione finale.
-
-## Condizione di completamento
-
-Candidato qualificato quando `M0`–`M2` attestano la fattibilità **Milan iniziale**, `M3` seleziona motivatamente **Milan o Chicago**, `M4`–`M5` passano per quel candidato e `M6` è PASS oppure DEFERRED. I PASS M0–M2 non costituiscono attestazione tecnica Chicago.
-
-La release ufficiale su `main` può adottare **un solo motore**. La RC del ramo Milan è sperimentale, clonabile soltanto dopo le verifiche di redistribuibilità; SIGFM su `main` resta il percorso di ripristino, non un fallback ibrido nell'installer. Merge, tag/release ufficiale, installazione nell'ambiente Fedora scelto, modifiche a `fprintd` o passaggio a `main` richiedono le rispettive decisioni/autorizzazioni.
-
-I criteri generali di sicurezza, Human Gate, disciplina Git, orchestrazione e documentazione rimangono nei file canonici; `TECHNICAL_MANUAL.md` contiene conoscenza tecnica stabile, **non** cronaca di prove o task agentici. I report operativi restano privati in `development/`.
+Il manuale tecnico contiene soltanto fatti durevoli verificati. Evidenze,
+rapporti e materiale sensibile restano nelle aree private gitignored.

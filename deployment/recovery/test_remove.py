@@ -191,6 +191,34 @@ class RecoveryTests(unittest.TestCase):
         self.assert_removed()
         self.assertFalse(self.rule)
 
+    def chicago_runtime_fixture(self):
+        m = self.m
+        shutil.rmtree(m.RUNTIME)
+        files = {'libfprint-2.so.2.0.0': b'SYNTHETIC CHICAGO LIBRARY',
+                 'ChicagoHS-NOTICES.txt': b'SYNTHETIC NOTICE'}
+        for name, data in files.items():
+            self.write(m.RUNTIME / name, data)
+        for name, target in m.LINKS.items():
+            (m.RUNTIME / name).symlink_to(target)
+        receipt = {'schema': 2, 'source_id': 'c' * 64, 'matcher': 'chicago-type24',
+                   'files': {name: m.digest(data) for name, data in files.items()},
+                   'links': m.LINKS}
+        self.write(m.RUNTIME / 'installation.json', json.dumps(receipt).encode(), 0o600)
+
+    def test_normal_chicago_receipt_preserves_state_and_templates(self):
+        self.chicago_runtime_fixture()
+        self.assertEqual(self.m.remove(), 0)
+        self.assert_removed()
+
+    def test_force_partial_chicago_without_receipts_preserves_state_and_templates(self):
+        self.chicago_runtime_fixture()
+        (self.m.RUNTIME / 'libfprint-2.so.2.0.0').unlink()
+        for path in (self.m.SUPPORT / 'receipt.json', self.m.RUNTIME / 'installation.json',
+                     self.m.RECOVERY / 'receipt.json'):
+            path.unlink()
+        self.assertEqual(self.m.remove(force=True), 0)
+        self.assert_removed()
+
     def test_normal_vendor_missing(self):
         self.remove_vendor()
         self.assertEqual(self.m.remove(), 0)

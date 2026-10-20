@@ -89,18 +89,21 @@ Report the result, exact error, failure point and whether password login and the
 desktop work. Do not send protected files, templates or fingerprint images.
 [Validation scope](VALIDATION.md) records the current evidence and limitations.
 
-## Return from Milan to SIGFM
+## Return from ChicagoHS to SIGFM
 
-Remove Milan with `goodix-uninstall`, or use `goodix-force-remove` for damaged
-software, then follow the restart instruction and verify password login. Use a
-separate clean `main` clone and its ordinary `./install.sh` procedure to reinstall
-SIGFM; no library is copied manually. This avoids asking an older SIGFM remover
-to interpret a Milan receipt. The Milan remover also recognizes existing SIGFM
-receipts for an update to Milan.
+Remove ChicagoHS with `goodix-uninstall`, or use `goodix-force-remove` for damaged
+software. Follow the restart instruction and verify password login. Then use a
+separate clean `main` clone and its ordinary installer:
 
-Milan and SIGFM enrollments are incompatible. A new enrollment is mandatory for
-Milan; after returning to SIGFM, enroll again if no valid SIGFM enrollment remains.
-Neither removal command resets the sensor, changes its pairing, or deletes
-fingerprint files. The Milan diagnostic executable and preparer belong to the
-runtime receipt and are removed with the runtime. Private diagnostic sessions,
-calibration and captures under `development/` are outside software removal.
+```bash
+git clone --branch main --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$HOME/goodix-5125-sigfm"
+cd "$HOME/goodix-5125-sigfm"
+./install.sh
+```
+
+Choose a new destination if that directory exists. No library is copied manually.
+The ChicagoHS remover accepts current ChicagoHS, legacy Milan and SIGFM receipts;
+remove ChicagoHS before installing SIGFM so an older remover need not interpret a
+new receipt. Historical templates remain on disk. Enroll again with SIGFM only if
+no valid SIGFM enrollment remains. Private captures and calibration are outside
+software removal. There is no purge command or automatic biometric deletion.

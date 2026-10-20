@@ -39,9 +39,9 @@ option('goodix_production_minimal',
        value: false,
        description: 'Build the Goodix production library without configuring test targets')
 
-option('goodix_milan', type: 'boolean', value: false,
-       description: 'Milan-only Goodix build; production builder requires checked native sources')
-option('goodix_milan_native_archive', type: 'string', value: '',
-       description: 'Pinned C1 native PIC archive built from checked sources')
-option('goodix_milan_native_include', type: 'string', value: '',
-       description: 'Pinned C1 native header directory from checked sources')
+option('goodix_chicago', type: 'boolean', value: true,
+       description: 'ChicagoHS-only Goodix build; production builder requires checked native sources')
+option('goodix_chicago_native_archive', type: 'string', value: '',
+       description: 'Pinned Chicago computational PIC archive built from checked sources')
+option('goodix_chicago_native_include', type: 'string', value: '',
+       description: 'Pinned Chicago computational header directory from checked sources')

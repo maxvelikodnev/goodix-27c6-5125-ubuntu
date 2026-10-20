@@ -216,7 +216,7 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         path = r.RUNTIME / relative
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
         write_file(path, (payload / name).read_bytes(),
-                   0o755 if relative == 'goodix-milan-diagnostic' else 0o644)
+                   0o644)
         hashes[relative] = digest
     links = {}
     for name, target in manifest['links'].items():
@@ -228,7 +228,7 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         'rule': r.RULE, 'owned': not rule_preexisting,
         'preexisting': rule_preexisting, 'phase': 'ready'}
     write_json(r.RUNTIME / 'installation.json', {'schema': 2, 'source_id': manifest['source_id'],
-        'matcher': 'milan-type17',
+        'matcher': 'chicago-type24',
         'files': hashes, 'links': links, 'material_selinux': material_selinux,
         'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
         'state_root': str(r.STATE)})
@@ -465,10 +465,8 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 print('GOODIX_ROLLBACK=PASS PRIOR_PROJECT_SOFTWARE_RESTORED=true', file=sys.stderr)
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')
-    print('Milan requires new enrollment for every finger/user; SIGFM templates are incompatible.')
-    print('Ordinary Milan authentication requires qualified calibration. '
-          'Use the diagnostic tool only under separate M5 live authorization. '
-          'The service was not started by installation.')
+    print('ChicagoHS requires new enrollment for every finger/user; SIGFM and Milan templates are incompatible.')
+    print('Live biometric qualification remains pending. The service was not started by installation.')
     print('Removal: goodix-uninstall. Emergency recovery: goodix-force-remove.')
 
 
@@ -503,7 +501,7 @@ def main():
     require(os.geteuid() != 0, 'run ./install.sh as your ordinary user; it requests sudo itself')
     require(args.owner_uid is None and args.default_materials is None, 'invalid invocation')
     # An incomplete or modified native source set must stop before sudo/packages.
-    builder.validate_milan_sources()
+    builder.validate_chicago_sources()
     supported_system()
     if args.check:
         prerequisites()

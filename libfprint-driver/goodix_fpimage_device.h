@@ -67,8 +67,8 @@ typedef struct _GUsbDevice GUsbDevice;
  * contact; completion is driven solely by the 21st accepted sample. */
 #define GOODIX_SIGFM_ENROLL_PHYSICAL_CONTACTS_UNBOUNDED G_MAXUINT
 
-#ifdef GOODIX_LIBFPRINT_MILAN
-#define GOODIX_BIOMETRIC_ENROLL_STAGES 18u
+#ifdef GOODIX_LIBFPRINT_CHICAGO
+#define GOODIX_BIOMETRIC_ENROLL_STAGES 12u
 #else
 #define GOODIX_BIOMETRIC_ENROLL_STAGES GOODIX_SIGFM_ENROLL_REQUIRED_STAGES
 #endif
@@ -389,24 +389,12 @@ void goodix_device_context_emit_terminal_error       (GoodixDeviceContext *ctx,
 void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext *ctx,
                                                             guint64 generation);
 
-#if defined(GOODIX_LIBFPRINT_MILAN) && defined(GOODIX_ENABLE_TEST_SEAMS)
-/* Deliberately invalid synthetic evidence: reaches the shared input validator,
- * never a private file or a persistent pairing command. */
-gboolean goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx,
-                                                              GError **error);
-/* Offline inert-byte seam; no file, key, sensor or privileged operation. */
-gboolean goodix_device_context_test_milan_diagnostic_arm (GoodixDeviceContext *ctx,
-                                                        const gchar *directory, GError **error);
-gboolean goodix_device_context_test_milan_experimental_arm (GoodixDeviceContext *ctx,
-                                                           const gchar *directory, GError **error);
-gboolean goodix_device_context_test_milan_native_arm (GoodixDeviceContext *ctx, const gchar *directory, GError **error);
-gboolean goodix_device_context_test_milan_native_source_guard (GoodixDeviceContext *ctx, GError **error);
-gboolean goodix_device_context_test_milan_native_background (GoodixDeviceContext *ctx, const guint16 *background,
-                                                             gsize count, guint64 generation, GError **error);
-gboolean goodix_device_context_test_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size);
-gboolean goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,
-                                                       const guint8 *payload,
-                                                       gsize size, GError **error);
+
+
+#if defined(GOODIX_LIBFPRINT_CHICAGO) && defined(GOODIX_ENABLE_TEST_SEAMS)
+gboolean goodix_device_context_test_chicago_prepare (GoodixDeviceContext *ctx, const guint8 otp[64], const guint16 background[5120], GError **error);
+gboolean goodix_device_context_test_chicago_pairing_activation (GoodixDeviceContext *ctx, GError **error);
+gboolean goodix_device_context_test_chicago_native_source_guard (GoodixDeviceContext *ctx, GError **error);
 #endif
 
 G_END_DECLS

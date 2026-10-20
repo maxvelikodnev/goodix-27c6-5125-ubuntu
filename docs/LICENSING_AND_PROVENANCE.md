@@ -17,9 +17,7 @@ change the original copyright or grant of any source file.
 | APP12509 live preflight | Project source; independently implemented from the repository's documented command contracts | LGPL-2.1-or-later; bounded A2/A8/E4/chip/OTP read-only discovery and CONFIG90 derivation, with no persistent command or retry |
 | APP12509 pairing provision boundary | Minimal adaptation of the project-authored qualified PSK PoC | GPL-2.0-or-later; fixed E0 construction, one-logical-write guard, exact ACK/completion parser and readback/TLS proof gates; no USB ownership, automatic retry or firmware command |
 | APP12509 pairing activation | Project source | LGPL-2.1-or-later; crash-safe PREPARED reservation, host pairing state reconciliation and bounded orchestration of the separately licensed pairing-provision boundary, readbacks, TLS and ACTIVE promotion |
-| SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
-| Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
-| OpenCV | Fedora OpenCV 4 packages (actual installed version recorded at build) | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
+| ChicagoHS | berkekbgz/libfprint-goodix-spi, commit `010a665f54089a1632b1ab7be588b316ace934e2` | LGPL-2.1-or-later; original computational C units, no SPI transport |
 | libgusb | Fedora system library | LGPL-2.1-or-later; USB dependency, not privately bundled |
 | OpenSSL | Fedora system library | Apache-2.0; TLS dependency |
 | Lifecycle and Plasma selector tools | Project source | GPL-2.0-or-later; ordinary Linux-PAM APIs, Python standard library and Fedora tools |
@@ -38,17 +36,15 @@ architecture. Each separately supplied package retains its own license.
 
 ## Combined library and notices
 
-The Goodix-enabled libfprint incorporates GPL-2.0-or-later preprocessing and
+The Goodix-enabled libfprint incorporates GPL-2.0-or-later configuration and pairing code and
 links Apache-2.0 components. Applicable later-version grants allow the combined
 library to be conveyed under GPL-3.0-or-later. Individual source files retain
 their own notices and licenses; GPL code is not relabelled as LGPL.
 
-SIGFM library build outputs include the applicable license texts, OpenCV's
-license corpus read from the installed Fedora RPM license files, source manifests
-and build provenance. The Milan-only payload omits OpenCV and carries original
-native notices and license texts in `Milan-NOTICES.txt`. Each local build records the actual package versions and
-payload hashes. Those records describe the produced software; they do not
-constitute an exhaustive dependency SBOM.
+The ChicagoHS-only payload omits SIGFM, Milan and OpenCV. It carries native
+notices in `ChicagoHS-NOTICES.txt` and applicable license texts. Each local build
+records actual package versions, source hashes, native dependency audit and
+payload hashes. Those records are not an exhaustive dependency SBOM.
 
 ## Source provenance
 
@@ -57,14 +53,6 @@ The exact target-specific source paths, licenses and origins are recorded in
 [`production/source-files.sha256`](../production/source-files.sha256).
 The [Fedora libfprint provenance record](../reference/libfprint-fedora44-1.94.100/PROVENANCE.md)
 identifies the original archive/source-package hashes and downstream changes.
-
-The four SIGFM files are `sigfm.cpp`, `sigfm.h`, `binary.hpp` and `img-info.hpp`
-under `Rockytkg/libfprint/libfprint/sigfm/`. Their notices identify Matthieu
-Charette, Natasha England-Elbro, Timur Mangliev and other credited contributors.
-The preprocessing files `libfprint-driver/rockytkg-imgproc/goodix_imgproc.c`
-and `.h` derive from Rockytkg's `src/goodix_imgproc.c` and
-`include/goodix_imgproc.h` at the commit above. Firmware, provisioning, USB
-control and debug-dump behavior are not incorporated with that subset.
 
 Local lifecycle and recovery code uses this project's ownership/receipt formats;
 no new external implementation or license boundary is introduced by the removal
@@ -115,31 +103,21 @@ only after TLS.
 It introduces no copied external implementation; the combined library remains
 subject to the licensing boundary described above.
 
-## Experimental Milan candidate
+## ChicagoHS computational backend
 
-The canonical builder consumes the pinned C source set under
-`production/milan-native/`: the original recipe, source/header files, original
-notices, per-file digests and source manifest. It builds 94 PIC C objects in a
-static archive, without the upstream worker or transport. The set comes from
-FreshHomie/goodix521d-fprintd `v0.1.0-19`, commit
-`4f48c482f35976ea4fac27d5e598730581c4f380`, and Milan revision
-`e68eb725b1a7845b401b1a3c9b0790921f12133e`. The recipe digest is
-`c992bf284cc4d615807a635bf53e8f8ac96746bc3fbcf22e23393bae3ad5250b`.
-The build validates this source set and requires no private checkout or data.
+The canonical builder consumes only the pinned source set in
+`production/chicago-native/` from `berkekbgz/libfprint-goodix-spi` at
+`010a665f54089a1632b1ab7be588b316ace934e2`. Imported files retain original
+copyright headers and LGPL-2.1-or-later terms. `PROVENANCE.md`, `NOTICES.txt`,
+`LICENSE` and `source-manifest.json` record origins, licensing and SHA-256 hashes.
+The C sources are built into a static PIC archive linked into libfprint; there is
+no separate library to copy or fetch during installation. The dependency audit
+permits only the vendored computational sources and system headers/libraries.
 
-The repository owner's explicit distribution decision of 20 October 2026
-accepts the examined native MIT/RVA portions under the licenses established by
-upstream provenance (MIT/LGPL as applicable). This closes the recorded
-publication gate for this project; it is not an independent legal certification.
-Original per-file notices and upstream license texts are preserved in
-`production/milan-native/NOTICES.txt` and in the built payload. Reader data,
-firmware and OEM binaries are excluded from this decision.
-
-The settled LGPL-2.1-or-later grant for `milan/match/candidate.c` (blob
-`c416e882b73c9d564d5a5d91ac08e5eb73bd12d3`) and `policy.c` (blob
-`b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455`) follows
-seaweeduk PR #28, AndyHazz's pinned Milan revision and C1.
-The SIGFM payload on `main` retains the licensing boundary above.
+No GDIX51C0 SPI transport, upstream fprintd patch, OEM binary or calibration file
+is incorporated. Native learning/templateStudy is disabled by the adapter.
+Original source bodies are unchanged; integration and print-envelope code are
+project-authored and retain their own per-file notices.
 
 ## Excluded material
 

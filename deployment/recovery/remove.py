@@ -108,13 +108,13 @@ def runtime_inventory(receipt):
     for name in files:
         require(isinstance(name, str) and re.fullmatch(r'(?:licenses/)?[A-Za-z0-9_.+-]+', name)
                 and name not in ('.', '..', 'installation.json'), 'unsafe runtime file name')
-    # Old receipts describe SIGFM. Milan keeps the same software paths and
-    # ownership checks, but has no OpenCV runtime to remove.
+    # Keep SIGFM and Milan receipts readable for migration and recovery.
+    # ChicagoHS retains the same software paths and ownership checks.
     matcher = receipt.get('matcher', 'sigfm')
-    require(matcher in ('sigfm', 'milan-type17'), 'unsupported runtime matcher')
-    if matcher == 'milan-type17':
+    require(matcher in ('sigfm', 'milan-type17', 'chicago-type24'), 'unsupported runtime matcher')
+    if matcher in ('milan-type17', 'chicago-type24'):
         require(not any(name.startswith('libopencv_') or name == 'OpenCV-LICENSES.txt'
-                        for name in files), 'unexpected OpenCV files in Milan runtime')
+                        for name in files), 'unexpected OpenCV files in native C runtime')
     else:
         for part in ('core', 'features2d', 'flann', 'imgproc'):
             require(sum(bool(re.fullmatch(r'libopencv_' + part + r'\.so\.[0-9.]+', name))

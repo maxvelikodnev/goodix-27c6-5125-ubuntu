@@ -1,101 +1,46 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix 27c6:5125 — experimental Milan branch
+# Goodix 27c6:5125 — ChicagoHS branch
 
-`porting_milan_type_17` contains an experimental, installable Milan Type 17
-release candidate built from its versioned sources with `./install.sh`.
-Milan live qualification is pending. Calibration acquisition and device binding
-are under study; the controlled diagnostic path requires separate authorization,
-and ordinary authentication remains closed until calibration is qualified.
-Milan requires new enrollment for every finger/user; SIGFM templates are
-incompatible. `main` remains the SIGFM recovery baseline.
-See [installation](docs/INSTALLATION.md), [recovery](docs/UNINSTALL.md) and
+`porting_ChicagoHS` contains the ChicagoHS Type 24 driver for **Fedora 44 KDE
+x86_64**, Goodix USB `27c6:5125` and APP12509/APP12508 firmware. The canonical
+source build integrates with Fedora's stock libfprint/fprintd/PAM/KDE interfaces.
+Live biometric and desktop qualification remains **NOT_RUN**; use an isolated
+VM without USB passthrough for initial software validation.
+
+ChicagoHS replaces the matcher and requires new twelve-stage enrollment for each
+finger/user. Historical SIGFM and Milan templates are preserved but incompatible.
+There is no alternative matcher or private diagnostic path in the payload.
+`main` remains the SIGFM recovery baseline. See the precise
 [qualification boundary](docs/VALIDATION.md).
 
-The supported configuration and hardware results described below concern SIGFM
-on `main`; they do not establish Milan behavior.
+## Installation and recovery
 
-Fingerprint driver for the Goodix USB reader `27c6:5125` running
-`GF_ST411SEC_APP_12509` or `GF_ST411SEC_APP_12508`. It connects a Goodix-enabled
-libfprint library to Fedora's fprintd service and desktop authentication,
-initializing the reader by itself on first use while preserving factory firmware
-and factory data.
+Follow the [canonical installation block](docs/INSTALLATION.md). `./install.sh`
+automatically selects first installation or update, builds from this source tree,
+and installs the login selector and two recovery commands. No private source,
+Windows file or upstream download is needed for the build. Fedora development
+packages may be installed through the system package manager.
 
-## Supported configuration
+Use **`goodix-uninstall`** for ordinary removal or **`goodix-force-remove`** from
+a TTY for damaged installations. Both work without the clone, network or reader,
+preserve host pairing state and fingerprint templates, and remove project
+software without replacing Fedora vendor files. Follow the
+[recovery instructions](docs/UNINSTALL.md), including the restart instruction.
 
-- Fedora 44 KDE, x86_64, with local user accounts.
-- Goodix USB `27c6:5125`, recognized firmware `GF_ST411SEC_APP_12509` and
-  `GF_ST411SEC_APP_12508`.
-- Fedora-provided fprintd, PAM, Plasma Login, KScreenLocker, sudo and PolicyKit.
+## Authentication
 
-Within the supported Fedora 44 KDE scope, the project integrates enrollment,
-verification, screen unlocking, ordinary sudo, PolicyKit, Plasma fingerprint
-login and password fallback through Fedora's existing authentication stack.
-Fedora qualification concerns one APP12509 reader. APP12508 has contributor-reported
-pairing, enrollment, VERIFY and IDENTIFY evidence on a Huawei MateBook D with
-Ubuntu GNOME; this does not extend the supported Fedora platform to Ubuntu/GNOME
-or qualify the full Fedora authentication path on APP12508. See
-[validation and limitations](docs/VALIDATION.md).
-
-## Installation
-
-> [!WARNING]
-> **This Milan branch is an experimental RC for separately authorized M5 testing.**
-> Use official releases or `main` for the qualified SIGFM baseline.
-
-**[Install using the single copy-paste block](docs/INSTALLATION.md).** The root
-`install.sh` automatically selects first installation (`FIRST_INSTALL`) or update
-(`UPDATE`), builds the runtime from this source tree, and installs the login
-integration and removal commands. It requests normal sudo authentication when
-needed.
-
-You need an administrative access. Git must be
-available to run the bootstrap block.
-
-After a successful installation, the repository clone may be removed.
-
-## Using fingerprint authentication
-
-The first fingerprint action initializes the reader by itself.
-
-Manage enrolled fingers through KDE's fingerprint settings. At Plasma Login,
-a nonempty password uses ordinary password login immediately. Submitting an
-empty password field explicitly selects fingerprint authentication, with at
-most three attempts and a stop on the first match. After selecting fingerprint,
-allow roughly one second before touching the reader.
-
-Keep password access available. Fingerprint login does not automatically unlock
-a password-encrypted KWallet.
-
-## Uninstall and emergency recovery
-
-Run **`goodix-uninstall`** from a working desktop terminal. If graphical login
-is unavailable, follow the [text-console emergency instructions](docs/UNINSTALL.md)
-and run **`goodix-force-remove`**. Both commands request their own sudo
-authentication, preserve host pairing state and templates, and work after
-the clone is removed.
-
-## Learn how it works
-
-New to Linux fingerprint authentication? **[Goodix Behind the Scenes](docs/learning/README.md)**
-is a beginner-friendly tour from the desktop prompt to the sensor, image,
-template and final match decision. It uses diagrams and plain-language analogies;
-the technical manual remains the canonical specification.
+Manage fingerprints through KDE's fingerprint settings. A nonempty password at
+Plasma Login selects password authentication; an empty submission selects the
+fingerprint path, with at most three attempts and stop on the first match.
+Keep password access available. Fingerprint login does not unlock a
+password-encrypted KWallet. Hardware behavior must be qualified before relying
+on this branch for authentication.
 
 ## Documentation
 
-- [Beginner learning guide](docs/learning/README.md)
 - [Installation and updates](docs/INSTALLATION.md)
 - [Uninstall and emergency recovery](docs/UNINSTALL.md)
+- [Validation and limitations](docs/VALIDATION.md)
 - [Technical architecture](TECHNICAL_MANUAL.md)
-- [Security and privacy](docs/SECURITY.md)
-- [Validation scope and known limitations](docs/VALIDATION.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
-- [Upstream references](docs/REFERENCES.md)
-- [Source build and validation checks](production/README.md)
-
-## License and acknowledgements
-
-Licensing is per file. The Goodix-enabled combined library is conveyed under
-`GPL-3.0-or-later`; individual files retain their original notices and terms.
-See [licensing and provenance](docs/LICENSING_AND_PROVENANCE.md) and
-[acknowledgements](ACKNOWLEDGEMENTS.md).
+- [Security and privacy](docs/SECURITY.md)

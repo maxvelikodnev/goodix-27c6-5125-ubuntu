@@ -14,65 +14,28 @@
     "private_workspace": "development/"
   },
   "phase_routes": {
-    "M0": [
+    "CH0": [
       "CORROBORATIONS.md",
-      "TECHNICAL_MANUAL.md",
-      "docs/LICENSING_AND_PROVENANCE.md",
-      "docs/VALIDATION.md"
+      "development/private-root/analysis/CH0_chicago/CH0_OFFLINE_REPORT_2026-10-20.md"
     ],
-    "M1": [
-      "CORROBORATIONS.md",
-      "production/README.md",
-      "libfprint-driver/README.md"
+    "CH1": [
+      "production/chicago-native/source-manifest.json",
+      "libfprint-driver/goodix_chicago.c"
     ],
-    "M2": [
-      "CORROBORATIONS.md",
-      "TECHNICAL_MANUAL.md",
+    "CH2": [
       "libfprint-driver/goodix_fpimage_device.c"
     ],
-    "M3": [
-      "CORROBORATIONS.md",
-      "docs/VALIDATION.md",
-      "libfprint-driver/goodix_fpimage_device.c",
-      "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp"
-    ],
-    "M4": [
-      "production/README.md",
-      "libfprint-driver/goodix_fpimage_device.c",
-      "docs/LICENSING_AND_PROVENANCE.md",
-      "libfprint-driver/goodix_milan.c",
-      "production/build-milan-candidate.py",
-      "libfprint-driver/tests/run_goodix_fpimage_device_test_inner.sh",
-      "development/private-root/analysis/M4_milan/qualification.json",
-      "libfprint-driver/tests/test_goodix_milan.c",
-      "development/private-root/m4-libfprint-candidate-final/build-provenance.json"
-    ],
-    "M5": [
+    "CH3": [
       "production/build-public.py",
-      "production/build-milan-native.py",
-      "production/README.md",
       "deployment/install.py",
       "deployment/recovery/remove.py",
-      "deployment/test_install.py",
-      "libfprint-driver/goodix_milan.c",
-      "libfprint-driver/tests/test_goodix_milan_contract.c",
       "docs/INSTALLATION.md",
-      "docs/UNINSTALL.md",
+      "docs/UNINSTALL.md"
+    ],
+    "CH4": [
       "docs/VALIDATION.md",
       "docs/LICENSING_AND_PROVENANCE.md",
-      "production/milan-native/source-manifest.json",
-      "production/milan-diagnostic.c",
-      "production/prepare-milan-diagnostic.py",
-      "development/private-root/analysis/M5_milan/m5a-public-qualification.json",
-      "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md",
-      "production/test_milan_background.c",
-      "production/run_milan_background_test.py",
-      "development/private-root/analysis/M5_milan/M5C_ALIGNMENT_REPORT_2026-10-20.md",
-      "development/private-root/analysis/M5_milan/m5c-background-init.json"
-    ],
-    "M6": [
-      "CORROBORATIONS.md",
-      "libfprint-driver/goodix_fpimage_device.c"
+      "development/private-root/analysis/CHICAGO_RC_2026-10-21/"
     ]
   },
   "routing_rule": "Leggere i file canonici e lo stato; caricare poi solo gli artefatti pertinenti. C1 e C2 rimandano a fonti esterne: non duplicare dossier senza necessità."

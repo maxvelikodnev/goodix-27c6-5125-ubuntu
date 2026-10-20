@@ -20,18 +20,16 @@ LIBFPRINT_SOURCE = Path('reference/libfprint-fedora44-1.94.100/source')
 LOGIN_SOURCE = Path('deployment/plasma-login-opt-in')
 BUILD_PACKAGES = ('gcc', 'meson', 'ninja-build', 'pkgconf-pkg-config',
                   'glib2-devel', 'libgusb-devel', 'libusb1-devel', 'openssl-devel',
-                  'json-glib-devel', 'pam-devel', 'binutils', 'libdeflate')
+                  'json-glib-devel', 'pam-devel', 'binutils')
 LICENSES = ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0', 'MIT')
-DIAGNOSTIC = 'runtime/goodix-milan-diagnostic'
-DIAGNOSTIC_PREPARE = 'runtime/prepare-milan-diagnostic.py'
-EXECUTABLES = {'check-material', DIAGNOSTIC}
+EXECUTABLES = {'check-material'}
 BASE_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL': 'C'}
-spec = importlib.util.spec_from_file_location('goodix_native_builder', ROOT / 'production/build-milan-native.py')
+spec = importlib.util.spec_from_file_location('goodix_native_builder', ROOT / 'production/build-chicago-native.py')
 native = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(native)
 
 
-def validate_milan_sources():
+def validate_chicago_sources():
     """Read-only preflight, before package installation or any privilege request."""
     return native.validate_sources(ROOT)
 
@@ -76,9 +74,7 @@ def source_inventory():
     if (ROOT / native.NATIVE_SOURCE).is_dir():
         roots.append(native.NATIVE_SOURCE)
     files = [ROOT / 'production/build-public.py',
-             ROOT / 'production/build-milan-native.py',
-             ROOT / 'production/milan-diagnostic.c',
-             ROOT / 'production/prepare-milan-diagnostic.py',
+             ROOT / 'production/build-chicago-native.py',
              *(ROOT / 'deployment' / name for name in
                ('check-material.c', 'materials.py', 'test_material_native.c', 'test_materials.py')),
              ROOT / 'production/host-test-only-symbols.txt',
@@ -125,12 +121,12 @@ def validate_payload(directory):
             and isinstance(manifest['files'], dict) and isinstance(manifest['links'], dict),
             'invalid payload manifest')
     files, links = manifest['files'], manifest['links']
-    fixed = {'runtime/libfprint-2.so.2.0.0', 'runtime/Milan-NOTICES.txt',
+    fixed = {'runtime/libfprint-2.so.2.0.0', 'runtime/ChicagoHS-NOTICES.txt',
              'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
              'runtime/build-provenance.json', 'login/pam_goodix_login_gate.so',
-             'login/plasmalogin.pam', 'check-material', DIAGNOSTIC, DIAGNOSTIC_PREPARE,
+             'login/plasmalogin.pam', 'check-material',
              *(f'runtime/licenses/{name}.txt' for name in LICENSES)}
-    require(set(files) == fixed, 'unexpected Milan payload file inventory')
+    require(set(files) == fixed, 'unexpected ChicagoHS payload file inventory')
     require(links == {'runtime/libfprint-2.so.2': 'libfprint-2.so.2.0.0',
                       'runtime/libfprint-2.so': 'libfprint-2.so.2'}, 'unexpected payload links')
     actual = set()
@@ -183,7 +179,7 @@ def pam_synthetic_tests(work):
 
 def build_payload(output):
     output = Path(output)
-    validate_milan_sources()
+    validate_chicago_sources()
     prerequisites()
     require(output.is_absolute() and not output.exists() and not output.is_symlink(),
             'build output must be a new absolute directory')
@@ -208,8 +204,8 @@ def build_payload(output):
             '--buildtype=release', '--wrap-mode=nodownload', '-Ddrivers=goodix_27c6_5125',
             '-Dintrospection=false', '-Ddoc=false', '-Dinstalled-tests=false',
             '-Dudev_rules=disabled', '-Dudev_hwdb=disabled', '-Dgoodix_production_minimal=true',
-            '-Dgoodix_milan=true', '-Dgoodix_milan_native_archive=' + str(archive),
-            '-Dgoodix_milan_native_include=' + str(native_include),
+            '-Dgoodix_chicago=true', '-Dgoodix_chicago_native_archive=' + str(archive),
+            '-Dgoodix_chicago_native_include=' + str(native_include),
             '-Dc_args=' + json.dumps(cflags), env=env)
         run('meson', 'compile', '-C', build, 'fprint-2', env=env)
         library = build / 'libfprint/libfprint-2.so.2.0.0'
@@ -218,37 +214,14 @@ def build_payload(output):
         forbidden = set((ROOT / 'production/host-test-only-symbols.txt').read_text().splitlines())
         require(not symbols & forbidden, 'test-only entrypoints present in production library')
         all_symbols = run('nm', library).lower()
-        require('sigfm' not in all_symbols and 'opencv' not in all_symbols,
-                'SIGFM/OpenCV symbols present in Milan library')
+        require('sigfm' not in all_symbols and 'opencv' not in all_symbols and 'milan' not in all_symbols,
+                'Milan/SIGFM/OpenCV symbols present in ChicagoHS library')
         dynamic = run('readelf', '-d', library).lower()
         require(not any(name in dynamic for name in ('opencv', 'libstdc++', 'libc++')),
-                'SIGFM/OpenCV/C++ runtime dependency present in Milan library')
+                'SIGFM/OpenCV/C++ runtime dependency present in ChicagoHS library')
         shutil.copyfile(library, runtime / library.name)
         (runtime / 'libfprint-2.so.2').symlink_to(library.name)
         (runtime / 'libfprint-2.so').symlink_to('libfprint-2.so.2')
-        diagnostic = output / DIAGNOSTIC
-        diagnostic_flags = shlex.split(run('pkg-config', '--cflags', '--libs',
-                                           'gio-2.0', 'gobject-2.0', 'gusb'))
-        run('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2',
-            '-I' + str(ROOT / LIBFPRINT_SOURCE / 'libfprint'),
-            '-I' + str(build / 'libfprint'),
-            f'-ffile-prefix-map={ROOT}=/usr/src/goodix',
-            f'-ffile-prefix-map={work}=/usr/src/goodix-build',
-            ROOT / 'production/milan-diagnostic.c', '-L' + str(runtime), '-lfprint-2',
-            *diagnostic_flags, '-Wl,-z,relro,-z,now', '-Wl,--no-undefined',
-            '-Wl,-rpath,$ORIGIN', '-o', diagnostic)
-        diagnostic_dynamic = run('readelf', '-d', diagnostic)
-        require(re.findall(r'\((?:RUNPATH|RPATH)\).*?\[([^]]+)\]', diagnostic_dynamic) == ['$ORIGIN'],
-                'diagnostic must load only its colocated Milan library')
-        diagnostic_linked = run('ldd', diagnostic)
-        require(str(runtime / 'libfprint-2.so.2') in diagnostic_linked and
-                'not found' not in diagnostic_linked,
-                'diagnostic dependency resolution failed for the built Milan library')
-        require(not any(name in diagnostic_linked.lower() for name in ('opencv', 'libstdc++', 'libc++')),
-                'OpenCV/C++ dependency present in diagnostic resolution')
-        run(diagnostic, '--offline-check')
-        shutil.copyfile(ROOT / 'production/prepare-milan-diagnostic.py', output / DIAGNOSTIC_PREPARE)
-        run('python3', '-I', '-B', output / DIAGNOSTIC_PREPARE, '--offline-check')
         run('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-fPIC', '-shared',
             ROOT / LOGIN_SOURCE / 'pam_goodix_login_gate.c', '-lpam',
             '-Wl,-z,relro,-z,now', '-Wl,--no-undefined', '-o', login / 'pam_goodix_login_gate.so')
@@ -275,13 +248,13 @@ def build_payload(output):
             'stock fprintd dependency resolution failed')
     require(not any(name in linked.lower() for name in ('opencv', 'libstdc++', 'libc++')),
             'OpenCV/C++ dependency present in stock fprintd resolution')
-    shutil.copyfile(ROOT / native.NATIVE_SOURCE / 'NOTICES.txt', runtime / 'Milan-NOTICES.txt')
+    shutil.copyfile(ROOT / native.NATIVE_SOURCE / 'NOTICES.txt', runtime / 'ChicagoHS-NOTICES.txt')
     shutil.copyfile(ROOT / 'docs/LICENSING_AND_PROVENANCE.md', runtime / 'LICENSING_AND_PROVENANCE.md')
     (runtime / 'licenses').mkdir()
     for name in LICENSES:
         shutil.copyfile(ROOT / 'LICENSES' / (name + '.txt'), runtime / 'licenses' / (name + '.txt'))
     (runtime / 'source-files.sha256').write_text(inventory)
-    provenance = {'source_id': source_id, 'matcher': 'milan-type17',
+    provenance = {'source_id': source_id, 'matcher': 'chicago-type24',
                   'native': native_provenance,
                   'packages': run('rpm', '-q', *BUILD_PACKAGES, 'fprintd').splitlines()}
     (runtime / 'build-provenance.json').write_text(json.dumps(provenance, sort_keys=True) + '\n')

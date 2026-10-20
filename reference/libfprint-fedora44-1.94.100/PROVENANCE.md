@@ -13,14 +13,14 @@ This directory is based on the source for Fedora package
 
 The Fedora spec uses the upstream libfprint v1.94.100 archive and has no active
 patch directives. `source/` includes downstream changes for the
-`goodix_27c6_5125` driver, SIGFM print semantics, bounded enrollment and
+`goodix_27c6_5125` driver, ChicagoHS RAW-print semantics, bounded enrollment and
 verification, and the production-minimal Meson option. It is therefore not
 byte-identical to the upstream archive.
 
-The Milan build adds an internal RAW-print completion seam to the existing
+The ChicagoHS build adds an internal RAW-print completion seam to the existing
 image-device lifecycle and a Meson link to the pinned native C engine. The
-canonical branch builder selects Milan and provides the archive built from its
-checked versioned source set under `production/milan-native/`. Meson configures C++ only for the SIGFM build. The exported libfprint
+canonical branch builder selects ChicagoHS and provides the archive built from its
+checked versioned source set under `production/chicago-native/`. This branch builds only the ChicagoHS C matcher. The exported libfprint
 ABI remains unchanged.
 
 Upstream and Fedora source files retain their original per-file copyright and
