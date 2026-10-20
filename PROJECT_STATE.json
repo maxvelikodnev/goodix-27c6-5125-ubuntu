@@ -31,12 +31,12 @@
     "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md"
   ],
   "current_blockers": [
-    "M5.B requires explicit separate authorization in the operator-selected Fedora environment for canonical installation, root, exclusive real USB access, protected M3 staging/import if needed, existing valid Linux pairing, one diagnostic capture and offline comparison.",
+    "M5.B capture requires separate explicit authorization in the operator-selected Fedora for canonical installation, root, exclusive real USB, only the pinned protected goodix_calib.dat input, and already-valid local Linux pairing. Optional result transfer and M3 analysis require later specific consent.",
     "Calibration acquisition/physical binding and original16-byte prefix semantics remain UNKNOWN. Ordinary authentication stays closed; explicit diagnostic-only path is ready."
   ],
   "license_notes": "User decisions: 2026-10-18 candidate.c/policy.c LGPL-2.1-or-later grant settled through seaweeduk PR28 -> AndyHazz e68eb725 -> C1. 2026-10-20 examined native MIT/RVA portions approved for redistribution under established upstream MIT/LGPL provenance; original notices, recipe and hashes preserved. Repository-owner distribution decision, not independent legal certification; no reader data, firmware or OEM binary publication authorized.",
-  "next_action": "Request M5_B_LIVE_CALIDATA_AND_AUTHORIZATION using the single environment-neutral private gate: prepare local pinned SIGFM recovery and the four protected diagnostic inputs, verify unchanged RC sources, canonical install, one protected 30s capture without E0, independent M3 comparison, then STOP. No live PASS, ordinary enrollment/auth or M6 authorized.",
-  "last_verified_head": "d461aec80ef01c280cdc9286812f54efa436f26b",
+  "next_action": "Request the single M5_B_LIVE_CALIDATA_AND_AUTHORIZATION gate: pinned local SIGFM recovery, unchanged RC, only protected goodix_calib.dat, one 30s diagnostic capture without E0, local integrity and clean-close checks, then STOP. Historical M3 tools stay solely in the existing analysis environment; transfer only four new outputs plus private integrity manifest if indispensable and separately authorized. No live PASS or ordinary authentication authorized.",
+  "last_verified_head": "388e47e1b8a950d900fe7acd0857eca980e904d1",
   "relevant_corroborations": [
     "C1",
     "C2",
@@ -44,12 +44,12 @@
   ],
   "candidate": "Milan",
   "current_task": {
-    "GOAL": "One environment-neutral portable M5.B diagnostic gate using the unchanged public Milan RC",
-    "STATE_DELTA": "HEAD d461aec changes only ROADMAP after RC 1103a49; public runtime source identity and accepted M5.A offline evidence retained. Operational gate and obsolete public physical-host prescriptions corrected; no live actions.",
-    "SCOPE": "Private M5.B operational gate, obsolete public document sentences and minimal state cache",
-    "REQUIRED_WORK": "Document exclusive Goodix USB access, protected four-file M3 staging in the chosen Fedora, unchanged canonical install/recovery and locally prepared pinned SIGFM rollback",
-    "VERIFY": "Targeted document diff, shell code-block syntax, comparator path dependencies and independent review; reuse accepted builds and tests",
-    "STOP_IF": "Before installation/root/USB/protected material access or transfer/capture without separate specific M5.B authorization."
+    "GOAL": "Separate the portable M5.B Fedora capture from optional historical M3 analysis without changing the RC",
+    "STATE_DELTA": "HEAD 388e47e is documentation/cache-only after RC 1103a49. Gate corrected: capture needs only RC, pinned private caldata and accessible reader with valid local pairing; no historical tools in capture Fedora; no live actions.",
+    "SCOPE": "Existing private M5.B operational gate and minimal non-authoritative state cache",
+    "REQUIRED_WORK": "Document capture-local integrity and STOP; only if indispensable and specifically authorized, transfer four new outputs plus private manifest to existing M3 environment and compare with local reference/caldata; retain canonical install/removal and pinned SIGFM recovery",
+    "VERIFY": "Independent delta review, Bash-block syntax, inline Python AST, JSON and diff checks; accepted RC offline evidence reused, no rebuild",
+    "STOP_IF": "Before root/install/USB/protected caldata/capture without separate specific authorization, and before any later result transfer or M3 analysis without its own specific consent."
   },
   "independent_review": "ACCEPT_AND_CONTINUE (public RC offline; live NOT_RUN)",
   "m5a_status": "READY",
