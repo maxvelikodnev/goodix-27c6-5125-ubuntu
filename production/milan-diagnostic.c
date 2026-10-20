@@ -53,8 +53,9 @@ finger_status (GObject *object, GParamSpec *property, gpointer data)
 static void
 enroll_progress (FpDevice *device, gint stages, FpPrint *print, gpointer data, GError *error)
 {
-  (void) print; (void) data;
-  g_print ("M5C_ENROLL_PROGRESS=%d/%d%s\n", stages, fp_device_get_nr_enroll_stages (device),
+  (void) print;
+  g_print ("%s_ENROLL_PROGRESS=%d/%d%s\n", GPOINTER_TO_INT (data) ? "M5D" : "M5C",
+           stages, fp_device_get_nr_enroll_stages (device),
            error ? " quality/diversity rejected; no stage accepted" : "");
 }
 
@@ -90,10 +91,10 @@ same_file (const struct stat *a, const struct stat *b)
 }
 
 static FpPrint *
-read_template (int directory, GError **error)
+read_template (int directory, const gchar *name, GError **error)
 {
   struct stat before, after, named;
-  int fd = openat (directory, "milan-template.fp", O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+  int fd = openat (directory, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
   FpPrint *print = NULL;
   guint8 *bytes = NULL;
   gsize offset = 0;
@@ -108,7 +109,7 @@ read_template (int directory, GError **error)
       if (count <= 0) goto out;
       offset += (gsize) count;
     }
-  if (fstat (fd, &after) || fstatat (directory, "milan-template.fp", &named, AT_SYMLINK_NOFOLLOW) ||
+  if (fstat (fd, &after) || fstatat (directory, name, &named, AT_SYMLINK_NOFOLLOW) ||
       !same_file (&before, &after) || !same_file (&after, &named)) goto out;
   print = fp_print_deserialize (bytes, offset, error);
 out:
@@ -119,14 +120,14 @@ out:
 }
 
 static gboolean
-save_template (int directory, FpPrint *print, GError **error)
+save_template (int directory, const gchar *name, FpPrint *print, GError **error)
 {
   guint8 *bytes = NULL;
   gsize size = 0, offset = 0;
   int fd = -1;
   gboolean ok = FALSE;
   if (!fp_print_serialize (print, &bytes, &size, error)) return FALSE;
-  fd = openat (directory, "milan-template.fp", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+  fd = openat (directory, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
   if (fd < 0) goto out;
   while (offset < size)
     {
@@ -154,8 +155,9 @@ main (int argc, char **argv)
   g_autoptr(GCancellable) cancellable = NULL;
   g_autoptr(GError) error = NULL;
   guint deadline = 0, interrupt = 0, terminate = 0;
-  gboolean opened = FALSE, armed = FALSE, experimental = FALSE, match = FALSE;
+  gboolean opened = FALSE, armed = FALSE, experimental = FALSE, native = FALSE, match = FALSE;
   const gchar *operation = "capture", *directory = NULL;
+  const gchar *template_name = "milan-template.fp";
   int result = 1, session_fd = -1;
   if (argc == 2 && (!strcmp (argv[1], "--help") || !strcmp (argv[1], "--offline-check")))
     {
@@ -163,17 +165,20 @@ main (int argc, char **argv)
       g_print (!strcmp (argv[1], "--help") ?
         "Usage: goodix-milan-diagnostic --offline-check | --session PRIVATE_DIRECTORY\n"
         "       goodix-milan-diagnostic --m5c enroll|verify|identify --session PRIVATE_DIRECTORY\n"
+        "       goodix-milan-diagnostic --m5d enroll|verify|identify --session PRIVATE_NATIVE_DIRECTORY\n"
+        "M5.D uses only the current session FDT_B0; never Windows calibration.\n"
         "Explicit root/USB/biometric authorization required. M5.B: one capture/30s.\n"
         "M5.C: one enrollment (18 stages, at most 36 contacts/600s), one probe per invocation/30s.\n"
         "At most three verify/identify attempts per session combined; stop at first MATCH.\n"
         "Private Milan template only. No fprintd, PAM, pairing provisioning or automatic retry.\n" :
-        "M5B_OFFLINE_CHECK=PASS M5C_CLI=AVAILABLE LIVE=NOT_RUN PROTECTED_DATA=NOT_OPENED USB=NOT_ENUMERATED\n");
+        "M5B_OFFLINE_CHECK=PASS M5C_CLI=AVAILABLE M5D_CLI=AVAILABLE LIVE=NOT_RUN PROTECTED_DATA=NOT_OPENED USB=NOT_ENUMERATED\n");
       return 0;
     }
   if (argc == 3 && !strcmp (argv[1], "--session")) directory = argv[2];
-  else if (argc == 5 && !strcmp (argv[1], "--m5c") && !strcmp (argv[3], "--session") &&
+  else if (argc == 5 && (!strcmp (argv[1], "--m5c") || !strcmp (argv[1], "--m5d")) && !strcmp (argv[3], "--session") &&
            (!strcmp (argv[2], "enroll") || !strcmp (argv[2], "verify") || !strcmp (argv[2], "identify")))
-    { experimental = TRUE; operation = argv[2]; directory = argv[4]; }
+    { experimental = TRUE; native = !strcmp (argv[1], "--m5d"); operation = argv[2]; directory = argv[4];
+      if (native) template_name = "milan-native-template.fp"; }
   if (!directory || !g_path_is_absolute (directory))
     { g_printerr ("Use --help for explicit session options\n"); return 2; }
   if (geteuid () != 0 || setrlimit (RLIMIT_CORE, &no_core) || prctl (PR_SET_DUMPABLE, 0))
@@ -194,7 +199,7 @@ main (int argc, char **argv)
       if (device) { g_printerr ("STOP: multiple Milan readers\n"); goto out; }
       device = candidate;
     }
-  const gchar *signal = experimental ? "goodix-milan-experimental-arm" : "goodix-milan-diagnostic-arm";
+  const gchar *signal = native ? "goodix-milan-native-arm" : experimental ? "goodix-milan-experimental-arm" : "goodix-milan-diagnostic-arm";
   if (!device || !g_signal_lookup (signal, G_OBJECT_TYPE (device)))
     { g_printerr ("STOP: canonical Milan reader/capability unavailable\n"); goto out; }
   if (!fp_device_open_sync (device, cancellable, &error)) goto out;
@@ -204,13 +209,14 @@ main (int argc, char **argv)
   if (!armed) { g_printerr ("STOP: private authorization/provenance rejected\n"); goto out; }
   if (experimental && !prompts.enrolling)
     {
-      reference = read_template (session_fd, &error);
+      reference = read_template (session_fd, template_name, &error);
       if (!reference) goto out;
       if (!fp_print_compatible (reference, device))
         { g_printerr ("STOP: template is not from this Milan namespace/device\n"); goto out; }
     }
   g_signal_connect (device, "notify::finger-status", G_CALLBACK (finger_status), &prompts);
-  g_print ("M5: wait for APPOGGIA; OTP prefix equality is mandatory. Authentication remains unqualified.\n");
+  g_print ("M5: wait for APPOGGIA; %s Authentication remains unqualified.\n",
+           native ? "Current preflight/TLS and same-session no-finger background are mandatory." : "OTP prefix equality is mandatory.");
   deadline = g_timeout_add_seconds (prompts.enrolling ? 600 : 30, cancel_capture, cancellable);
   if (!experimental)
     {
@@ -224,10 +230,11 @@ main (int argc, char **argv)
     {
       reference = g_object_ref_sink (fp_print_new (device));
       fp_print_set_finger (reference, FP_FINGER_RIGHT_INDEX);
-      fp_print_set_username (reference, "m5c-private-experiment");
-      enrolled = fp_device_enroll_sync (device, reference, cancellable, enroll_progress, NULL, &error);
-      if (!enrolled || !save_template (session_fd, enrolled, &error)) goto out;
-      g_print ("M5C_ENROLL=PASS OTP_PREFIX=MATCH CONTACTS=%u TEMPLATE=private AUTHENTICATION_QUALIFIED=false\n", prompts.contacts);
+      fp_print_set_username (reference, native ? "m5d-private-experiment" : "m5c-private-experiment");
+      enrolled = fp_device_enroll_sync (device, reference, cancellable, enroll_progress, GINT_TO_POINTER (native), &error);
+      if (!enrolled || !save_template (session_fd, template_name, enrolled, &error)) goto out;
+      g_print ("%s_ENROLL=PASS %s CONTACTS=%u TEMPLATE=private AUTHENTICATION_QUALIFIED=false\n",
+               native ? "M5D" : "M5C", native ? "PREFLIGHT=PASS BACKGROUND=CURRENT_FDT_B0 OTP_PREFIX=NOT_APPLICABLE" : "OTP_PREFIX=MATCH", prompts.contacts);
     }
   else
     {
@@ -242,7 +249,9 @@ main (int argc, char **argv)
           if (!fp_device_identify_sync (device, gallery, cancellable, NULL, NULL, &identified, NULL, &error)) goto out;
           match = identified != NULL;
         }
-      g_print ("M5C_PROBE=%s OTP_PREFIX=MATCH CONTACTS=%u AUTHENTICATION_QUALIFIED=false; no automatic retry.\n", match ? "MATCH_STOP" : "NO_MATCH", prompts.contacts);
+      g_print ("%s_PROBE=%s %s CONTACTS=%u AUTHENTICATION_QUALIFIED=false; no automatic retry.\n",
+               native ? "M5D" : "M5C", match ? "MATCH_STOP" : "NO_MATCH",
+               native ? "PREFLIGHT=PASS BACKGROUND=CURRENT_FDT_B0 OTP_PREFIX=NOT_APPLICABLE" : "OTP_PREFIX=MATCH", prompts.contacts);
     }
   result = 0;
 out:

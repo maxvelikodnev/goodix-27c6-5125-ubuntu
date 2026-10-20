@@ -91,6 +91,30 @@ def write_private(fd, name, data):
         os.close(output)
 
 
+def prepare_native_session(path):
+    """Only authorization metadata; no calibration/background source is opened."""
+    if not path.is_absolute() or 'development' not in path.parts:
+        raise ValueError('native session must be absolute inside private development/')
+    parent_fd = open_directory(path.parent)
+    try:
+        parent = os.fstat(parent_fd)
+        if parent.st_uid != 0 or stat.S_IMODE(parent.st_mode) != 0o700:
+            raise ValueError('native session parent must already be root-owned mode0700')
+        os.mkdir(path.name, 0o700, dir_fd=parent_fd)
+        fd = os.open(path.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent_fd)
+        try:
+            write_private(fd, 'receipt.ini',
+                          b'[M5B]\nschema=1\npurpose=M5.D_PRIVATE_LINUX_NATIVE\n'
+                          b'source=CURRENT_SESSION_FDT_B0\ndevice_binding=LIVE_PREFLIGHT_REQUIRED\n'
+                          b'prefix_semantics=NOT_APPLICABLE\n')
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--offline-check', action='store_true', help='synthetic checks only, no source files or USB')
@@ -99,11 +123,12 @@ def main():
     parser.add_argument('--expected-sha256', help='M3 envelope hash from the private qualification report')
     parser.add_argument('--expected-payload-sha256', help='M3 payload hash from the private qualification report')
     parser.add_argument('--ack-binding-unknown', action='store_true')
+    parser.add_argument('--linux-native', action='store_true', help='M5.D metadata-only session; no Windows source')
     parser.add_argument('--experimental-enrollment', action='store_true',
                         help='explicit M5.C private session; current OTP equality remains mandatory at runtime')
     args = parser.parse_args()
     if args.offline_check:
-        if args.source or args.session or args.ack_binding_unknown or args.experimental_enrollment or args.expected_sha256 or args.expected_payload_sha256:
+        if args.source or args.session or args.ack_binding_unknown or args.experimental_enrollment or args.linux_native or args.expected_sha256 or args.expected_payload_sha256:
             parser.error('--offline-check does not accept protected-data options')
         payload = bytearray(140464)
         payload[0x22490:0x22490 + 20] = b'Preprocess_v_1.01.01'
@@ -119,6 +144,15 @@ def main():
                 continue
             raise ValueError('synthetic invalid input was accepted')
         print('M5B_PREPARE_OFFLINE=PASS PROTECTED_DATA=NOT_OPENED USB=NOT_USED')
+        return
+    if args.linux_native:
+        if (os.geteuid() != 0 or not args.session or args.source or args.experimental_enrollment or
+                args.ack_binding_unknown or args.expected_sha256 or args.expected_payload_sha256):
+            parser.error('--linux-native requires root authorization and --session only; no A/source options')
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        os.umask(0o077)
+        prepare_native_session(args.session)
+        print('M5D_PREPARED=PASS WINDOWS_CALIDATA=NOT_USED BACKGROUND=CURRENT_SESSION_REQUIRED ENROLL_BUDGET=1 PROBE_BUDGET=3')
         return
     if (os.geteuid() != 0 or not args.source or not args.session or not args.ack_binding_unknown or
             not args.expected_sha256 or not args.expected_payload_sha256 or

@@ -32,6 +32,16 @@ GoodixMilan *goodix_milan_new (const guint8 *payload, gsize size, GError **error
 GoodixMilan *goodix_milan_load (const gchar *directory, GError **error);
 /* Separate private M5.C opt-in. Ordinary load(NULL) always stays closed. */
 GoodixMilan *goodix_milan_load_experimental (const gchar *directory, GError **error);
+/* M5.D owns only the current epoch's decoded no-finger raster, never calidata. */
+GoodixMilan *goodix_milan_load_native (const gchar *directory, GError **error);
+gboolean goodix_milan_is_native (GoodixMilan *milan);
+gboolean goodix_milan_native_preflight (GoodixMilan *milan, guint64 generation, GError **error);
+gboolean goodix_milan_native_background (GoodixMilan *milan, const uint16_t *background,
+                                         gsize count, guint width, guint height,
+                                         guint64 generation, GError **error);
+gboolean goodix_milan_native_preprocess (GoodixMilan *milan, const uint16_t *raw,
+                                         gsize count, guint64 generation,
+                                         GoodixMilanSample *sample, GError **error);
 gboolean goodix_milan_is_diagnostic (GoodixMilan *milan);
 gboolean goodix_milan_is_experimental (GoodixMilan *milan);
 gboolean goodix_milan_uses_directory (GoodixMilan *milan, int directory_fd);
@@ -48,6 +58,7 @@ gboolean goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
 /* Same validator and inode-safe reader, current UID and synthetic hashes only. */
 GoodixMilan *goodix_milan_test_load (const gchar *directory, GError **error);
 GoodixMilan *goodix_milan_test_load_experimental (const gchar *directory, GError **error);
+GoodixMilan *goodix_milan_test_load_native (const gchar *directory, GError **error);
 #endif
 void goodix_milan_free (GoodixMilan *milan);
 gboolean goodix_milan_enroll_start (GoodixMilan *milan, GError **error);

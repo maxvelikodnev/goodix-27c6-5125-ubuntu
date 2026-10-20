@@ -298,6 +298,9 @@ context_protocol_failure (GoodixDeviceContext *ctx,
                           const GError        *error)
 {
   g_autoptr(GError) local_error = NULL;
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (goodix_milan_is_native (ctx->milan)) goodix_milan_clear_binding (ctx->milan);
+#endif
 
   if (ctx->terminal_fence)
     {
@@ -840,7 +843,12 @@ goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx, G
 static gboolean
 context_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size)
 {
-  if (ctx->milan && !goodix_milan_bind_to_otp (ctx->milan, otp, size))
+  g_autoptr(GError) error = NULL;
+  gboolean bound = goodix_milan_is_native (ctx->milan) ?
+    (otp && size == GOODIX_CONFIG90_OTP_LENGTH &&
+     goodix_milan_native_preflight (ctx->milan, ctx->generation, &error)) :
+    goodix_milan_bind_to_otp (ctx->milan, otp, size);
+  if (ctx->milan && !bound)
     {
       goodix_live_preflight_free (ctx->live_preflight);
       ctx->live_preflight = NULL;
@@ -1553,6 +1561,9 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
                       ctx->enrollment_binding));
 
   g_clear_handle_id (&ctx->login_deadline, g_source_remove);
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (goodix_milan_is_native (ctx->milan)) goodix_milan_clear_binding (ctx->milan);
+#endif
   g_clear_object (&ctx->activation_cancellable);
   g_clear_object (&ctx->usb_cancellable);
   g_clear_error (&ctx->terminal_error);
@@ -2955,7 +2966,7 @@ milan_diagnostic_arm (GoodixFpImageDevice *self, const gchar *directory)
 }
 
 static gboolean
-milan_experimental_arm (GoodixFpImageDevice *self, const gchar *directory, gint directory_fd)
+milan_experimental_arm_mode (GoodixFpImageDevice *self, const gchar *directory, gint directory_fd, gboolean native)
 {
   GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
   GoodixFpImageDevicePrivate *priv = goodix_fpimage_device_get_instance_private (self);
@@ -2966,7 +2977,7 @@ milan_experimental_arm (GoodixFpImageDevice *self, const gchar *directory, gint 
       ctx->login_preparing || ctx->login_series || ctx->poisoned || ctx->usb_interface_claimed ||
       fpi_device_get_current_action (FP_DEVICE (self)) != FPI_DEVICE_ACTION_NONE)
     return FALSE;
-  ctx->milan = goodix_milan_load_experimental (directory, &error);
+  ctx->milan = native ? goodix_milan_load_native (directory, &error) : goodix_milan_load_experimental (directory, &error);
   if (!ctx->milan) { g_warning ("M5.C arm rejected: %s", error->message); return FALSE; }
   /* Client template I/O must use the exact retained directory inode, even if a
    * user-owned ancestor was renamed while resolving either path. */
@@ -2975,6 +2986,14 @@ milan_experimental_arm (GoodixFpImageDevice *self, const gchar *directory, gint 
   priv->milan_experimental_only = TRUE;
   return TRUE;
 }
+
+static gboolean
+milan_experimental_arm (GoodixFpImageDevice *self, const gchar *directory, gint directory_fd)
+{ return milan_experimental_arm_mode (self, directory, directory_fd, FALSE); }
+
+static gboolean
+milan_native_arm (GoodixFpImageDevice *self, const gchar *directory, gint directory_fd)
+{ return milan_experimental_arm_mode (self, directory, directory_fd, TRUE); }
 
 static FpiMatchResult
 milan_raw_match (FpImageDevice *dev, FpPrint *reference, FpPrint *probe, GError **error)
@@ -2988,9 +3007,9 @@ milan_raw_match (FpImageDevice *dev, FpPrint *reference, FpPrint *probe, GError 
     }
   GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (GOODIX_FPIMAGE_DEVICE (dev));
   if (priv->milan_experimental_only &&
-      (!ctx || strcmp (goodix_milan_device_binding (ctx->milan), "OTP_A6_PREFIX_MATCH")))
+      (!ctx || !strcmp (goodix_milan_device_binding (ctx->milan), "UNKNOWN")))
     {
-      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID, "M5.C current OTP binding required");
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID, "Milan current calibration/session binding required");
       return FPI_MATCH_ERROR;
     }
   FpiMatchResult result = goodix_milan_match (dev, reference, probe, error);
@@ -3016,6 +3035,9 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
 #ifdef GOODIX_LIBFPRINT_MILAN
   /* Explicit process-local call by the diagnostic client. No environment,
    * process-name checks or fprintd policy enables this signal automatically. */
+  g_signal_new_class_handler ("goodix-milan-native-arm", G_TYPE_FROM_CLASS (klass),
+                              G_SIGNAL_RUN_LAST, G_CALLBACK (milan_native_arm),
+                              NULL, NULL, NULL, G_TYPE_BOOLEAN, 2, G_TYPE_STRING, G_TYPE_INT);
   g_signal_new_class_handler ("goodix-milan-experimental-arm", G_TYPE_FROM_CLASS (klass),
                               G_SIGNAL_RUN_LAST, G_CALLBACK (milan_experimental_arm),
                               NULL, NULL, NULL, G_TYPE_BOOLEAN, 2, G_TYPE_STRING, G_TYPE_INT);
@@ -3327,6 +3349,26 @@ goodix_device_context_test_milan_experimental_arm (GoodixDeviceContext *ctx, con
 }
 
 gboolean
+goodix_device_context_test_milan_native_arm (GoodixDeviceContext *ctx, const gchar *directory, GError **error)
+{
+  GoodixFpImageDevicePrivate *priv;
+  if (!ctx || ctx->milan || ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE) return FALSE;
+  priv = goodix_fpimage_device_get_instance_private (ctx->device);
+  if (priv->milan_diagnostic_only || priv->milan_experimental_only) return FALSE;
+  ctx->milan = goodix_milan_test_load_native (directory, error);
+  if (!ctx->milan) return FALSE;
+  priv->milan_experimental_only = TRUE;
+  return TRUE;
+}
+
+gboolean
+goodix_device_context_test_milan_native_background (GoodixDeviceContext *ctx, const guint16 *background,
+                                                   gsize count, guint64 generation, GError **error)
+{
+  return goodix_milan_native_background (ctx->milan, background, count, 80, 64, generation, error);
+}
+
+gboolean
 goodix_device_context_test_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size)
 { return context_milan_bind (ctx, otp, size); }
 
@@ -3365,7 +3407,9 @@ context_milan_image (GoodixDeviceContext *ctx, GoodixEnrollmentPipeline *pipelin
       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CANCELLED, "Milan callback fenced or cancelled");
       return FALSE;
     }
-  gboolean preprocessed = goodix_5125_milan_preprocess (ctx->milan, samples, count, &sample, error);
+  gboolean preprocessed = goodix_milan_is_native (ctx->milan) ?
+    goodix_milan_native_preprocess (ctx->milan, samples, count, ctx->generation, &sample, error) :
+    goodix_5125_milan_preprocess (ctx->milan, samples, count, &sample, error);
   if (goodix_milan_is_diagnostic (ctx->milan))
     {
       g_autoptr(GError) record_error = NULL;
@@ -3428,6 +3472,39 @@ context_milan_image (GoodixDeviceContext *ctx, GoodixEnrollmentPipeline *pipelin
 }
 #endif
 
+#ifdef GOODIX_LIBFPRINT_MILAN
+static gboolean
+context_milan_session_background (GoodixDeviceContext *ctx, GoodixPostTlsLifecycle *lifecycle,
+                                   guint64 generation, GError **error)
+{
+  guint16 background[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT] = { 0 };
+  gboolean ok;
+  if (!goodix_milan_is_native (ctx->milan)) return TRUE;
+  /* copy_baseline becomes valid only from a successfully decoded FDT_B0 after
+   * the existing no-finger command 0x20, before first finger acquisition. */
+  if (ctx->terminal_fence || !lifecycle || lifecycle != ctx->post_tls_lifecycle ||
+      !generation || generation != ctx->generation ||
+      ctx->runtime_post_tls_audit.baseline_b0_count != 1 ||
+      ctx->runtime_post_tls_audit.baseline_decode_count != 1 ||
+      !goodix_post_tls_lifecycle_copy_baseline (lifecycle, background))
+    {
+      goodix_milan_clear_binding (ctx->milan);
+      OPENSSL_cleanse (background, sizeof background);
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
+                           "M5.D no current decoded no-finger background provenance");
+      return FALSE;
+    }
+  ok = goodix_milan_native_background (ctx->milan, background, G_N_ELEMENTS (background), 80, 64, generation, error);
+  OPENSSL_cleanse (background, sizeof background);
+  return ok;
+}
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+gboolean
+goodix_device_context_test_milan_native_source_guard (GoodixDeviceContext *ctx, GError **error)
+{ return context_milan_session_background (ctx, NULL, ctx->generation, error); }
+#endif
+#endif
+
 static gboolean
 context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
                         guint                   acquisition_index,
@@ -3456,6 +3533,7 @@ context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
       return TRUE;
     }
 #ifdef GOODIX_LIBFPRINT_MILAN
+  if (!context_milan_session_background (ctx, lifecycle, ctx->generation, error)) return FALSE;
   return context_milan_image (ctx, NULL, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT, error);
 #elif defined(GOODIX_LIBFPRINT_SIGFM)
   {
@@ -3911,6 +3989,9 @@ context_enrollment_first_arm_handoff (GoodixPostTlsLifecycle *lifecycle,
                  ctx->runtime_coordinator_audit.pairing_write_count);
       OPENSSL_cleanse (learned_fdt, sizeof learned_fdt);
     }
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (!context_milan_session_background (ctx, lifecycle, generation, error)) return FALSE;
+#endif
 #ifdef GOODIX_LIBFPRINT_SIGFM
   if (!goodix_post_tls_lifecycle_copy_baseline (
         lifecycle, ctx->sigfm_baseline))

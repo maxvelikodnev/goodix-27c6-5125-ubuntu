@@ -7,6 +7,7 @@
 #include "goodix_config90.h"
 #include "521d-calidata-image.h"
 #include "521d-enrollment-session.h"
+#include "521d-wrapper.h"
 #include "fpi-image.h"
 #include <openssl/crypto.h>
 #include <string.h>
@@ -28,6 +29,10 @@ struct _GoodixMilan {
   Gx521dEnrollmentSession *enrollment;
   gboolean diagnostic, experimental, capture_started, capture_recorded, otp_bound;
   guint8 envelope_prefix[16];
+  gboolean linux_native, background_valid;
+  guint64 native_generation;
+  uint16_t background[GOODIX_MILAN_PIXELS];
+  gchar background_hash[65];
   int directory_fd;
 };
 
@@ -136,7 +141,7 @@ receipt_value (GKeyFile *receipt, const gchar *key, const gchar *expected)
 }
 
 static GoodixMilan *
-load_experiment (const gchar *directory, uid_t uid, gboolean experimental, GError **error)
+load_experiment (const gchar *directory, uid_t uid, gboolean experimental, gboolean native, GError **error)
 {
   GoodixMilan *milan = NULL;
   g_autoptr(GKeyFile) receipt = g_key_file_new ();
@@ -153,11 +158,24 @@ load_experiment (const gchar *directory, uid_t uid, gboolean experimental, GErro
   if (memchr (metadata, 0, metadata_size) ||
       !g_key_file_load_from_data (receipt, (const gchar *) metadata, metadata_size, G_KEY_FILE_NONE, NULL) ||
       !receipt_value (receipt, "schema", "1") ||
-      !receipt_value (receipt, "purpose", experimental ? "M5.C_PRIVATE_ENROLL_VERIFY" : "M5.B_CAPTURE_ONLY") ||
-      !receipt_value (receipt, "source", "M3_USER_DECLARED_WINDOWS_COPY") ||
-      !receipt_value (receipt, "device_binding", "UNKNOWN") ||
-      !receipt_value (receipt, "prefix_semantics", "UNKNOWN"))
+      !receipt_value (receipt, "purpose", native ? "M5.D_PRIVATE_LINUX_NATIVE" : experimental ? "M5.C_PRIVATE_ENROLL_VERIFY" : "M5.B_CAPTURE_ONLY") ||
+      !receipt_value (receipt, "source", native ? "CURRENT_SESSION_FDT_B0" : "M3_USER_DECLARED_WINDOWS_COPY") ||
+      !receipt_value (receipt, "device_binding", native ? "LIVE_PREFLIGHT_REQUIRED" : "UNKNOWN") ||
+      !receipt_value (receipt, "prefix_semantics", native ? "NOT_APPLICABLE" : "UNKNOWN"))
     { invalid (error, "Milan diagnostic provenance receipt invalid"); goto out; }
+  if (native)
+    {
+      struct stat unused;
+      /* A/B directories are not interchangeable, and B never opens a blob. */
+      if (fstatat (fd, "calidata.dat", &unused, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        { invalid (error, "M5.D requires a separate session without Windows calidata"); goto out; }
+      milan = g_new0 (GoodixMilan, 1);
+      milan->linux_native = TRUE;
+      milan->experimental = TRUE;
+      milan->directory_fd = fd;
+      fd = -1;
+      goto out;
+    }
   envelope = read_private_file (fd, "calidata.dat", uid, GOODIX_MILAN_CALIDATA_ENVELOPE,
                                 GOODIX_MILAN_CALIDATA_ENVELOPE, &size, error);
   if (!envelope) goto out;
@@ -194,7 +212,7 @@ goodix_milan_load (const gchar *directory, GError **error)
     }
   if (geteuid () != 0)
     { invalid (error, "Milan diagnostic capture requires explicit root authorization"); return NULL; }
-  return load_experiment (directory, 0, FALSE, error);
+  return load_experiment (directory, 0, FALSE, FALSE, error);
 }
 
 GoodixMilan *
@@ -202,14 +220,27 @@ goodix_milan_load_experimental (const gchar *directory, GError **error)
 {
   if (geteuid () != 0 || !directory)
     { invalid (error, "M5.C requires explicit root authorization and private session"); return NULL; }
-  return load_experiment (directory, 0, TRUE, error);
+  return load_experiment (directory, 0, TRUE, FALSE, error);
 }
 
+GoodixMilan *
+goodix_milan_load_native (const gchar *directory, GError **error)
+{
+  if (geteuid () != 0 || !directory)
+    { invalid (error, "M5.D requires explicit root authorization and private session"); return NULL; }
+  return load_experiment (directory, 0, TRUE, TRUE, error);
+}
+
+gboolean goodix_milan_is_native (GoodixMilan *milan)
+{ return milan && milan->linux_native; }
+
 #ifdef GOODIX_ENABLE_TEST_SEAMS
+GoodixMilan *goodix_milan_test_load_native (const gchar *directory, GError **error)
+{ return load_experiment (directory, geteuid (), TRUE, TRUE, error); }
 GoodixMilan *goodix_milan_test_load_experimental (const gchar *directory, GError **error)
-{ return load_experiment (directory, geteuid (), TRUE, error); }
+{ return load_experiment (directory, geteuid (), TRUE, FALSE, error); }
 GoodixMilan *goodix_milan_test_load (const gchar *directory, GError **error)
-{ return load_experiment (directory, geteuid (), FALSE, error); }
+{ return load_experiment (directory, geteuid (), FALSE, FALSE, error); }
 #endif
 
 gboolean goodix_milan_is_diagnostic (GoodixMilan *milan)
@@ -227,7 +258,14 @@ gboolean goodix_milan_uses_directory (GoodixMilan *milan, int directory_fd)
 }
 
 void goodix_milan_clear_binding (GoodixMilan *milan)
-{ if (milan) milan->otp_bound = FALSE; }
+{
+  if (!milan) return;
+  milan->otp_bound = FALSE;
+  milan->native_generation = 0;
+  milan->background_valid = FALSE;
+  OPENSSL_cleanse (milan->background, sizeof milan->background);
+  OPENSSL_cleanse (milan->background_hash, sizeof milan->background_hash);
+}
 
 gboolean
 goodix_milan_bind_to_otp (GoodixMilan *milan, const guint8 *otp, gsize size)
@@ -235,14 +273,18 @@ goodix_milan_bind_to_otp (GoodixMilan *milan, const guint8 *otp, gsize size)
   goodix_milan_clear_binding (milan);
   /* Only the full, already validated preflight evidence can bind a loaded
    * envelope; a payload-only synthetic object has no device identity. */
-  if (!milan || milan->directory_fd < 0 || !otp || size != GOODIX_CONFIG90_OTP_LENGTH)
+  if (!milan || milan->linux_native || milan->directory_fd < 0 || !otp || size != GOODIX_CONFIG90_OTP_LENGTH)
     return FALSE;
   milan->otp_bound = CRYPTO_memcmp (milan->envelope_prefix, otp, sizeof milan->envelope_prefix) == 0;
   return milan->otp_bound;
 }
 
 const gchar *goodix_milan_device_binding (const GoodixMilan *milan)
-{ return milan && milan->otp_bound ? "OTP_A6_PREFIX_MATCH" : "UNKNOWN"; }
+{
+  if (milan && milan->linux_native)
+    return milan->native_generation && milan->background_valid ? "CURRENT_PREFLIGHT_FDT_B0" : "UNKNOWN";
+  return milan && milan->otp_bound ? "OTP_A6_PREFIX_MATCH" : "UNKNOWN";
+}
 
 static gboolean write_private_result (int directory_fd, const gchar *name,
                                        const guint8 *bytes, gsize size);
@@ -317,7 +359,7 @@ gboolean
 goodix_milan_record_match (GoodixMilan *milan, GError **error)
 {
   static const guint8 marker[] = "MATCH: M5.C session stopped\n";
-  if (!goodix_milan_is_experimental (milan) || !milan->otp_bound ||
+  if (!goodix_milan_is_experimental (milan) || !strcmp (goodix_milan_device_binding (milan), "UNKNOWN") ||
       !write_private_result (milan->directory_fd, "match.stop", marker, sizeof marker - 1) ||
       fsync (milan->directory_fd)) return invalid (error, "M5.C MATCH stop could not be recorded");
   return TRUE;
@@ -384,7 +426,7 @@ gboolean goodix_5125_milan_preprocess (GoodixMilan *milan, const uint16_t *raw,
   Gx521dDefaultResult out = { 0 };
   Gx521dFeatureObject feature = { 0 };
   gboolean ok = FALSE;
-  if (!milan || !raw || !sample || count != GOODIX_MILAN_PIXELS)
+  if (!milan || milan->linux_native || !raw || !sample || count != GOODIX_MILAN_PIXELS)
     return invalid (error, "Milan sample geometry invalid");
   if (milan->directory_fd >= 0 && !milan->otp_bound)
     return invalid (error, "Milan calibration has no current OTP binding");
@@ -423,6 +465,113 @@ out:
   OPENSSL_cleanse (&out, sizeof out);
   OPENSSL_cleanse (&feature, sizeof feature);
   if (!ok) { OPENSSL_cleanse (sample, sizeof *sample); if (!error || !*error) invalid (error, "Milan preprocessing failed"); }
+  return ok;
+}
+
+/* B uses the same init + reset/default + feature(flags=0) contract as the
+ * pinned worker. A fresh native context is created for every contact; only
+ * the verified epoch background is retained. No Windows restore/fallback. */
+static gboolean native_failure (GoodixMilan *milan, GError **error, const gchar *message)
+{
+  goodix_milan_clear_binding (milan);
+  return invalid (error, message);
+}
+
+gboolean
+goodix_milan_native_preflight (GoodixMilan *milan, guint64 generation, GError **error)
+{
+  if (!goodix_milan_is_native (milan) || !generation || milan->native_generation)
+    return native_failure (milan, error, "M5.D preflight order or epoch invalid");
+  milan->native_generation = generation;
+  return TRUE;
+}
+
+gboolean
+goodix_milan_native_background (GoodixMilan *milan, const uint16_t *background,
+                                gsize count, guint width, guint height,
+                                guint64 generation, GError **error)
+{
+  Gx521dPreprocessor native = { 0 };
+  g_autofree gchar *hash = NULL;
+  if (!goodix_milan_is_native (milan) || !generation || generation != milan->native_generation ||
+      !background || count != GOODIX_MILAN_PIXELS || width != 80 || height != 64)
+    return native_failure (milan, error, "M5.D background missing, wrong geometry or stale epoch");
+  for (gsize i = 0; i < count; i++)
+    if (background[i] > 4095) return native_failure (milan, error, "M5.D background outside 12-bit range");
+  hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) background, sizeof milan->background);
+  if (milan->background_valid)
+    {
+      if (strcmp (hash, milan->background_hash) || memcmp (background, milan->background, sizeof milan->background))
+        return native_failure (milan, error, "M5.D background changed within the epoch");
+      return TRUE;
+    }
+  int code = gx521d_preprocessor_init (&native, background);
+  gboolean valid = code == 0 && native.parameters_ready == 1 && native.calibrated == 1 && native.image && !native.loaded;
+  gx521d_preprocessor_clear (&native);
+  if (!valid) return native_failure (milan, error, "M5.D background rejected by native setup");
+  memcpy (milan->background, background, sizeof milan->background);
+  g_strlcpy (milan->background_hash, hash, sizeof milan->background_hash);
+  milan->background_valid = TRUE;
+  return TRUE;
+}
+
+gboolean
+goodix_milan_native_preprocess (GoodixMilan *milan, const uint16_t *raw,
+                                gsize count, guint64 generation,
+                                GoodixMilanSample *sample, GError **error)
+{
+  Gx521dPreprocessor native = { 0 };
+  Gx521dDefaultResult out = { 0 };
+  Gx521dFeatureObject feature = { 0 };
+  Gx521dImageTrace *trace = NULL;
+  g_autofree gchar *hash = NULL;
+  gboolean ok = FALSE, retry = FALSE;
+  if (sample) OPENSSL_cleanse (sample, sizeof *sample);
+  if (!goodix_milan_is_native (milan) || !sample || !raw || count != GOODIX_MILAN_PIXELS ||
+      !generation || generation != milan->native_generation || !milan->background_valid)
+    return native_failure (milan, error, "M5.D preprocessing needs current preflight and background");
+  for (gsize i = 0; i < count; i++)
+    if (raw[i] > 4095) return native_failure (milan, error, "M5.D frame outside 12-bit range");
+  hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) milan->background, sizeof milan->background);
+  if (strcmp (hash, milan->background_hash))
+    return native_failure (milan, error, "M5.D retained background integrity failed");
+  if (gx521d_preprocessor_init (&native, milan->background) != 0 ||
+      native.parameters_ready != 1 || native.calibrated != 1 || !native.image || native.loaded) goto out;
+  /* Same calls as preprocessor_default; retain explicit result/trace so owned
+   * raw-derived buffers can be cleansed, without changing native parameters. */
+  gx521d_image_reset_entry_selection (native.image);
+  trace = g_new0 (Gx521dImageTrace, 1);
+  int code = gx521d_default_step (native.image, raw, &out, trace);
+  if (code == 0x29aa || (!code && (out.status == 0xc351 || out.status == 0x7531)))
+    {
+      retry = TRUE;
+      g_set_error_literal (error, FP_DEVICE_RETRY, FP_DEVICE_RETRY_GENERAL, "Milan capture quality rejected");
+      goto out;
+    }
+  if (code || out.status != 0 || out.quality < 0 || out.quality > 100 || out.coverage < 0 || out.coverage > 100 ||
+      gx521d_feature_extract (out.image, out.quality, out.coverage, 0, &feature) != 0) goto out;
+  memcpy (&sample->feature_count, feature.scalar_header + 0xf0, 4);
+  memcpy (&sample->tag, feature.scalar_header + 0x150, 4);
+  if (sample->feature_count < 0 || sample->feature_count > 120) goto out;
+  sample->quality = out.quality; sample->coverage = out.coverage;
+  memcpy (sample->pixels, out.image, sizeof sample->pixels);
+  {
+    g_autofree gchar *feature_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) &feature, sizeof feature);
+    g_autofree gchar *preprocess_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) &out, sizeof out);
+    g_strlcpy (sample->feature_sha256, feature_hash, sizeof sample->feature_sha256);
+    g_strlcpy (sample->preprocess_sha256, preprocess_hash, sizeof sample->preprocess_sha256);
+  }
+  ok = TRUE;
+out:
+  gx521d_preprocessor_clear (&native);
+  if (trace) { OPENSSL_cleanse (trace, sizeof *trace); g_free (trace); }
+  OPENSSL_cleanse (&out, sizeof out);
+  OPENSSL_cleanse (&feature, sizeof feature);
+  if (!ok)
+    {
+      OPENSSL_cleanse (sample, sizeof *sample);
+      if (!retry) native_failure (milan, error, "M5.D native preprocessing failed");
+    }
   return ok;
 }
 

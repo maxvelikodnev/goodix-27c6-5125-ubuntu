@@ -399,6 +399,10 @@ gboolean goodix_device_context_test_milan_diagnostic_arm (GoodixDeviceContext *c
                                                         const gchar *directory, GError **error);
 gboolean goodix_device_context_test_milan_experimental_arm (GoodixDeviceContext *ctx,
                                                            const gchar *directory, GError **error);
+gboolean goodix_device_context_test_milan_native_arm (GoodixDeviceContext *ctx, const gchar *directory, GError **error);
+gboolean goodix_device_context_test_milan_native_source_guard (GoodixDeviceContext *ctx, GError **error);
+gboolean goodix_device_context_test_milan_native_background (GoodixDeviceContext *ctx, const guint16 *background,
+                                                             gsize count, guint64 generation, GError **error);
 gboolean goodix_device_context_test_milan_bind (GoodixDeviceContext *ctx, const guint8 *otp, gsize size);
 gboolean goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,
                                                        const guint8 *payload,

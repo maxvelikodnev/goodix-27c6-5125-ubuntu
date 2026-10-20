@@ -15,16 +15,27 @@
 #include <unistd.h>
 #include "521d-calidata.h"
 #include "goodix_config90.h"
+#include "521d-wrapper.h"
+#include "521d-enrollment-session.h"
 
 typedef struct {
   gchar *root, *development, *directory, *data_path, *receipt_path;
   guint8 *envelope;
-  gboolean experimental;
+  gboolean experimental, native;
 } SyntheticSession;
 
 static void
 write_synthetic_session (SyntheticSession *session)
 {
+  if (session->native)
+    {
+      g_unlink (session->data_path);
+      g_assert_true (g_file_set_contents (session->receipt_path,
+        "[M5B]\nschema=1\npurpose=M5.D_PRIVATE_LINUX_NATIVE\nsource=CURRENT_SESSION_FDT_B0\n"
+        "device_binding=LIVE_PREFLIGHT_REQUIRED\nprefix_semantics=NOT_APPLICABLE\n", -1, NULL));
+      g_assert_cmpint (g_chmod (session->receipt_path, 0600), ==, 0);
+      return;
+    }
   g_autofree gchar *full = g_compute_checksum_for_data (G_CHECKSUM_SHA256, session->envelope, GOODIX_MILAN_CALIDATA_ENVELOPE);
   g_autofree gchar *payload = g_compute_checksum_for_data (G_CHECKSUM_SHA256, session->envelope + 16, GOODIX_MILAN_CALIDATA_ENVELOPE - 16);
   g_autofree gchar *receipt = g_strdup_printf (
@@ -410,8 +421,15 @@ test_m5c_gsf1_and_admission (void)
   GoodixMilanSample sample = { .quality = 80, .coverage = 100, .feature_count = 0 };
   g_autoptr(GBytes) bytes = NULL;
   g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
-  sample.feature_count = 10; sample.tag = 1;
-  g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
+  sample.feature_count = 10;
+  const gint unsupported_tags[] = { 1, 512, 768 };
+  for (guint i = 0; i < G_N_ELEMENTS (unsupported_tags); i++)
+    {
+      sample.tag = unsupported_tags[i];
+      g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
+      g_assert_cmpuint (goodix_milan_enroll_progress (milan), ==, 0);
+      g_assert_null (bytes);
+    }
   sample.tag = 0; sample.quality = 24;
   g_assert_cmpint (goodix_milan_enroll (milan, &sample, &bytes, &error), ==, GOODIX_MILAN_RETRY);
   sample.quality = 80; sample.coverage = 64;
@@ -419,6 +437,192 @@ test_m5c_gsf1_and_admission (void)
   g_assert_cmpuint (goodix_milan_enroll_progress (milan), ==, 0);
   goodix_milan_free (milan); clear_synthetic_session (&session);
   g_print ("M5C_GSF1 verify_identify_reject_before_acquire=1 forged_identity_rejected=1 admission_thresholds_unchanged=1\n");
+}
+
+static void
+native_inputs (guint16 *background, guint16 *raw)
+{
+  for (guint i = 0; i < GOODIX_MILAN_PIXELS; i++)
+    {
+      background[i] = 2000;
+      raw[i] = (guint16) (2000.0 + 250.0 * sin ((double) (i % 80) * 0.75) + 70.0 * sin ((double) (i / 80) * 0.29));
+    }
+}
+
+static void
+test_native_preprocessing (void)
+{
+  SyntheticSession session = synthetic_session (); session.native = TRUE; write_synthetic_session (&session);
+  guint16 background[GOODIX_MILAN_PIXELS], raw[GOODIX_MILAN_PIXELS];
+  native_inputs (background, raw);
+  guint16 before_background[GOODIX_MILAN_PIXELS], before_raw[GOODIX_MILAN_PIXELS];
+  memcpy (before_background, background, sizeof background); memcpy (before_raw, raw, sizeof raw);
+  g_autoptr(GError) error = NULL;
+  GoodixMilan *milan = goodix_milan_test_load_native (session.directory, &error);
+  g_assert_nonnull (milan); g_assert_no_error (error);
+  g_assert_true (goodix_milan_is_native (milan));
+  g_assert_false (goodix_milan_is_diagnostic (milan));
+  g_assert_true (goodix_milan_is_experimental (milan));
+  g_assert_false (goodix_milan_native_background (milan, background, GOODIX_MILAN_PIXELS, 80, 64, 1, &error));
+  g_clear_error (&error);
+  g_assert_true (goodix_milan_native_preflight (milan, 1, &error));
+  g_assert_true (goodix_milan_native_background (milan, background, GOODIX_MILAN_PIXELS, 80, 64, 1, &error));
+  g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "CURRENT_PREFLIGHT_FDT_B0");
+  GoodixMilanSample sample = { 0 }, again = { 0 };
+  g_assert_true (goodix_milan_native_preprocess (milan, raw, GOODIX_MILAN_PIXELS, 1, &sample, &error));
+  g_assert_no_error (error);
+  g_assert_true (goodix_milan_native_preprocess (milan, raw, GOODIX_MILAN_PIXELS, 1, &again, &error));
+  g_assert_cmpmem (&sample, sizeof sample, &again, sizeof again);
+  /* Compare the complete adapter against the pinned worker's wrapper calls. */
+  Gx521dPreprocessor native = { 0 };
+  guint8 pixels[GOODIX_MILAN_PIXELS] = { 0 }, auxiliary[GX521D_AUXILIARY_BYTES] = { 0 };
+  gint32 cq[2] = { 0 };
+  Gx521dDescriptor source = { .pixels = raw, .width = 80, .height = 64, .ppi = 500, .bits = 16, .channels = 1, .bytes = sizeof raw, .frames = 1 };
+  Gx521dDescriptor dest = { .pixels = pixels, .width = 80, .height = 64, .ppi = 500, .bits = 8, .channels = 1, .bytes = sizeof pixels, .frames = 1 };
+  g_assert_cmpint (gx521d_preprocessor_init (&native, background), ==, 0);
+  g_assert_cmpint (gx521d_preprocessor_default (&native, &source, auxiliary, &dest, cq), ==, 0);
+  g_assert_cmpmem (sample.pixels, sizeof sample.pixels, pixels, sizeof pixels);
+  g_assert_cmpint (sample.quality, ==, dest.quality); g_assert_cmpint (sample.coverage, ==, dest.coverage);
+  Gx521dFeatureObject feature = { 0 };
+  g_assert_cmpint (gx521d_feature_extract (pixels, dest.quality, dest.coverage, 0, &feature), ==, 0);
+  g_autofree gchar *feature_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) &feature, sizeof feature);
+  g_assert_cmpstr (sample.feature_sha256, ==, feature_hash);
+  gx521d_preprocessor_clear (&native);
+  g_assert_cmpmem (background, sizeof background, before_background, sizeof before_background);
+  g_assert_cmpmem (raw, sizeof raw, before_raw, sizeof before_raw);
+  g_assert_false (goodix_5125_milan_preprocess (milan, raw, GOODIX_MILAN_PIXELS, &sample, &error)); g_clear_error (&error);
+  goodix_milan_clear_binding (milan);
+  g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "UNKNOWN");
+  g_assert_false (goodix_milan_native_preprocess (milan, raw, GOODIX_MILAN_PIXELS, 1, &sample, &error)); g_clear_error (&error);
+  goodix_milan_free (milan); clear_synthetic_session (&session);
+  g_print ("M5D_NATIVE synthetic_full_preprocess=PASS wrapper_pixels_quality_coverage_feature_equal=1 fresh_per_contact=1 immutable_inputs=1 cleanup=1 biometric_qualification=NOT_TESTED\n");
+}
+
+static void
+test_native_rejections (void)
+{
+  for (guint fault = 0; fault < 11; fault++)
+    {
+      SyntheticSession session = synthetic_session (); session.native = TRUE; write_synthetic_session (&session);
+      guint16 background[GOODIX_MILAN_PIXELS], raw[GOODIX_MILAN_PIXELS]; native_inputs (background, raw);
+      GoodixMilanSample sample;
+      g_autoptr(GError) error = NULL;
+      GoodixMilan *milan = goodix_milan_test_load_native (session.directory, &error);
+      g_assert_nonnull (milan); g_assert_true (goodix_milan_native_preflight (milan, 5, &error));
+      if (fault <= 6)
+        {
+          if (fault == 4) background[0] = 4096;
+          if (fault == 5) memset (background, 0, sizeof background);
+          if (fault == 6) for (guint i = 0; i < GOODIX_MILAN_PIXELS; i++) background[i] = 4095;
+          g_assert_false (goodix_milan_native_background (milan, fault == 0 ? NULL : background,
+            fault == 1 ? GOODIX_MILAN_PIXELS - 1 : GOODIX_MILAN_PIXELS,
+            fault == 2 ? 64 : 80, fault == 2 ? 80 : 64, fault == 3 ? 4 : 5, &error));
+        }
+      else
+        {
+          g_assert_true (goodix_milan_native_background (milan, background, GOODIX_MILAN_PIXELS, 80, 64, 5, &error));
+          if (fault == 7)
+            { background[0]++; g_assert_false (goodix_milan_native_background (milan, background, GOODIX_MILAN_PIXELS, 80, 64, 5, &error)); }
+          if (fault == 8)
+            { raw[0] = 4096; g_assert_false (goodix_milan_native_preprocess (milan, raw, GOODIX_MILAN_PIXELS, 5, &sample, &error)); }
+          if (fault == 9) g_assert_false (goodix_milan_native_preprocess (milan, raw, GOODIX_MILAN_PIXELS, 6, &sample, &error));
+          if (fault == 10) g_assert_false (goodix_milan_native_preflight (milan, 5, &error));
+        }
+      g_assert_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID); g_clear_error (&error);
+      g_assert_cmpstr (goodix_milan_device_binding (milan), ==, "UNKNOWN");
+      g_assert_false (goodix_milan_native_preprocess (milan, raw, GOODIX_MILAN_PIXELS, 5, &sample, &error)); g_clear_error (&error);
+      goodix_milan_free (milan); clear_synthetic_session (&session);
+    }
+  g_print ("M5D_REJECTIONS missing_short_geometry_range_setup_degraded_stale_altered_order=PASS terminal_invalidation=1\n");
+}
+
+static void
+test_native_loader_separation (void)
+{
+  SyntheticSession session = synthetic_session ();
+  g_autoptr(GError) error = NULL;
+  g_assert_null (goodix_milan_test_load_native (session.directory, &error)); g_clear_error (&error);
+  session.native = TRUE; write_synthetic_session (&session);
+  g_assert_null (goodix_milan_test_load_experimental (session.directory, &error)); g_clear_error (&error);
+  GoodixMilan *milan = goodix_milan_test_load_native (session.directory, &error);
+  g_assert_nonnull (milan); goodix_milan_free (milan);
+  g_assert_cmpint (g_chmod (session.directory, 0755), ==, 0);
+  g_assert_null (goodix_milan_test_load_native (session.directory, &error)); g_clear_error (&error);
+  g_assert_cmpint (g_chmod (session.directory, 0700), ==, 0);
+  g_assert_cmpint (g_chmod (session.receipt_path, 0644), ==, 0);
+  g_assert_null (goodix_milan_test_load_native (session.directory, &error)); g_clear_error (&error);
+  g_assert_cmpint (g_chmod (session.receipt_path, 0600), ==, 0);
+  g_assert_true (g_file_set_contents (session.data_path, "not a calibration", -1, NULL));
+  g_assert_null (goodix_milan_test_load_native (session.directory, &error)); g_clear_error (&error);
+  clear_synthetic_session (&session);
+  g_print ("M5D_LOADER A_B_distinct=1 no_blob_read=1 permissions=1 separate_template_path=client\n");
+}
+
+static void
+test_native_action_lifecycle (void)
+{
+  for (guint fault = 0; fault < 4; fault++)
+    {
+      SyntheticSession session = synthetic_session (); session.native = TRUE; write_synthetic_session (&session);
+      g_autoptr(GError) error = NULL;
+      g_autoptr(GoodixFpImageDevice) device = goodix_fpimage_device_new ();
+      g_autoptr(GCancellable) cancel = g_cancellable_new ();
+      g_assert_true (fp_device_open_sync (FP_DEVICE (device), NULL, &error));
+      GoodixDeviceContext *ctx = goodix_fpimage_device_get_context (device);
+      gboolean armed = TRUE;
+      g_signal_emit_by_name (device, "goodix-milan-native-arm", session.directory, -1, &armed);
+      g_assert_false (armed);
+      g_assert_true (goodix_device_context_test_milan_native_arm (ctx, session.directory, &error));
+      g_assert_false (goodix_device_context_test_milan_pairing_activation (ctx, &error)); g_clear_error (&error);
+      g_assert_cmpuint (goodix_device_context_get_backend_command_count (ctx), ==, 0);
+      g_autoptr(FpPrint) print = g_object_ref_sink (fp_print_new (FP_DEVICE (device)));
+      Enrollment result = { 0 };
+      fp_device_enroll (FP_DEVICE (device), print, cancel, NULL, NULL, NULL, enrollment_done, &result);
+      guint64 generation = goodix_device_context_get_generation (ctx);
+      guint8 otp[GOODIX_CONFIG90_OTP_LENGTH] = { 0 };
+      g_assert_true (goodix_device_context_test_milan_bind (ctx, otp, sizeof otp));
+      guint16 background[GOODIX_MILAN_PIXELS], raw[GOODIX_MILAN_PIXELS]; native_inputs (background, raw);
+      if (fault != 1)
+        {
+          g_assert_true (goodix_device_context_test_milan_native_background (ctx, background, GOODIX_MILAN_PIXELS, generation, &error));
+          if (fault == 2)
+            { g_assert_false (goodix_device_context_test_milan_native_source_guard (ctx, &error)); g_clear_error (&error); }
+          if (fault == 3) raw[0] = 4096;
+        }
+      goodix_device_context_emit_arm_complete (ctx, NULL);
+      goodix_device_context_emit_finger_down (ctx);
+      goodix_device_context_emit_image_ready (ctx, raw, GOODIX_MILAN_PIXELS);
+      if (!fault)
+        {
+          goodix_device_context_emit_release_tail_complete (ctx);
+          goodix_device_context_emit_finger_up_ready (ctx);
+          g_cancellable_cancel (cancel);
+        }
+      gint64 until = g_get_monotonic_time () + 3000000;
+      while (!result.done && g_get_monotonic_time () < until)
+        { while (g_main_context_pending (NULL)) g_main_context_iteration (NULL, FALSE); g_usleep (1000); }
+      g_assert_true (result.done); g_assert_null (result.print);
+      if (!fault) g_assert_error (result.error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+      else g_assert_error (result.error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID);
+      g_clear_error (&result.error);
+      guint commands = goodix_device_context_get_backend_command_count (ctx);
+      goodix_device_context_emit_image_ready (ctx, raw, GOODIX_MILAN_PIXELS);
+      g_assert_cmpuint (goodix_device_context_get_backend_command_count (ctx), ==, commands);
+      g_assert_true (fp_device_close_sync (FP_DEVICE (device), NULL, &error)); g_assert_no_error (error);
+      g_assert_null (goodix_fpimage_device_get_context (device));
+      g_assert_true (fp_device_open_sync (FP_DEVICE (device), NULL, &error));
+      ctx = goodix_fpimage_device_get_context (device);
+      g_assert_false (goodix_device_context_test_milan_native_arm (ctx, session.directory, &error));
+      g_assert_cmpuint (goodix_device_context_get_backend_command_count (ctx), ==, 0);
+      g_assert_true (fp_device_close_sync (FP_DEVICE (device), NULL, &error));
+      GoodixMilan *reopened = goodix_milan_test_load_native (session.directory, &error);
+      g_assert_nonnull (reopened);
+      GoodixMilanSample sample;
+      g_assert_false (goodix_milan_native_preprocess (reopened, raw, GOODIX_MILAN_PIXELS, generation, &sample, &error)); g_clear_error (&error);
+      g_assert_false (goodix_milan_begin_experimental_action (reopened, FPI_DEVICE_ACTION_ENROLL, &error)); g_clear_error (&error);
+      goodix_milan_free (reopened); clear_synthetic_session (&session);
+    }
+  g_print ("M5D_ACTION full_native_sample_delivery=1 cancel_error_cleanup=1 missing_background=1 provenance_guard=1 stale_frame_fenced=1 reopen_needs_new_background=1 budget_retained=1 pairing_blocked=1\n");
 }
 
 static void
@@ -571,5 +775,9 @@ main (int argc, char **argv)
   g_test_add_func ("/milan-contract/otp-binding-and-budgets", test_otp_binding_and_budgets);
   g_test_add_func ("/milan-contract/m5c-preflight-lifecycle", test_m5c_preflight_lifecycle);
   g_test_add_func ("/milan-contract/m5c-gsf1-admission", test_m5c_gsf1_and_admission);
+  g_test_add_func ("/milan-contract/m5d-native-preprocessing", test_native_preprocessing);
+  g_test_add_func ("/milan-contract/m5d-native-rejections", test_native_rejections);
+  g_test_add_func ("/milan-contract/m5d-native-loader", test_native_loader_separation);
+  g_test_add_func ("/milan-contract/m5d-native-action", test_native_action_lifecycle);
   return g_test_run ();
 }

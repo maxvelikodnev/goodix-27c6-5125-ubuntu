@@ -3,8 +3,8 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
-  "phase": "M5.C",
-  "phase_status": "M5C_OFFLINE_READY__HUMAN_REQUIRED_FOR_LIVE__M5_OPEN",
+  "phase": "M5.D",
+  "phase_status": "M5C_A_LIVE_PASS_REPORTED__M5D_OFFLINE_BIOMETRIC_BLOCKED__M5_OPEN",
   "completed_gates": [
     "M0_SOURCE_BASELINE",
     "M1_NATIVE_ENGINE_OFFLINE",
@@ -45,7 +45,14 @@
     "development/private-root/analysis/M5_milan/m5c-background-init.json",
     "development/private-root/m5c-rc-source-final",
     "development/private-root/m5c-rc-payload-verified",
-    "development/private-root/m5c-rc-source-final.tar.gz"
+    "development/private-root/m5c-rc-source-final.tar.gz",
+    "development/private-root/analysis/M5_milan/M5D_REPORT_2026-10-20.md",
+    "development/private-root/analysis/M5_milan/m5d_compare.py",
+    "development/private-root/analysis/M5_milan/m5d-comparison.json",
+    "development/private-root/analysis/M5_milan/m5d-worker-parity.json",
+    "production/test_prepare_milan_native.py",
+    "development/private-root/m5d-rc-source",
+    "development/private-root/m5d-rc-payload"
   ],
   "m5b_status": {
     "capture_pipeline": "PASS",
@@ -60,12 +67,12 @@
     "prefix_universal_uniqueness": "UNKNOWN_NOT_A_BLOCKER_FOR_AUTHORIZED_SINGLE_READER_EXPERIMENT"
   },
   "current_blockers": [
-    "M5.C live enrollment and verify/identify are not run or authorized; ordinary Milan authentication remains closed and M5 live qualification remains OPEN.",
-    "Before M5.C, the operator must confirm current VM runtime state, password fallback, existing ACTIVE pairing and the already prepared canonical SIGFM removal/reinstallation route. No fresh USB check was performed offline."
+    "B completes all 35 real preprocess calls but feature tags are nonzero in 27; unchanged enrollment admits only 4/18 after 27 candidate contacts. B matching blocked without a complete template.",
+    "B matching/live and ordinary authentication remain unqualified. Native opaque allocation/internal scratch erasure is not guaranteed by the pinned upstream cleanup."
   ],
   "license_notes": "User decisions: 2026-10-18 candidate.c/policy.c LGPL-2.1-or-later grant settled through seaweeduk PR28 -> AndyHazz e68eb725 -> C1. 2026-10-20 examined native MIT/RVA portions approved for redistribution under established upstream MIT/LGPL provenance; original notices, recipe and hashes preserved. Repository-owner distribution decision, not independent legal certification; no reader data, firmware or OEM binary publication authorized.",
-  "next_action": "Request one M5C_EXPERIMENTAL_ENROLLMENT gate in the Fedora VM: install reviewed RC with the reader disconnected and stock unit unmasked, then suspend fprintd before assigning USB, reuse only the existing root-only qualified calibration snapshot in a new private M5.C session, one enrollment (18 accepted stages, maximum 36 contacts/600 seconds), at most three verify/identify probes combined and stop at first MATCH; close and roll back through Milan removal then SIGFM reinstall. No separate OTP-only/M5.B capture gate and no live action authorized by this cache.",
-  "last_verified_head": "e5a39968f8ef261243a494eb57fb7733660f82c1",
+  "next_action": "Finish offline RC verification and independent review; retain BLOCKED B qualification until native nonzero classification tags are understood without changing thresholds/tag handling. Keep VM M5.C masked and consumed A session intact; no live gate or routine SIGFM rollback.",
+  "last_verified_head": "d13022692badc6827108b1ffe65ff128c0ad5009",
   "relevant_corroborations": [
     "C1",
     "C2",
@@ -73,30 +80,52 @@
   ],
   "candidate": "Milan",
   "current_task": {
-    "GOAL": "Prepare the first private Milan enrollment using the existing qualified snapshot and verify the independent background initialization path offline",
-    "STATE_DELTA": "M5.C private capability implemented with mandatory preflight OTP-prefix binding, protected calibration/session/template, durable action budgets, active-pairing-only safety; full canonical source build and synthetic tests pass. Both genuine pre-contact 5125 FDT_B0 baselines initialize the imported Milan API without Windows calidata.",
-    "SCOPE": "Driver/client/preparer, synthetic tests and source ledger, installation/validation docs, private M5.C report and state cache",
-    "REQUIRED_WORK": "Operator authorization and execution of the single M5.C gate; native-background biometric qualification remains separate and does not block snapshot-based A",
-    "VERIFY": "Canonical RC build from source snapshot without development or Git; current source inventory equals snapshot; contract 11, builder 26, deployment 90, normal preflight/pairing 22, background API synthetic plus 2 genuine no-finger baselines; independent diff/code review",
-    "STOP_IF": "Before live USB/root/runtime installation/protected biometrics without separate gate; on binding ambiguity, invalid permissions, non-ACTIVE pairing, any journal/cleanup error, first MATCH or three physical probes; no canonical edits or protected Git operations"
+    "GOAL": "Implement Linux-native calibration/preprocessing B from the existing same-session FDT_B0 raster",
+    "STATE_DELTA": "A operator live PASS registered; B same-session background adapter implemented, real preprocessing35PASS and worker parity35PASS, B enrollment4/18 blocked by unsupported feature tags",
+    "SCOPE": "B driver/client/preparer, synthetic tests and source ledger, private comparison/report, operational state cache only",
+    "REQUIRED_WORK": "Report B qualification BLOCKED with existing-corpus evidence; next technical investigation must explain unsupported tags without changing matcher policy. No live gate is ready.",
+    "VERIFY": "Canonical snapshot build and payload validation PASS; source inventory matches worktree; contract15, preparer7, builder26, normal postTLS63 PASS; real preprocessing35 and original-worker parity35 PASS. B enrollment4/18, matchingBLOCKED. Sanitizers unavailable.",
+    "STOP_IF": "Before any USB/root/install/VM/live action; do not change unsupported tags, matcher thresholds or algorithm to force PASS. No canonical/manual/index changes or commits. The granted protected-data scope was only the completed read-only offline comparison."
   },
-  "independent_review": "ACCEPT_AND_CONTINUE_2026-10-20: A/B diff, code, synthetic contract and final source build reviewed independently; FpPrint ownership corrected; operator gate installs with reader disconnected and masks fprintd only after install PASS. No blocking defect remains offline. Live M5.C requires separate consent; M5 stays OPEN. No protected M4 corpus rerun or sanitizer PASS claimed.",
+  "independent_review": "CODE_ACCEPT_B_QUALIFICATION_BLOCKED_2026-10-20: implementation accepted; contract15 and preparer7 PASS, canonical build and snapshot inventory verified. Existing-corpus B enrollment4/18 blocks matching/live readiness; worker parity35PASS, cause of nonzero tags UNKNOWN. Upstream opaque scratch cleanup limitation explicitly retained.",
   "m5a_status": "READY",
-  "rc_source_id": "fd2c7a6fe0ebee0501ce56da38c4e29c5c692b4c3928ef75c4275b8a703e3ad9",
+  "rc_source_id": "88bf1541290fed7e5d588d2c53ed244090d9f44b3b74b03fddb20ea85836fd8d",
   "uncommitted_worktree_changes": true,
   "m5c_status": {
     "offline_rc": "PASS_SOURCE_SNAPSHOT_WITHOUT_DEVELOPMENT_OR_GIT",
-    "live": "NOT_RUN",
+    "live": "OPERATOR_REPORTED_PASS_ENROLL_18_OF_18_23_CONTACTS_5_RETRY_AND_FIRST_PROBE_MATCH_NEW_PROCESS",
     "ordinary_authentication": "CLOSED",
-    "private_template": "NEW_MILAN_ONLY_OUTSIDE_FPRINTD_GALLERY",
+    "private_template": "A_VM_SESSION_CONSUMED_STOP_MATCH_DO_NOT_REUSE",
     "pairing": "ACTIVE_REUSE_ONLY_NO_E0_IN_PRIVATE_SESSION",
     "sanitizers": "UNAVAILABLE_HOST_LIBRARIES_MISSING",
-    "pam_synthetic": "PASS_AS_NORMAL_USER_OUTSIDE_SANDBOX; UNCHANGED_TEST_FAILS_WITH_PAM_SYSTEM_ERR_INSIDE_SANDBOX"
+    "pam_synthetic": "PASS_AS_NORMAL_USER_OUTSIDE_SANDBOX; UNCHANGED_TEST_FAILS_WITH_PAM_SYSTEM_ERR_INSIDE_SANDBOX",
+    "close": "OPERATOR_REPORTED_PASS"
   },
   "linux_native_background_status": {
     "source": "Existing authentic M3 S1/S2 FDT_B0 no-finger rasters; 5120 U16 samples, distinct from 12-byte FDT tables",
     "initialization": "PASS_2_OF_2_WITHOUT_WINDOWS_CALIDATA",
-    "runtime_and_biometric_qualification": "NOT_IMPLEMENTED_OR_QUALIFIED",
-    "new_background_capture_needed_for_initialization": false
+    "runtime_and_biometric_qualification": "B_IMPLEMENTED_PRIVATE__REAL_PREPROCESS_35_PASS__ENROLLMENT_4_OF_18__MATCHING_BLOCKED",
+    "new_background_capture_needed_for_initialization": false,
+    "real_corpus_authorization": "EXPLICIT_USER_READ_ONLY_OFFLINE_35_FRAMES_2_BACKGROUNDS_M2_CALIDATA",
+    "freshhomie_worker_parity": "PASS_35_OF_35_STATUS_QUALITY_COVERAGE_U8_FEATURES",
+    "feature_tags": {
+      "0": 8,
+      "512": 3,
+      "768": 24
+    }
+  },
+  "m5d_status": {
+    "implementation": "PRIVATE_B_IMPLEMENTED_FAIL_CLOSED",
+    "offline_build": "PASS",
+    "source_id": "88bf1541290fed7e5d588d2c53ed244090d9f44b3b74b03fddb20ea85836fd8d",
+    "contract": "15_PASS",
+    "preparer": "7_PASS",
+    "builder": "26_PASS",
+    "post_tls": "63_NORMAL_PASS_SANITIZERS_UNAVAILABLE",
+    "qualification": "BLOCKED_UNSUPPORTED_FEATURE_TAGS_ENROLLMENT_4_OF_18",
+    "live": "NOT_AUTHORIZED_NOT_RUN",
+    "ordinary_authentication": "CLOSED",
+    "vm": "OPERATOR_REPORTED_M5C_INSTALLED_FPRINTD_MASKED_RUNTIME_UNCHANGED",
+    "upstream_memory_cleanup": "OPAQUE_HEAP_AND_INTERNAL_SCRATCH_ZEROIZATION_NOT_GUARANTEED"
   }
 }
