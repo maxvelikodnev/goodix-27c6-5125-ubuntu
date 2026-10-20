@@ -1,6 +1,25 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Validation scope and known limitations
 
+## Milan branch boundary
+
+The Milan Type 17 candidate passed M4 offline actions, template serialization,
+retry and cleanup checks. Those results are not live Fedora/KDE authentication
+or biometric safety qualification. M5 prepares the canonical source build and
+synthetic install/update/removal/rollback transactions. Native MIT/RVA
+redistribution remains gated; no public self-contained RC is claimed.
+
+The qualified M3 preprocessing and fresh `FDT_B0` differed in all 35 compared
+frames. `FDT_B0` is not a substitute for Milan calidata. A reproducible calibration
+source and device binding remain unknown; production activation fails closed
+before reading protected calibration, claiming the USB interface or sending
+protocol/pairing commands. Stock libfprint may already have opened a USB handle. The private M4 calidata is not shipped.
+Milan uses its own driver/template identity and requires new enrollment.
+
+All hardware, Windows and installation lifecycle evidence below concerns the
+SIGFM baseline on `main`. Milan M5 live qualification is pending and must run on
+the physical Fedora host after separate authorization.
+
 ## Tested configuration
 
 The Fedora qualification evidence concerns one Goodix USB `27c6:5125` reader running

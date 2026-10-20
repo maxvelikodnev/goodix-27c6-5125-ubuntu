@@ -197,7 +197,7 @@ if 'goodix_27c6_5125' in drivers
         archive = get_option('goodix_milan_native_archive')
         native_include = get_option('goodix_milan_native_include')
         if archive == '' or native_include == '' or not fs.is_file(archive)
-            error('Milan requires the explicitly pinned private native archive and headers')
+            error('Milan requires the pinned native archive and source headers; no SIGFM fallback')
         endif
         driver_sources += {'goodix_27c6_5125': driver_sources['goodix_27c6_5125'] + files(
             '../../../../libfprint-driver/goodix_milan.c')}

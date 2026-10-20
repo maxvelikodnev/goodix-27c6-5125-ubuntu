@@ -31,17 +31,8 @@ class PublicBuild(unittest.TestCase):
         self.test_symbol = False
         self.pam_test_failure = False
         self.material_test_failure = False
-        self.package_root = self.base / 'synthetic-fedora'
-        self.include = self.package_root / 'include/opencv4'
-        self.include.mkdir(parents=True)
-        self.libdir = self.package_root / 'lib64'
-        self.libdir.mkdir()
-        for part in b.OPENCV_PARTS:
-            library = self.libdir / f'libopencv_{part}.so.4.13.0'
-            library.write_bytes(b'SYNTHETIC FEDORA OPENCV ' + part.encode())
-            (self.libdir / f'libopencv_{part}.so').symlink_to(library.name)
         for relative in [b.LIBFPRINT_SOURCE / 'meson.build', Path('libfprint-driver/driver.c'),
-                         Path('Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp'),
+                         b.native.NATIVE_SOURCE / 'NOTICES.txt',
                          *(Path('deployment') / name for name in
                            ('check-material.c', 'materials.py', 'test_material_native.c', 'test_materials.py')),
                          b.LOGIN_SOURCE / 'pam_goodix_login_gate.c', b.LOGIN_SOURCE / 'plasmalogin.pam',
@@ -51,13 +42,17 @@ class PublicBuild(unittest.TestCase):
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('synthetic source or notice\n')
-        (self.root / 'production').mkdir()
+        (self.root / 'production').mkdir(exist_ok=True)
         (self.root / 'production/build-public.py').write_bytes(SOURCE.read_bytes())
+        (self.root / 'production/build-milan-native.py').write_bytes(
+            SOURCE.with_name('build-milan-native.py').read_bytes())
         (self.root / 'production/host-test-only-symbols.txt').write_text('goodix_forbidden_test_seam\n')
         for name, value in (('ROOT', self.root),):
             self.start(patch.object(b, name, value))
         self.start(patch.object(b, 'prerequisites'))
-        self.start(patch.object(b, 'opencv_notices', return_value='Synthetic package license corpus\n'))
+        self.start(patch.object(b, 'validate_milan_sources', return_value={}))
+        self.start(patch.object(b.native, 'build_native', return_value=(
+            self.base / 'libnative.a', self.root / b.native.NATIVE_SOURCE, {'native_pic_objects': 94})))
         self.start(patch.object(b, 'run', side_effect=self.command))
 
     def start(self, replacement):
@@ -70,21 +65,10 @@ class PublicBuild(unittest.TestCase):
         self.commands.append((args, env))
         program = args[0]
         if program == 'pkg-config':
-            if args[1] == '--modversion':
-                return '4.13.0'
-            if args[1] == '--variable=includedir':
-                return str(self.include)
-            if args[1] == '--variable=libdir':
-                return str(self.libdir)
             self.assertEqual(args[1:], ('--cflags', '--libs', 'glib-2.0', 'openssl'))
             return '-I/synthetic/glib -lglib-2.0 -lssl -lcrypto'
         if program == 'readelf':
-            name = Path(args[-1]).name
-            if name.startswith('libopencv_'):
-                name = name.replace('.so.4.13.0', '.so.413')
-            else:
-                name = 'libfprint-2.so.2'
-            return f' (SONAME) Library soname: [{name}]'
+            return ' (SONAME) Library soname: [libfprint-2.so.2]'
         if program == 'meson':
             if args[1] == 'setup':
                 Path(args[2]).mkdir()
@@ -131,7 +115,8 @@ class PublicBuild(unittest.TestCase):
         self.assertEqual(manifest, b.validate_payload(self.output))
         self.assertEqual(set(manifest), {'schema', 'source_id', 'files', 'links'})
         self.assertNotIn('payload.json', manifest['files'])
-        self.assertEqual(len([name for name in manifest['files'] if '/libopencv_' in name]), 4)
+        self.assertFalse(any('opencv' in name.lower() for name in manifest['files']))
+        self.assertIn('runtime/Milan-NOTICES.txt', manifest['files'])
         self.assertEqual((self.output / 'login/plasmalogin.pam').read_bytes(),
                          (self.root / b.LOGIN_SOURCE / 'plasmalogin.pam').read_bytes())
         self.assertEqual((self.output / 'check-material').stat().st_mode & 0o777, 0o755)
@@ -141,16 +126,22 @@ class PublicBuild(unittest.TestCase):
         self.assertFalse(any('/dev/bus/usb' in arg or '/sys/bus/usb' in arg
                              for args, _ in self.commands for arg in args))
 
-    def test_goodix_cpp_keeps_array_bounds_warning_nonfatal(self):
-        source = SOURCE.parents[1] / b.LIBFPRINT_SOURCE / 'libfprint/meson.build'
-        text = source.read_text()
-        self.assertIn(
-            "drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])",
-            text)
-        # NBIS C sources have their own upstream warning settings.
-        cpp_flags = '\n'.join(line for line in text.splitlines()
-                              if 'drivers_cppflags +=' in line)
-        self.assertNotIn('-Wno-array-bounds', cpp_flags)
+    def test_milan_does_not_request_a_cpp_compiler_or_opencv(self):
+        self.build()
+        self.assertNotIn('gcc-c++', b.BUILD_PACKAGES)
+        self.assertNotIn('opencv-devel', b.BUILD_PACKAGES)
+        self.assertFalse(any(args[0] in ('c++', 'g++') or any('opencv' in arg for arg in args)
+                             for args, _ in self.commands))
+        setup = next(args for args, _ in self.commands if args[:2] == ('meson', 'setup'))
+        self.assertIn('-Dgoodix_milan=true', setup)
+        self.assertFalse(any(arg.startswith('-Dcpp_args=') for arg in setup))
+
+    def test_missing_native_sources_stops_before_build_or_output(self):
+        with patch.object(b, 'validate_milan_sources', side_effect=RuntimeError(b.native.PUBLICATION_GATE)):
+            with self.assertRaisesRegex(RuntimeError, 'MIT/RVA publication gate'):
+                self.build()
+        self.assertEqual(self.commands, [])
+        self.assertFalse(self.output.exists())
 
     def test_compile_contract_minimal_no_generated_target_execution_or_download(self):
         self.build()
@@ -280,6 +271,50 @@ class PublicBuild(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--output', result.stdout)
         self.assertFalse(self.output.exists())
+
+
+class NativeSourceContract(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='goodix-native-source-test-')
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = self.root / b.native.NATIVE_SOURCE
+        (self.source / b.native.RECIPE_PATH).parent.mkdir(parents=True)
+        self.recipe = self.source / b.native.RECIPE_PATH
+        self.recipe.write_text(json.dumps({'commands': [], 'source_sha256': {}}))
+        (self.source / 'NOTICES.txt').write_text('Synthetic original notices\n')
+        self.manifest = {'schema': 1, 'c1_commit': b.native.C1_PIN,
+                         'milan_commit': b.native.MILAN_PIN,
+                         'files': {name: b.native.digest(self.source / name) for name in
+                                   (b.native.RECIPE_PATH.as_posix(), 'NOTICES.txt')}}
+        (self.source / 'source-manifest.json').write_text(json.dumps(self.manifest))
+        pin = patch.object(b.native, 'RECIPE_SHA256', b.native.digest(self.recipe))
+        pin.start()
+        self.addCleanup(pin.stop)
+
+    def test_source_validation_needs_no_git_and_detects_content_drift(self):
+        self.assertEqual(b.native.validate_sources(self.root), self.manifest)
+        (self.source / 'NOTICES.txt').write_text('tampered')
+        with self.assertRaisesRegex(RuntimeError, 'native source drift'):
+            b.native.validate_sources(self.root)
+
+    def test_unknown_files_and_symlinked_sources_are_rejected(self):
+        extra = self.source / 'extra.c'
+        extra.write_text('unexpected')
+        with self.assertRaisesRegex(RuntimeError, 'inventory drift'):
+            b.native.validate_sources(self.root)
+        extra.unlink()
+        (self.source / 'NOTICES.txt').unlink()
+        (self.source / 'NOTICES.txt').symlink_to(self.recipe)
+        with self.assertRaisesRegex(RuntimeError, 'symlinks'):
+            b.native.validate_sources(self.root)
+
+    def test_unpinned_recipe_is_rejected_even_with_updated_manifest(self):
+        self.recipe.write_text(json.dumps({'commands': ['changed'], 'source_sha256': {}}))
+        self.manifest['files'][b.native.RECIPE_PATH.as_posix()] = b.native.digest(self.recipe)
+        (self.source / 'source-manifest.json').write_text(json.dumps(self.manifest))
+        with self.assertRaisesRegex(RuntimeError, 'recipe is not pinned'):
+            b.native.validate_sources(self.root)
 
 
 def manual_report_leaks(text):

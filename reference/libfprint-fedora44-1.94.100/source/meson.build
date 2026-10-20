@@ -1,4 +1,4 @@
-project('libfprint', [ 'c', 'cpp' ],
+project('libfprint', 'c',
     version: '1.94.100',
     license: 'LGPLv2.1+',
     default_options: [
@@ -25,7 +25,10 @@ libexecdir = prefix / get_option('libexecdir')
 datadir = prefix / get_option('datadir')
 
 cc = meson.get_compiler('c')
-cpp = meson.get_compiler('cpp')
+if not get_option('goodix_milan')
+  add_languages('cpp', required: true)
+  cpp = meson.get_compiler('cpp')
+endif
 host_system = host_machine.system()
 
 libfprint_sanitizers = get_option('b_sanitize').split(',')
@@ -83,7 +86,9 @@ c_cflags = cc.get_supported_arguments([
     '-Werror=pointer-to-int-cast',
 ])
 add_project_arguments(common_cflags + c_cflags, language: 'c')
-add_project_arguments(common_cflags, language: 'cpp')
+if not get_option('goodix_milan')
+  add_project_arguments(common_cflags, language: 'cpp')
+endif
 
 # maintaining compatibility with the previous libtool versioning
 # current = binary - interface

@@ -1,5 +1,16 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix 27c6:5125 for Fedora KDE
+# Goodix 27c6:5125 — experimental Milan branch
+
+`porting_milan_type_17` prepares a Milan Type 17 release candidate. Native source
+publication (MIT/RVA) and reader calibration/binding remain gated; this public
+clone currently stops before installation. The complete source-only build is
+being checked privately. Milan requires new enrollment for every finger/user;
+SIGFM templates are incompatible. `main` remains the SIGFM recovery baseline.
+See [Milan installation status](docs/INSTALLATION.md) and
+[qualification boundary](docs/VALIDATION.md). No Milan live qualification is claimed.
+
+The supported configuration and hardware results described below concern SIGFM
+on `main`; they do not establish Milan behavior.
 
 Fingerprint driver for the Goodix USB reader `27c6:5125` running
 `GF_ST411SEC_APP_12509` or `GF_ST411SEC_APP_12508`. It connects a Goodix-enabled

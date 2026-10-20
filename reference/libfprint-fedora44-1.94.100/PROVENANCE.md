@@ -17,9 +17,12 @@ patch directives. `source/` includes downstream changes for the
 verification, and the production-minimal Meson option. It is therefore not
 byte-identical to the upstream archive.
 
-The experimental Milan build also adds an internal RAW-print completion seam
-to the existing image-device lifecycle and an opt-in Meson link to the private
-pinned native engine. The exported libfprint ABI remains unchanged.
+The Milan build adds an internal RAW-print completion seam to the existing
+image-device lifecycle and a Meson link to the pinned native C engine. The
+canonical branch builder selects Milan and provides the archive built from its
+checked source set; that set remains private while the MIT/RVA publication gate
+is open. Meson configures C++ only for the SIGFM build. The exported libfprint
+ABI remains unchanged.
 
 Upstream and Fedora source files retain their original per-file copyright and
 license notices. The downstream Goodix integration and imported components are

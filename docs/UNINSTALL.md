@@ -56,7 +56,7 @@ assume that cleanup completed.
 | `/etc/pam.d/plasmalogin` | Removes the project's login entry first and exposes current Fedora PAM |
 | `/usr/local/lib64/goodix-plasma-login/` | Removes the selector and installation metadata |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
-| `/usr/local/lib64/goodix-27c6-5125/` | Removes private libfprint/OpenCV, links, notices and installation metadata |
+| `/usr/local/lib64/goodix-27c6-5125/` | Removes project libfprint, matcher dependencies, links, notices and installation metadata |
 | Project-owned SELinux huge-page `dontaudit` module | Removes the project module and restores Fedora's normal audit visibility |
 | `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
@@ -88,3 +88,18 @@ module, even without its receipt; unrelated SELinux rules are untouched.
 Report the result, exact error, failure point and whether password login and the
 desktop work. Do not send protected files, templates or fingerprint images.
 [Validation scope](VALIDATION.md) records the current evidence and limitations.
+
+## Return from Milan to SIGFM
+
+Remove Milan with `goodix-uninstall`, or use `goodix-force-remove` for damaged
+software, then follow the restart instruction and verify password login. Use a
+separate clean `main` clone and its ordinary `./install.sh` procedure to reinstall
+SIGFM; no library is copied manually. This avoids asking an older SIGFM remover
+to interpret a Milan receipt. The Milan remover also recognizes existing SIGFM
+receipts for an update to Milan.
+
+Milan and SIGFM enrollments are incompatible. A new enrollment is mandatory for
+Milan; after returning to SIGFM, enroll again if no valid SIGFM enrollment remains.
+Neither removal command resets the sensor, changes its pairing, or deletes
+fingerprint files. Milan calidata, if later provisioned, belongs to protected host
+state and is outside software removal.

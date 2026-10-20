@@ -1,5 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Installation and updates
+# Milan experimental branch: installation and updates
+
+This page describes `porting_milan_type_17`. The branch prepares a Milan-only
+release candidate; `main` retains SIGFM. **The public clone is not yet an
+installable RC:** the native MIT/RVA source publication decision remains open.
+`./install.sh` refuses an incomplete source set before requesting sudo or
+installing packages. A complete source-only staging tree is kept private until
+that decision; it contains no reader calibration, keys or fingerprint data.
+
+Milan calibration acquisition and device binding are also unqualified. Runtime
+activation refuses to proceed until that prerequisite is resolved. Host
+installation and real-reader qualification require separate authorization.
+The SIGFM hardware results in [validation](VALIDATION.md) do not qualify Milan.
 
 ## Supported configuration
 
@@ -19,15 +31,17 @@ The reader may be absent during installation, update, reinstall and removal.
 When it is present, keep your finger off it during administrative prompts.
 
 You need Git, network access for the public clone and Fedora packages, and disk
-space for a native source build. Nothing has to be prepared for the reader: no
-Windows machine, no capture tooling, no private key material and no
-reader-specific file. The installer builds from the source you clone; it requires
-no previously compiled output, and it does not open USB.
+space for a native source build. The software builder needs no private development tree, precompiled library,
+Windows files, PSK, calibration or template. It builds only Milan C sources and
+does not require OpenCV or a C++ compiler. Reader-specific Milan calibration is
+a separate, unresolved runtime prerequisite; do not copy the M3/M4 calibration
+or substitute `FDT_B0`. The installer does not open USB.
 
 ## Install, update or reinstall
 
-Use this same block in a normal desktop terminal for first installation, update,
-or reinstall after normal or emergency removal, including after deleting the clone:
+After the native source publication gate is closed and host installation is
+authorized, use this block for first installation, update or reinstall. It
+requires the Milan branch in an existing clone and never switches branches:
 
 ```bash
 (
@@ -39,9 +53,13 @@ if [ -d "$REPO/.git" ] && [ ! -L "$REPO" ]; then
         https://github.com/sorguido/goodix-27c6-5125.git|git@github.com:sorguido/goodix-27c6-5125.git) ;;
         *) echo "STOP: $REPO is not the Goodix Git repository."; exit 1 ;;
     esac
+    if [ "$(git -C "$REPO" branch --show-current)" != "porting_milan_type_17" ]; then
+        echo "STOP: select a separate Milan clone; the current branch is preserved."
+        exit 1
+    fi
     git -C "$REPO" pull --ff-only
 elif [ ! -e "$REPO" ] && [ ! -L "$REPO" ]; then
-    git clone https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
+    git clone --branch porting_milan_type_17 --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
 else
     echo "STOP: $REPO exists but is not the Goodix Git repository."
     exit 1
@@ -55,7 +73,7 @@ cd "$REPO"
 The subshell stops on errors without closing your terminal. A failed clone or
 fast-forward pull does not launch the installer.
 
-`install.sh` automatically selects `FIRST_INSTALL` or `UPDATE`.
+`install.sh` checks the complete native source set first, then automatically selects `FIRST_INSTALL` or `UPDATE`.
 It handles the host state check, supported Fedora prerequisites, source
 build, installation and failure reporting. All package-manager,
 build and installer output remains visible in the same terminal; the script does
@@ -112,24 +130,27 @@ installation did not complete. Neither runtime nor either removal command needs 
 clone after successful installation. The repository clone may be removed; the
 same bootstrap block clones it again automatically when needed.
 
-A fresh install creates only the empty host pairing state root. The runtime then
-initializes the reader itself on the first fingerprint action: it confirms the
-target identity, derives the configuration from the reader's own OTP, stores a
-locally generated pairing key and records it with a single bounded pairing write.
-Ordinary later use reuses that stored key and writes nothing to the reader.
-Password and desktop access remain available throughout.
+A fresh install creates only the empty host pairing state root. Pairing uses
+the same lifecycle as SIGFM on `main`: initial provisioning when necessary,
+reuse of a valid Linux key, and qualified restoration after external replacement.
+An ordinary reopen with a valid Linux pairing performs no `E0`. Every qualified
+transaction retains the one-write limit, durable journal, byte-for-byte
+`BB010002` preservation, readback/hash/TLS proof and fail-closed behavior.
+Current Milan runtime activation stops before claiming the USB interface or
+sending protocol/pairing commands because calibration acquisition and binding
+remain unqualified. Stock libfprint may already have opened a USB handle.
 
 Advanced users may clone elsewhere: the installer resolves its own location.
 The standard procedure above needs no override.
 
 ## Enrollment and basic verification
 
-After successful installation, use KDE's normal fingerprint settings to manage
-your enrolled fingers. The first fingerprint action takes slightly longer while
-the reader is initialized; later actions do not repeat that step. If your finger
-is already enrolled, keep that enrollment;
-installation preserves existing templates. Otherwise enroll one finger following
-the normal prompts, without opening simultaneous fingerprint applications.
+After calibration and live use are separately qualified, use KDE's normal
+fingerprint settings. **Milan requires a new enrollment for every finger and
+user.** SIGFM/`GSF1` templates cannot verify or identify with Milan and are never
+converted. The separate driver identity keeps historical SIGFM files outside
+the Milan gallery; they need not be deleted to enroll with Milan. Do not open
+simultaneous fingerprint applications.
 
 ### Recommended enrollment practice
 
@@ -147,8 +168,7 @@ During enrollment:
 - keep the finger reasonably flat on the sensor and avoid deliberately
   repeating the same contact area.
 
-The goal is not to reproduce the same touch 21 times, but to build good coverage
-of the finger across the 21 accepted samples.
+Milan requires 18 accepted samples; build coverage across those samples.
 
 Windows Hello follows a similar principle and explicitly encourages capturing
 the finger from different angles. KDE's standard enrollment dialog may provide
@@ -186,21 +206,21 @@ Never attach host pairing state, templates, fingerprint images or raw USB captur
 ## What updates and reinstalls preserve
 
 The same bootstrap block checks dependencies and rebuilds from current source.
-Existing project software is replaced while fprintd is quiescent. Host pairing
-state and existing templates are preserved; a reader's pairing identity is never
-changed by an update, and reinstallation after removal does not re-pair it.
+Existing project software is replaced while fprintd is quiescent. The software transaction preserves host pairing state and existing template
+files. It does not access the reader. Subsequent reader use follows the ordinary
+pairing lifecycle described above.
 
 After normal or emergency removal, the block reinstalls the software and
-restores its SELinux labels. Existing templates remain available. Incompatible
+restores its SELinux labels. Existing Milan templates remain available to Milan; SIGFM templates remain incompatible. Incompatible
 Fedora changes may disable fingerprint functionality; report them or remove the
 project instead of replacing Fedora's own authentication components.
 
 ## Using the reader with Windows
 
-The same reader can be shared with Windows. Windows may replace the reader's
+The inherited pairing lifecycle supports sharing the reader with Windows. Windows may replace the reader's
 pairing when it initializes the device; Linux classifies that change read-only,
 preserves the Windows record byte-for-byte and restores its own stored key with
 one qualified write on the next fingerprint action. No reinstall, re-enrollment
 or manual key handling is needed, and no key is shared between the two operating
-systems. Coexistence is qualified for one reader and one Windows 11 virtual
-machine; see [validation](VALIDATION.md) for that boundary.
+systems. That coexistence evidence belongs to SIGFM. Milan has not yet been qualified
+live with Windows; see [validation](VALIDATION.md).

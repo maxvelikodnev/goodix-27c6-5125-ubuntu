@@ -227,6 +227,7 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         'rule': r.RULE, 'owned': not rule_preexisting,
         'preexisting': rule_preexisting, 'phase': 'ready'}
     write_json(r.RUNTIME / 'installation.json', {'schema': 2, 'source_id': manifest['source_id'],
+        'matcher': 'milan-type17',
         'files': hashes, 'links': links, 'material_selinux': material_selinux,
         'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
         'state_root': str(r.STATE)})
@@ -463,7 +464,9 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 print('GOODIX_ROLLBACK=PASS PRIOR_PROJECT_SOFTWARE_RESTORED=true', file=sys.stderr)
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')
-    print('Use KDE fingerprint settings to enroll or your existing template. The service was not started by installation.')
+    print('Milan requires new enrollment for every finger/user; SIGFM templates are incompatible.')
+    print('Milan calibration acquisition and device binding require qualification before use. '
+          'The service was not started by installation.')
     print('Removal: goodix-uninstall. Emergency recovery: goodix-force-remove.')
 
 
@@ -497,6 +500,8 @@ def main():
         return 0
     require(os.geteuid() != 0, 'run ./install.sh as your ordinary user; it requests sudo itself')
     require(args.owner_uid is None and args.default_materials is None, 'invalid invocation')
+    # A publication-gated/incomplete clone must stop before sudo or packages.
+    builder.validate_milan_sources()
     supported_system()
     if args.check:
         prerequisites()

@@ -25,7 +25,8 @@ typedef enum {
 
 /* Inert payload only; caller retains its bytes. No file or device access. */
 GoodixMilan *goodix_milan_new (const guint8 *payload, gsize size, GError **error);
-/* Fixed production path, root-only, no symlinks. Never creates/provisions files. */
+/* Production fails closed without file access until source, envelope and
+ * device binding are qualified. Never creates or provisions calibration. */
 GoodixMilan *goodix_milan_load (GError **error);
 void goodix_milan_free (GoodixMilan *milan);
 gboolean goodix_milan_enroll_start (GoodixMilan *milan, GError **error);

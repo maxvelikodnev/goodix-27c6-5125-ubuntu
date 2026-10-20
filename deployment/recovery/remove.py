@@ -105,12 +105,20 @@ def runtime_inventory(receipt):
     require(isinstance(files, dict) and isinstance(links, dict), 'invalid runtime inventory')
     require(links == LINKS, 'unexpected library links')
     require('libfprint-2.so.2.0.0' in files, 'missing fingerprint library')
-    for part in ('core', 'features2d', 'flann', 'imgproc'):
-        require(sum(bool(re.fullmatch(r'libopencv_' + part + r'\.so\.[0-9.]+', name))
-                    for name in files) == 1, 'invalid OpenCV library inventory')
     for name in files:
         require(isinstance(name, str) and re.fullmatch(r'(?:licenses/)?[A-Za-z0-9_.+-]+', name)
                 and name not in ('.', '..', 'installation.json'), 'unsafe runtime file name')
+    # Old receipts describe SIGFM. Milan keeps the same software paths and
+    # ownership checks, but has no OpenCV runtime to remove.
+    matcher = receipt.get('matcher', 'sigfm')
+    require(matcher in ('sigfm', 'milan-type17'), 'unsupported runtime matcher')
+    if matcher == 'milan-type17':
+        require(not any(name.startswith('libopencv_') or name == 'OpenCV-LICENSES.txt'
+                        for name in files), 'unexpected OpenCV files in Milan runtime')
+    else:
+        for part in ('core', 'features2d', 'flann', 'imgproc'):
+            require(sum(bool(re.fullmatch(r'libopencv_' + part + r'\.so\.[0-9.]+', name))
+                        for name in files) == 1, 'invalid OpenCV library inventory')
     return set(files), links
 
 

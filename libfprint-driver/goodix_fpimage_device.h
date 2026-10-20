@@ -388,6 +388,8 @@ void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext 
                                                             guint64 generation);
 
 #if defined(GOODIX_LIBFPRINT_MILAN) && defined(GOODIX_ENABLE_TEST_SEAMS)
+/* Deliberately invalid synthetic evidence: reaches the shared input validator,
+ * never a private file or a persistent pairing command. */
 gboolean goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx,
                                                               GError **error);
 /* Offline inert-byte seam; no file, key, sensor or privileged operation. */

@@ -1,65 +1,50 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Public source build
+# Milan source build
 
-Ordinary users install and update through the root `install.sh` using the
-[documented installation procedure](../docs/INSTALLATION.md). No separate build
-command, payload selection or maintainer tooling is required.
+The root `install.sh` uses `build-public.py` for the Milan-only payload on this
+branch. The canonical installer and standalone `goodix-uninstall` and
+`goodix-force-remove` retain the existing Fedora integration and software-only
+recovery paths. See [installation status](../docs/INSTALLATION.md).
 
-## Build architecture
+## Source availability
 
-`build-public.py` resolves the source root from its own location and builds as
-an ordinary user on Fedora 44 x86_64. It uses the public libfprint base, Goodix
-driver and SIGFM sources together with the supported Fedora development packages.
-It does not require Git history, a branch name, a particular clone directory or
-pre-existing build output.
+The native MIT/RVA publication gate is still open. `production/milan-native/`
+is therefore absent from the public tree. `validate_milan_sources()` rejects
+that incomplete source set before the installer requests sudo or installs
+packages. It does not fall back to SIGFM, download code, or search `development/`.
+The separate `build-milan-candidate.py` remains the historical private M4 builder;
+it is not part of ordinary installation.
 
-The generated payload contains the Goodix-enabled libfprint runtime, the required
-OpenCV libraries, the Plasma Login selector and PAM entry, the offline validation
-helper, license notices and source/build provenance. Fedora supplies fprintd,
-libgusb, OpenSSL, PAM, Plasma and the ordinary authentication consumers.
+A complete source-only staging tree can exercise the canonical builder privately
+without Git history, the M4 binary, a reference checkout or reader data. Closing
+the publication decision is required before promoting those native sources and
+claiming that a public clone is a self-contained RC.
 
-The builder verifies the library ABI, dependency resolution, payload inventory
-and content hashes before installation. OpenCV notices come from installed Fedora
-RPM license files. Build provenance records the source-content digest and package
-versions rather than depending on Git objects.
+## Build and payload
 
-The [source ledger](source-files.tsv) and [matching digests](source-files.sha256)
-record the public driver sources and their provenance. See
-[Licensing and provenance](../docs/LICENSING_AND_PROVENANCE.md) for the combined
-library's terms.
+`build-public.py` resolves its source root from its own location and builds as an
+ordinary Fedora 44 x86_64 user. The pinned C1 native recipe is built as PIC C
+objects in a static archive; Meson selects Milan. OpenCV, SIGFM and a C++ compiler
+are not required by this payload. Fedora supplies the stock fprintd, libgusb,
+OpenSSL, GLib, libdeflate, PAM and desktop consumers.
 
-## Validation boundary
+The payload contains libfprint, the existing Plasma Login selector/PAM entry,
+the offline material checker, original native notices/license texts, source
+hashes and build provenance. It uses the same libfprint SONAME and checks the
+symbols required by stock fprintd, dependency resolution, payload inventory and
+hashes. No calibration, key, biometric template, capture or OEM binary is shipped.
 
-The public installer performs the checks required for the supported installation
-path. Additional maintainer verification is separate from the end-user procedure
-and is not required to install, use, update or remove the driver.
+The public [source ledger](source-files.tsv) and [digests](source-files.sha256)
+cover the local driver sources. The native source set has a pinned recipe,
+per-file source digests and original notices, validated before building. See
+[licensing and provenance](../docs/LICENSING_AND_PROVENANCE.md).
 
-A successful source build does not by itself establish hardware behavior or every
-Fedora authentication/SELinux path. The qualified scope and remaining limits are
-documented in [Validation](../docs/VALIDATION.md).
+## Runtime boundary
 
-## Private Milan candidate
-
-`build-milan-candidate.py` builds the experimental M4 Milan Type 17 library
-without installing it. It reuses this builder's environment, source checks and
-stock fprintd ABI checks, and executes the pinned C1 native recipe as PIC objects
-in a static archive. Meson selects Milan at build time; the resulting library has
-no SIGFM/OpenCV symbols or dependencies. The ordinary installer and its SIGFM
-payload remain unchanged.
-
-With the private C1 reference already present, run as an ordinary Fedora 44 user:
-
-```sh
-python3 production/build-milan-candidate.py \
-  --output "$PWD/development/private-root/m4-candidate"
-```
-
-The output must be a new Git-ignored directory inside `development/`. It contains
-the candidate library, redirected native commands, source hashes, source pins,
-package versions and static ABI/dependency evidence. It is deliberately not an
-installer payload and contains no calibration or fingerprint data. The native
-sources and combined output remain private under the existing publication gate;
-see [licensing and provenance](../docs/LICENSING_AND_PROVENANCE.md#experimental-milan-candidate).
-Offline build and ABI checks establish neither live authentication nor system
-rollback behavior. The running SIGFM installation is the rollback; M5 needs
-separate authorization and calibration provisioning before any activation.
+Milan calibration acquisition and device binding remain unqualified. Runtime
+activation fails closed before reading protected calibration, claiming the USB
+interface or sending protocol/pairing commands. Stock libfprint may already have
+opened a USB handle.
+A successful offline build and synthetic installation transaction do not qualify
+live authentication, Windows coexistence or sensor safety. M5 live work requires
+separate authorization on the physical Fedora host.

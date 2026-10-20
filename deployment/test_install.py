@@ -62,6 +62,7 @@ class Installer(unittest.TestCase):
         self.ctx.enter_context(patch.object(m.r, 'command', side_effect=self.command))
         self.ctx.enter_context(patch.object(m, 'supported_system'))
         self.ctx.enter_context(patch.object(m, 'prerequisites'))
+        self.ctx.enter_context(patch.object(m.builder, 'validate_milan_sources', return_value={}))
         self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
         self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
         self.ctx.enter_context(patch.object(m, 'label_materials', side_effect=self.labels))
@@ -168,12 +169,11 @@ class Installer(unittest.TestCase):
 
     def make_payload(self, directory):
         directory.mkdir()
-        names = {'runtime/libfprint-2.so.2.0.0', 'runtime/OpenCV-LICENSES.txt',
+        names = {'runtime/libfprint-2.so.2.0.0', 'runtime/Milan-NOTICES.txt',
                  'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
                  'runtime/build-provenance.json', 'login/' + m.r.MODULE,
                  'login/plasmalogin.pam', 'check-material',
-                 *(f'runtime/licenses/{n}.txt' for n in m.builder.LICENSES),
-                 *(f'runtime/libopencv_{n}.so.413' for n in m.builder.OPENCV_PARTS)}
+                 *(f'runtime/licenses/{n}.txt' for n in m.builder.LICENSES)}
         manifest = {'schema': 1, 'source_id': 'a' * 64, 'files': {}, 'links': {}}
         for name in names:
             target = directory / name
@@ -195,6 +195,10 @@ class Installer(unittest.TestCase):
     def test_first_install_mode_and_no_protected_output(self):
         self.apply()
         self.assertIn('GOODIX_INSTALL_MODE=FIRST_INSTALL', self.stdout.getvalue())
+        receipt = json.loads((m.r.RUNTIME / 'installation.json').read_bytes())
+        self.assertEqual(receipt['matcher'], 'milan-type17')
+        self.assertFalse(any('opencv' in name.lower() for name in receipt['files']))
+        self.assertIn('new enrollment for every finger/user', self.stdout.getvalue())
         for value in self.bundle.files.values():
             self.assertNotIn(value.decode(), self.stdout.getvalue() + self.stderr.getvalue())
 
@@ -287,6 +291,25 @@ class Installer(unittest.TestCase):
         self.apply()
         self.assertEqual((m.r.RUNTIME / library.name).read_bytes(), library.read_bytes())
         self.assertEqual(before, {p.name: p.stat().st_ino for p in m.r.MATERIAL.iterdir()})
+        m.r.normal_preflight()
+        self.assert_preserved()
+
+    def test_update_from_sigfm_receipt_uses_same_canonical_removal(self):
+        self.apply()
+        path = m.r.RUNTIME / 'installation.json'
+        receipt = json.loads(path.read_bytes())
+        receipt.pop('matcher')  # Existing main schema-2 receipts have no matcher.
+        for part in ('core', 'features2d', 'flann', 'imgproc'):
+            name = f'libopencv_{part}.so.413'
+            data = b'SYNTHETIC SIGFM LIBRARY ' + part.encode()
+            (m.r.RUNTIME / name).write_bytes(data)
+            receipt['files'][name] = m.r.digest(data)
+        path.write_text(json.dumps(receipt))
+        m.r.normal_preflight()
+        self.apply()
+        receipt = json.loads(path.read_bytes())
+        self.assertEqual(receipt['matcher'], 'milan-type17')
+        self.assertFalse(any(name.startswith('libopencv_') for name in receipt['files']))
         m.r.normal_preflight()
         self.assert_preserved()
 
@@ -502,6 +525,18 @@ class Installer(unittest.TestCase):
                 patch.object(m.builder, 'build_payload', side_effect=build), \
                 patch.object(m.subprocess, 'run', side_effect=execute):
             self.assertEqual(m.main(), 0)
+
+    def test_missing_native_sources_stop_before_sudo_or_dependencies(self):
+        with patch.object(m.os, 'geteuid', return_value=1000), \
+                patch.object(sys, 'argv', ['install.py', '--install-dependencies']), \
+                patch.object(m.builder, 'validate_milan_sources',
+                             side_effect=RuntimeError('MIT/RVA publication gate')), \
+                patch.object(m.subprocess, 'run') as run, \
+                patch.object(m.builder, 'build_payload') as build, \
+                self.assertRaisesRegex(RuntimeError, 'MIT/RVA publication gate'):
+            m.main()
+        run.assert_not_called()
+        build.assert_not_called()
 
     def test_failed_material_preflight_never_installs_packages_or_builds(self):
         for explicit in ([], ['--materials', str(self.source)]):

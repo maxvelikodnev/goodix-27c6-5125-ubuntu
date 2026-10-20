@@ -48,9 +48,19 @@
       "development/private-root/m4-libfprint-candidate-final/build-provenance.json"
     ],
     "M5": [
-      "docs/VALIDATION.md",
+      "production/build-public.py",
+      "production/build-milan-native.py",
+      "production/README.md",
       "deployment/install.py",
-      "TECHNICAL_MANUAL.md"
+      "deployment/recovery/remove.py",
+      "deployment/test_install.py",
+      "libfprint-driver/goodix_milan.c",
+      "libfprint-driver/tests/test_goodix_milan_contract.c",
+      "docs/INSTALLATION.md",
+      "docs/UNINSTALL.md",
+      "docs/VALIDATION.md",
+      "docs/LICENSING_AND_PROVENANCE.md",
+      "development/private-root/analysis/M5_milan/qualification.json"
     ],
     "M6": [
       "CORROBORATIONS.md",

@@ -43,9 +43,10 @@ links Apache-2.0 components. Applicable later-version grants allow the combined
 library to be conveyed under GPL-3.0-or-later. Individual source files retain
 their own notices and licenses; GPL code is not relabelled as LGPL.
 
-Library build outputs include the applicable license texts, OpenCV's license
-corpus read from the installed Fedora RPM license files, source manifests and
-build provenance. Each local build records the actual package versions and
+SIGFM library build outputs include the applicable license texts, OpenCV's
+license corpus read from the installed Fedora RPM license files, source manifests
+and build provenance. The Milan-only payload omits OpenCV and carries original
+native notices and license texts in `Milan-NOTICES.txt`. Each local build records the actual package versions and
 payload hashes. Those records describe the produced software; they do not
 constitute an exhaustive dependency SBOM.
 
@@ -116,6 +117,13 @@ subject to the licensing boundary described above.
 
 ## Experimental Milan candidate
 
+The canonical builder on this branch expects a pinned native C source set under
+`production/milan-native/`, including its recipe, per-file digests and original
+notices. The source set is intentionally not present in the public tree while
+the distinct MIT/RVA publication decision below remains open. An incomplete clone
+fails before privileged installation; no private path or binary is substituted.
+The complete source-only staging tree and combined output remain private.
+
 The separate M4 builder uses FreshHomie/goodix521d-fprintd `v0.1.0-19`, commit
 `4f48c482f35976ea4fac27d5e598730581c4f380`, and its Milan source snapshot at
 `e68eb725b1a7845b401b1a3c9b0790921f12133e`. It consumes C1's
@@ -133,7 +141,7 @@ the distinct publication questions concerning other C1 MIT/RVA transcriptions.
 Those sources and the combined experimental binary remain private pending the
 existing publication decision. The public adapter and build script do not
 redistribute that native source, calibration, templates or fingerprint images.
-The ordinary public SIGFM payload retains the licensing boundary above.
+The SIGFM payload on `main` retains the licensing boundary above.
 
 ## Excluded material
 

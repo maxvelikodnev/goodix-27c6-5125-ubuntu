@@ -8,10 +8,6 @@
 #include "521d-enrollment-session.h"
 #include "fpi-image.h"
 #include <openssl/crypto.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <string.h>
 
 #define MAX_TEMPLATE (384u * 1024u)
@@ -51,54 +47,13 @@ goodix_milan_new (const guint8 *payload, gsize size, GError **error)
 GoodixMilan *
 goodix_milan_load (GError **error)
 {
-  int directory = -1, fd = -1;
-  struct stat info, before;
-  guint8 bytes[GOODIX_MILAN_CALIDATA_ENVELOPE];
-  gsize offset = 0;
-  GoodixMilan *result = NULL;
-  /* Walk every component; a trusted leaf must not hide a symlinked ancestor. */
-  directory = open ("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-  const gchar *components[] = {"var", "lib", "fprint", "goodix-5125-state-v2"};
-  for (guint i = 0; directory >= 0 && i < G_N_ELEMENTS (components); i++) {
-    if (fstat (directory, &info) || !S_ISDIR (info.st_mode) || info.st_uid != 0 ||
-        info.st_gid != 0 || (info.st_mode & 0022)) goto failed;
-    int next = openat (directory, components[i], O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    close (directory); directory = next;
-  }
-  if (directory < 0 || fstat (directory, &info) || !S_ISDIR (info.st_mode) ||
-      info.st_uid != 0 || info.st_gid != 0 || (info.st_mode & 07777) != 0700)
-    goto failed;
-  fd = openat (directory, "milan-calidata.dat", O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-  if (fd < 0 || fstat (fd, &info) || !S_ISREG (info.st_mode) ||
-      info.st_uid != 0 || info.st_gid != 0 || (info.st_mode & 07777) != 0600 ||
-      info.st_nlink != 1 || info.st_size != GOODIX_MILAN_CALIDATA_ENVELOPE)
-    goto failed;
-  before = info;
-  while (offset < sizeof bytes) {
-    ssize_t n = read (fd, bytes + offset, sizeof bytes - offset);
-    if (n < 0 && errno == EINTR) continue;
-    if (n <= 0) goto failed;
-    offset += (gsize) n;
-  }
-  { guint8 extra; ssize_t n;
-    do { n = read (fd, &extra, 1); } while (n < 0 && errno == EINTR);
-    if (n != 0) goto failed;
-  }
-  if (fstat (fd, &info) || before.st_dev != info.st_dev || before.st_ino != info.st_ino ||
-      before.st_mode != info.st_mode || before.st_uid != info.st_uid || before.st_gid != info.st_gid ||
-      before.st_nlink != info.st_nlink || before.st_size != info.st_size ||
-      before.st_mtim.tv_sec != info.st_mtim.tv_sec || before.st_mtim.tv_nsec != info.st_mtim.tv_nsec ||
-      before.st_ctim.tv_sec != info.st_ctim.tv_sec || before.st_ctim.tv_nsec != info.st_ctim.tv_nsec)
-    goto failed;
-  result = goodix_milan_new (bytes + 16, GX521D_CALIDATA_BYTES, error);
-  goto out;
-failed:
-  invalid (error, "Milan requires a trusted private calibration file");
-out:
-  OPENSSL_cleanse (bytes, sizeof bytes);
-  if (fd >= 0) close (fd);
-  if (directory >= 0) close (directory);
-  return result;
+  /* File permissions establish a trusted host writer, not that calibration
+   * belongs to this sensor. The legacy envelope's first 16 bytes and its
+   * acquisition/device binding have not been qualified. Do not read private
+   * calibration or activate production until that contract is demonstrated. */
+  g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+                       "Milan calibration source and device binding require qualification");
+  return NULL;
 }
 
 void goodix_milan_enroll_clear (GoodixMilan *milan)

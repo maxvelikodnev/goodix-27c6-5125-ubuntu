@@ -628,15 +628,6 @@ production_live_preflight_acquire_state (
     &live, &ctx->runtime_material, &ctx->runtime_secure_view,
     ctx->runtime_fdt_seed, &ctx->runtime_coordinator_audit,
     &ctx->runtime_material_audit, error);
-#ifdef GOODIX_LIBFPRINT_MILAN
-  if (ready && ctx->runtime_coordinator_audit.decision !=
-               GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE)
-    {
-      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-                           "Milan candidate requires an already active pairing");
-      return FALSE;
-    }
-#endif
   return ready;
 }
 
@@ -769,13 +760,6 @@ production_start_pairing_activation (
 {
   GoodixPairingActivationPaths paths;
   GoodixPairingActivationPolicy policy;
-#ifdef GOODIX_LIBFPRINT_MILAN
-  /* M4 authorizes an offline biometric replacement, never new sensor pairing.
-   * Refuse before any journal, random PSK, persistent command or activation. */
-  g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-                       "Milan candidate requires the existing active pairing");
-  return FALSE;
-#endif
 
   /* Pairing activation is the only writer of persistent sensor pairing state.
    * An operator epoch is a host-tool session that must never be able to reach
@@ -1744,15 +1728,6 @@ goodix_fpimage_device_acquire_action_resources (GoodixFpImageDevice *self,
                      &ctx->runtime_material_audit, NULL, error) &&
                    ctx->runtime_material != NULL;
 #endif
-#ifdef GOODIX_LIBFPRINT_MILAN
-  if (material_ready && ctx->runtime_coordinator_audit.decision !=
-                        GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE)
-    {
-      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-                           "Milan candidate refuses legacy or inactive pairing");
-      goto fail;
-    }
-#endif
   if (!material_ready)
     {
       FpiDeviceAction action = fpi_device_get_current_action (FP_DEVICE (self));
@@ -2060,15 +2035,6 @@ goodix_fpimage_device_reopen_for_capture_action (
                      ctx->runtime_fdt_seed, &ctx->runtime_coordinator_audit,
                      &ctx->runtime_material_audit, NULL, error) &&
                    ctx->runtime_material != NULL;
-#endif
-#ifdef GOODIX_LIBFPRINT_MILAN
-  if (material_ready && ctx->runtime_coordinator_audit.decision !=
-                        GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE)
-    {
-      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-                           "Milan candidate refuses legacy or inactive pairing");
-      goto fail;
-    }
 #endif
   if (!material_ready)
     {
@@ -2915,7 +2881,11 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
 
   object_class->finalize = goodix_fpimage_device_finalize;
 
+#ifdef GOODIX_LIBFPRINT_MILAN
+  device_class->id        = "goodix_27c6_5125_milan_host_only";
+#else
   device_class->id        = "goodix_27c6_5125_host_only";
+#endif
   device_class->full_name = "Goodix 27c6:5125 host-only shell";
   device_class->type      = FP_DEVICE_TYPE_VIRTUAL;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
@@ -2963,7 +2933,14 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
 
   /* fp_device_set_property() consults the final instance class before
    * constructed() copies the transport type into private state. */
+#ifdef GOODIX_LIBFPRINT_MILAN
+  /* fprintd storage and fp_print_compatible() use this driver identity. Keep
+   * historical SIGFM prints outside the Milan gallery, without deleting or
+   * converting them. A new Milan enrollment is required for every finger. */
+  device_class->id        = "goodix_27c6_5125_milan";
+#else
   device_class->id        = "goodix_27c6_5125";
+#endif
   device_class->full_name = "Goodix 27c6:5125 Fingerprint Sensor";
   device_class->type      = FP_DEVICE_TYPE_USB;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;

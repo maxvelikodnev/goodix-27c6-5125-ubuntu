@@ -31,6 +31,12 @@ if [ "${GOODIX_MILAN_TEST:-0}" = 1 ]; then
   includes="$includes -I$GOODIX_MILAN_NATIVE_INCLUDE -I$GOODIX_MILAN_NATIVE_INCLUDE/../upstream/goodix53x5-libfprint-e68eb725b1a7845b401b1a3c9b0790921f12133e/drivers/goodix53x5"
   milan_link="$GOODIX_MILAN_NATIVE_ARCHIVE /usr/lib64/libdeflate.so.0"
   algorithm_objects="$build_dir/goodix_milan.o"
+  if [ "${GOODIX_MILAN_CONTRACT_TEST:-0}" = 1 ]; then
+    : "${GOODIX_MILAN_CONTRACT_FPRINTD_SOURCE:?stock fprintd source directory required}"
+    test_source="$test_dir/test_goodix_milan_contract.c"
+    includes="$includes -I$GOODIX_MILAN_CONTRACT_FPRINTD_SOURCE/src"
+    milan_link="$build_dir/file_storage.o $milan_link"
+  fi
 fi
 
 if [ "${GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST:-0}" = 1 ]; then
@@ -93,6 +99,12 @@ python3 "$test_dir/support/generate_libfprint_enums.py" \
   --output-source "$build_dir/fp-enums.c" \
   "$local_fp_dir/fp-device.h" \
   "$local_fp_dir/fp-print.h"
+
+if [ "${GOODIX_MILAN_CONTRACT_TEST:-0}" = 1 ]; then
+  gcc $local_flags $glib_cflags $includes -c \
+    "$GOODIX_MILAN_CONTRACT_FPRINTD_SOURCE/src/file_storage.c" \
+    -o "$build_dir/file_storage.o"
+fi
 
 # ---- libfprint core subset needed for real FpImageDevice actions ----
 compile_libfprint() {

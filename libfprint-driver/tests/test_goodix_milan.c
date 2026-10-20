@@ -322,13 +322,7 @@ static void test_ordinary_retry_actions (void)
   goodix_device_context_emit_finger_up_ready (f.ctx);
   wait_done (&f); g_assert_false (f.success); g_assert_false (f.match);
   g_assert_error (f.error, FP_DEVICE_RETRY, FP_DEVICE_RETRY_GENERAL); clear_fixture (&f);
-  f = fixture (TRUE);
-  g_autoptr(GError) error = NULL;
-  g_assert_false (goodix_device_context_test_milan_pairing_activation (f.ctx, &error));
-  g_assert_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED);
-  g_assert_cmpuint (goodix_device_context_get_backend_command_count (f.ctx), ==, 0);
-  clear_fixture (&f);
-  g_print ("MILAN_RETRY_ACTIONS zero_saturated_enroll_retry=1 no_progress=1 verify_retry_release=1 pairing_refused_before_command=1\n");
+  g_print ("MILAN_RETRY_ACTIONS zero_saturated_enroll_retry=1 no_progress=1 verify_retry_release=1\n");
 }
 static void count_match_report (FpDevice *device, FpPrint *match, FpPrint *print,
                                 gpointer data, GError *error)
@@ -399,7 +393,7 @@ int main (int argc, char **argv)
   g_test_add_func ("/milan/04-cancel-hold-cleanup", test_cancel_and_hold);
   g_test_add_func ("/milan/05-synthetic-contracts", test_synthetic_contracts);
   g_test_add_func ("/milan/06-preprocess-all35", test_all_preprocessing);
-  g_test_add_func ("/milan/07-ordinary-retry-pairing-refusal", test_ordinary_retry_actions);
+  g_test_add_func ("/milan/07-ordinary-retry", test_ordinary_retry_actions);
   g_test_add_func ("/milan/08-cancel-during-match", test_cancel_during_match);
   int result = g_test_run ();
   g_clear_object (&enrolled);
