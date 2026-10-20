@@ -3,8 +3,8 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
-  "phase": "M5.D",
-  "phase_status": "M5C_A_LIVE_PASS_REPORTED__M5D_OFFLINE_BIOMETRIC_BLOCKED__M5_OPEN",
+  "phase": "M5.E",
+  "phase_status": "M5E_DIAGNOSTICS_COMPLETE__SOFTWARE_CAUSE_SUPPORTED__PHYSICAL_CAUSE_UNKNOWN__B_BLOCKED__M5_OPEN",
   "completed_gates": [
     "M0_SOURCE_BASELINE",
     "M1_NATIVE_ENGINE_OFFLINE",
@@ -52,7 +52,8 @@
     "development/private-root/analysis/M5_milan/m5d-worker-parity.json",
     "production/test_prepare_milan_native.py",
     "development/private-root/m5d-rc-source",
-    "development/private-root/m5d-rc-payload"
+    "development/private-root/m5d-rc-payload",
+    "development/private-root/analysis/M5_milan/M5E_CLASSIFICATION_REPORT_2026-10-20.md"
   ],
   "m5b_status": {
     "capture_pipeline": "PASS",
@@ -67,12 +68,12 @@
     "prefix_universal_uniqueness": "UNKNOWN_NOT_A_BLOCKER_FOR_AUTHORIZED_SINGLE_READER_EXPERIMENT"
   },
   "current_blockers": [
-    "B completes all 35 real preprocess calls but feature tags are nonzero in 27; unchanged enrollment admits only 4/18 after 27 candidate contacts. B matching blocked without a complete template.",
-    "B matching/live and ordinary authentication remain unqualified. Native opaque allocation/internal scratch erasure is not guaranteed by the pinned upstream cleanup."
+    "B enrollment/matching qualification remains blocked under the unchanged supported-tag contract. M5.E proves the software count-to-mode mechanism; the physical reason for those cold classifier statistics on 5125 remains UNKNOWN.",
+    "No B live gate is ready. Native opaque memory cleanup and general live authentication qualification remain outside this completed diagnostic scope."
   ],
   "license_notes": "User decisions: 2026-10-18 candidate.c/policy.c LGPL-2.1-or-later grant settled through seaweeduk PR28 -> AndyHazz e68eb725 -> C1. 2026-10-20 examined native MIT/RVA portions approved for redistribution under established upstream MIT/LGPL provenance; original notices, recipe and hashes preserved. Repository-owner distribution decision, not independent legal certification; no reader data, firmware or OEM binary publication authorized.",
-  "next_action": "Finish offline RC verification and independent review; retain BLOCKED B qualification until native nonzero classification tags are understood without changing thresholds/tag handling. Keep VM M5.C masked and consumed A session intact; no live gate or routine SIGFM rollback.",
-  "last_verified_head": "d13022692badc6827108b1ffe65ff128c0ad5009",
+  "next_action": "STOP after M5.E report. Proposed separate source/synthetic-first audit of cold classifier admission inputs; any later protected-data observation requires its own bounded consent. Keep M5.C VM masked and consumed A session intact.",
+  "last_verified_head": "aab00009a54af6552517335338279b05de110295",
   "relevant_corroborations": [
     "C1",
     "C2",
@@ -80,14 +81,14 @@
   ],
   "candidate": "Milan",
   "current_task": {
-    "GOAL": "Implement Linux-native calibration/preprocessing B from the existing same-session FDT_B0 raster",
-    "STATE_DELTA": "A operator live PASS registered; B same-session background adapter implemented, real preprocessing35PASS and worker parity35PASS, B enrollment4/18 blocked by unsupported feature tags",
-    "SCOPE": "B driver/client/preparer, synthetic tests and source ledger, private comparison/report, operational state cache only",
-    "REQUIRED_WORK": "Report B qualification BLOCKED with existing-corpus evidence; next technical investigation must explain unsupported tags without changing matcher policy. No live gate is ready.",
-    "VERIFY": "Canonical snapshot build and payload validation PASS; source inventory matches worktree; contract15, preparer7, builder26, normal postTLS63 PASS; real preprocessing35 and original-worker parity35 PASS. B enrollment4/18, matchingBLOCKED. Sanitizers unavailable.",
-    "STOP_IF": "Before any USB/root/install/VM/live action; do not change unsupported tags, matcher thresholds or algorithm to force PASS. No canonical/manual/index changes or commits. The granted protected-data scope was only the completed read-only offline comparison."
+    "GOAL": "Explain Linux-native classifier modes6/7 without changing runtime or matcher",
+    "STATE_DELTA": "M5.D local/remote HEAD reconciled at aab0000; M5.E source/synthetic audit and explicitly authorized scalar observation complete, exact parity35/35 with original worker and M5.D. Software decision mechanism supported; physical cause UNKNOWN.",
+    "SCOPE": "Private observer, synthetic tests and classification report; operational cache only",
+    "REQUIRED_WORK": "Stop after report delivery. Any investigation of cold classifier threshold inputs is a separate proposed scope requiring a subsequent mandate and protected-data consent.",
+    "VERIFY": "Pinned sources unchanged. E1 publish1030/encode11/pipeline2/inputinvalid4, processFD12 and integrated runner PASS; E2 consent obtained; E3 original-worker/M5D parity35/35 PASS; no runtime/VM/live changes.",
+    "STOP_IF": "No further corpus, M2, templates, PSK, USB, root, VM or live activity. Do not alter tags, thresholds, preprocessing, matcher or canonical files. B remains BLOCKED and M5 OPEN."
   },
-  "independent_review": "CODE_ACCEPT_B_QUALIFICATION_BLOCKED_2026-10-20: implementation accepted; contract15 and preparer7 PASS, canonical build and snapshot inventory verified. Existing-corpus B enrollment4/18 blocks matching/live readiness; worker parity35PASS, cause of nonzero tags UNKNOWN. Upstream opaque scratch cleanup limitation explicitly retained.",
+  "independent_review": "M5E_CAUSE_SUPPORTED__PHYSICAL_CAUSE_UNKNOWN__B_BLOCKED_2026-10-20: pinned-source/synthetic observer review PASS; authorized scalar report parity35 and predicates/admission independently checked. No runtime defect or physical explanation proven; no live gate, STOP after report.",
   "m5a_status": "READY",
   "rc_source_id": "88bf1541290fed7e5d588d2c53ed244090d9f44b3b74b03fddb20ea85836fd8d",
   "uncommitted_worktree_changes": true,
