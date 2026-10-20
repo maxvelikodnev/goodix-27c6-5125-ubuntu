@@ -200,6 +200,8 @@ GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 gboolean goodix_fpimage_device_test_action_requires_live_preflight (
   FpiDeviceAction action);
+gboolean goodix_fpimage_device_test_action_may_start_without_material (
+  FpiDeviceAction action, GoodixRuntimeCoordinatorDecision decision);
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 void goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
@@ -393,6 +395,8 @@ void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext 
 gboolean goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx,
                                                               GError **error);
 /* Offline inert-byte seam; no file, key, sensor or privileged operation. */
+gboolean goodix_device_context_test_milan_diagnostic_arm (GoodixDeviceContext *ctx,
+                                                        const gchar *directory, GError **error);
 gboolean goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,
                                                        const guint8 *payload,
                                                        gsize size, GError **error);

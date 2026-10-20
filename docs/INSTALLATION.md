@@ -1,17 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Milan experimental branch: installation and updates
 
-This page describes `porting_milan_type_17`. The branch prepares a Milan-only
-release candidate; `main` retains SIGFM. **The public clone is not yet an
-installable RC:** the native MIT/RVA source publication decision remains open.
-`./install.sh` refuses an incomplete source set before requesting sudo or
-installing packages. A complete source-only staging tree is kept private until
-that decision; it contains no reader calibration, keys or fingerprint data.
+This page describes the experimental, installable Milan-only RC on
+`porting_milan_type_17`; `main` retains SIGFM. The canonical installer builds from
+versioned sources without private development files, reader data or prebuilt
+libraries. It validates source completeness and integrity before requesting sudo.
 
-Milan calibration acquisition and device binding are also unqualified. Runtime
-activation refuses to proceed until that prerequisite is resolved. Host
-installation and real-reader qualification require separate authorization.
-The SIGFM hardware results in [validation](VALIDATION.md) do not qualify Milan.
+Milan calibration acquisition and device binding are under study. The explicitly
+controlled M5 diagnostic capture path requires separate authorization; ordinary
+authentication stays closed until calibration is qualified. The private M3 blob
+is not shipped or required to install the software. Host installation and
+real-reader testing require separate consent for M5. SIGFM hardware results in
+[validation](VALIDATION.md) do not qualify Milan.
 
 ## Supported configuration
 
@@ -34,13 +34,14 @@ You need Git, network access for the public clone and Fedora packages, and disk
 space for a native source build. The software builder needs no private development tree, precompiled library,
 Windows files, PSK, calibration or template. It builds only Milan C sources and
 does not require OpenCV or a C++ compiler. Reader-specific Milan calibration is
-a separate, unresolved runtime prerequisite; do not copy the M3/M4 calibration
-or substitute `FDT_B0`. The installer does not open USB.
+a separate runtime prerequisite under investigation. Do not substitute `FDT_B0`
+or provision private calibration through ordinary installation. The protected
+M5 diagnostic procedure is separate from installation. The installer does not
+open USB.
 
 ## Install, update or reinstall
 
-After the native source publication gate is closed and host installation is
-authorized, use this block for first installation, update or reinstall. It
+After host installation is separately authorized for M5, use this block for first installation, update or reinstall. It
 requires the Milan branch in an existing clone and never switches branches:
 
 ```bash
@@ -136,9 +137,10 @@ reuse of a valid Linux key, and qualified restoration after external replacement
 An ordinary reopen with a valid Linux pairing performs no `E0`. Every qualified
 transaction retains the one-write limit, durable journal, byte-for-byte
 `BB010002` preservation, readback/hash/TLS proof and fail-closed behavior.
-Current Milan runtime activation stops before claiming the USB interface or
-sending protocol/pairing commands because calibration acquisition and binding
-remain unqualified. Stock libfprint may already have opened a USB handle.
+Ordinary Milan authentication stops while calibration remains unqualified.
+The separately authorized diagnostic path permits only controlled capture;
+it does not grant enrollment, verify, identify or PAM access. Stock libfprint
+may already have opened a USB handle before an ordinary action is refused.
 
 Advanced users may clone elsewhere: the installer resolves its own location.
 The standard procedure above needs no override.

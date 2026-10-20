@@ -1,13 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 — experimental Milan branch
 
-`porting_milan_type_17` prepares a Milan Type 17 release candidate. Native source
-publication (MIT/RVA) and reader calibration/binding remain gated; this public
-clone currently stops before installation. The complete source-only build is
-being checked privately. Milan requires new enrollment for every finger/user;
-SIGFM templates are incompatible. `main` remains the SIGFM recovery baseline.
-See [Milan installation status](docs/INSTALLATION.md) and
-[qualification boundary](docs/VALIDATION.md). No Milan live qualification is claimed.
+`porting_milan_type_17` contains an experimental, installable Milan Type 17
+release candidate built from its versioned sources with `./install.sh`.
+Milan live qualification is pending. Calibration acquisition and device binding
+are under study; the controlled diagnostic path requires separate authorization,
+and ordinary authentication remains closed until calibration is qualified.
+Milan requires new enrollment for every finger/user; SIGFM templates are
+incompatible. `main` remains the SIGFM recovery baseline.
+See [installation](docs/INSTALLATION.md), [recovery](docs/UNINSTALL.md) and
+[qualification boundary](docs/VALIDATION.md).
 
 The supported configuration and hardware results described below concern SIGFM
 on `main`; they do not establish Milan behavior.
@@ -37,7 +39,8 @@ or qualify the full Fedora authentication path on APP12508. See
 ## Installation
 
 > [!WARNING]
-> **Use only official releases or the `main` branch for installation.**
+> **This Milan branch is an experimental RC for separately authorized M5 testing.**
+> Use official releases or `main` for the qualified SIGFM baseline.
 
 **[Install using the single copy-paste block](docs/INSTALLATION.md).** The root
 `install.sh` automatically selects first installation (`FIRST_INSTALL`) or update

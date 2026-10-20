@@ -170,6 +170,7 @@ class Installer(unittest.TestCase):
     def make_payload(self, directory):
         directory.mkdir()
         names = {'runtime/libfprint-2.so.2.0.0', 'runtime/Milan-NOTICES.txt',
+                 'runtime/goodix-milan-diagnostic', 'runtime/prepare-milan-diagnostic.py',
                  'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
                  'runtime/build-provenance.json', 'login/' + m.r.MODULE,
                  'login/plasmalogin.pam', 'check-material',
@@ -181,7 +182,7 @@ class Installer(unittest.TestCase):
             data = (self.clone / 'deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes() \
                 if name == 'login/plasmalogin.pam' else b'SYNTHETIC PUBLIC PAYLOAD ' + name.encode()
             target.write_bytes(data)
-            target.chmod(0o755 if name == 'check-material' else 0o644)
+            target.chmod(0o755 if name in ('check-material', 'runtime/goodix-milan-diagnostic') else 0o644)
             manifest['files'][name] = m.r.digest(data)
         for name, target in m.r.LINKS.items():
             (directory / 'runtime' / name).symlink_to(target)
@@ -199,6 +200,8 @@ class Installer(unittest.TestCase):
         self.assertEqual(receipt['matcher'], 'milan-type17')
         self.assertFalse(any('opencv' in name.lower() for name in receipt['files']))
         self.assertIn('new enrollment for every finger/user', self.stdout.getvalue())
+        self.assertEqual(stat.S_IMODE((m.r.RUNTIME / 'goodix-milan-diagnostic').stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((m.r.RUNTIME / 'prepare-milan-diagnostic.py').stat().st_mode), 0o644)
         for value in self.bundle.files.values():
             self.assertNotIn(value.decode(), self.stdout.getvalue() + self.stderr.getvalue())
 
@@ -530,10 +533,10 @@ class Installer(unittest.TestCase):
         with patch.object(m.os, 'geteuid', return_value=1000), \
                 patch.object(sys, 'argv', ['install.py', '--install-dependencies']), \
                 patch.object(m.builder, 'validate_milan_sources',
-                             side_effect=RuntimeError('MIT/RVA publication gate')), \
+                             side_effect=RuntimeError('incomplete Milan native source set')), \
                 patch.object(m.subprocess, 'run') as run, \
                 patch.object(m.builder, 'build_payload') as build, \
-                self.assertRaisesRegex(RuntimeError, 'MIT/RVA publication gate'):
+                self.assertRaisesRegex(RuntimeError, 'incomplete Milan native source set'):
             m.main()
         run.assert_not_called()
         build.assert_not_called()

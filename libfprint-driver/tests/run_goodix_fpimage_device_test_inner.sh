@@ -60,7 +60,7 @@ configuration_mentions=$(find "$git_root/libfprint-driver" \
   grep -H 'goodix_device_context_configure_enrollment_graph' {} + | \
   wc -l)
 if [ "$configuration_mentions" -ne 3 ] ||
-   ! grep -A60 '^production_activation_start_secure_graph' \
+   ! grep -A80 '^production_activation_start_secure_graph' \
       "$git_root/libfprint-driver/goodix_fpimage_device.c" | \
       grep -F 'goodix_device_context_configure_enrollment_graph (' >/dev/null; then
   echo "production enrollment graph caller set is not the reviewed singleton" >&2

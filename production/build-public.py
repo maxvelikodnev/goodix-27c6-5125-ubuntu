@@ -21,7 +21,10 @@ LOGIN_SOURCE = Path('deployment/plasma-login-opt-in')
 BUILD_PACKAGES = ('gcc', 'meson', 'ninja-build', 'pkgconf-pkg-config',
                   'glib2-devel', 'libgusb-devel', 'libusb1-devel', 'openssl-devel',
                   'json-glib-devel', 'pam-devel', 'binutils', 'libdeflate')
-LICENSES = ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0')
+LICENSES = ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0', 'MIT')
+DIAGNOSTIC = 'runtime/goodix-milan-diagnostic'
+DIAGNOSTIC_PREPARE = 'runtime/prepare-milan-diagnostic.py'
+EXECUTABLES = {'check-material', DIAGNOSTIC}
 BASE_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL': 'C'}
 spec = importlib.util.spec_from_file_location('goodix_native_builder', ROOT / 'production/build-milan-native.py')
 native = importlib.util.module_from_spec(spec)
@@ -74,6 +77,8 @@ def source_inventory():
         roots.append(native.NATIVE_SOURCE)
     files = [ROOT / 'production/build-public.py',
              ROOT / 'production/build-milan-native.py',
+             ROOT / 'production/milan-diagnostic.c',
+             ROOT / 'production/prepare-milan-diagnostic.py',
              *(ROOT / 'deployment' / name for name in
                ('check-material.c', 'materials.py', 'test_material_native.c', 'test_materials.py')),
              ROOT / 'production/host-test-only-symbols.txt',
@@ -123,7 +128,7 @@ def validate_payload(directory):
     fixed = {'runtime/libfprint-2.so.2.0.0', 'runtime/Milan-NOTICES.txt',
              'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
              'runtime/build-provenance.json', 'login/pam_goodix_login_gate.so',
-             'login/plasmalogin.pam', 'check-material',
+             'login/plasmalogin.pam', 'check-material', DIAGNOSTIC, DIAGNOSTIC_PREPARE,
              *(f'runtime/licenses/{name}.txt' for name in LICENSES)}
     require(set(files) == fixed, 'unexpected Milan payload file inventory')
     require(links == {'runtime/libfprint-2.so.2': 'libfprint-2.so.2.0.0',
@@ -148,8 +153,10 @@ def validate_payload(directory):
     for name, target in links.items():
         path = directory / name
         require(path.is_symlink() and os.readlink(path) == target, 'payload link drift: ' + name)
-    require(stat.S_IMODE((directory / 'check-material').stat().st_mode) == 0o755,
-            'material checker must be executable with mode 0755')
+    for name in files:
+        require(stat.S_IMODE((directory / name).stat().st_mode) ==
+                (0o755 if name in EXECUTABLES else 0o644),
+                'unexpected payload permissions: ' + name)
     return manifest
 
 
@@ -219,6 +226,29 @@ def build_payload(output):
         shutil.copyfile(library, runtime / library.name)
         (runtime / 'libfprint-2.so.2').symlink_to(library.name)
         (runtime / 'libfprint-2.so').symlink_to('libfprint-2.so.2')
+        diagnostic = output / DIAGNOSTIC
+        diagnostic_flags = shlex.split(run('pkg-config', '--cflags', '--libs',
+                                           'gio-2.0', 'gobject-2.0', 'gusb'))
+        run('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2',
+            '-I' + str(ROOT / LIBFPRINT_SOURCE / 'libfprint'),
+            '-I' + str(build / 'libfprint'),
+            f'-ffile-prefix-map={ROOT}=/usr/src/goodix',
+            f'-ffile-prefix-map={work}=/usr/src/goodix-build',
+            ROOT / 'production/milan-diagnostic.c', '-L' + str(runtime), '-lfprint-2',
+            *diagnostic_flags, '-Wl,-z,relro,-z,now', '-Wl,--no-undefined',
+            '-Wl,-rpath,$ORIGIN', '-o', diagnostic)
+        diagnostic_dynamic = run('readelf', '-d', diagnostic)
+        require(re.findall(r'\((?:RUNPATH|RPATH)\).*?\[([^]]+)\]', diagnostic_dynamic) == ['$ORIGIN'],
+                'diagnostic must load only its colocated Milan library')
+        diagnostic_linked = run('ldd', diagnostic)
+        require(str(runtime / 'libfprint-2.so.2') in diagnostic_linked and
+                'not found' not in diagnostic_linked,
+                'diagnostic dependency resolution failed for the built Milan library')
+        require(not any(name in diagnostic_linked.lower() for name in ('opencv', 'libstdc++', 'libc++')),
+                'OpenCV/C++ dependency present in diagnostic resolution')
+        run(diagnostic, '--offline-check')
+        shutil.copyfile(ROOT / 'production/prepare-milan-diagnostic.py', output / DIAGNOSTIC_PREPARE)
+        run('python3', '-I', '-B', output / DIAGNOSTIC_PREPARE, '--offline-check')
         run('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-fPIC', '-shared',
             ROOT / LOGIN_SOURCE / 'pam_goodix_login_gate.c', '-lpam',
             '-Wl,-z,relro,-z,now', '-Wl,--no-undefined', '-o', login / 'pam_goodix_login_gate.so')
@@ -262,7 +292,7 @@ def build_payload(output):
         if path.is_symlink():
             manifest['links'][name] = os.readlink(path)
         elif path.is_file():
-            path.chmod(0o755 if name == 'check-material' else 0o644)
+            path.chmod(0o755 if name in EXECUTABLES else 0o644)
             manifest['files'][name] = sha256(path.read_bytes())
     (output / 'payload.json').write_text(json.dumps(manifest, sort_keys=True, indent=2) + '\n')
     return validate_payload(output)

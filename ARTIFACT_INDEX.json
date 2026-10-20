@@ -60,7 +60,11 @@
       "docs/UNINSTALL.md",
       "docs/VALIDATION.md",
       "docs/LICENSING_AND_PROVENANCE.md",
-      "development/private-root/analysis/M5_milan/qualification.json"
+      "production/milan-native/source-manifest.json",
+      "production/milan-diagnostic.c",
+      "production/prepare-milan-diagnostic.py",
+      "development/private-root/analysis/M5_milan/m5a-public-qualification.json",
+      "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md"
     ],
     "M6": [
       "CORROBORATIONS.md",

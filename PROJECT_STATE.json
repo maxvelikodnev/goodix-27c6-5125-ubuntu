@@ -4,7 +4,7 @@
   "project": "Goodix 27c6:5125 — Milan Type 17 port",
   "execution_path": "PRIMARY",
   "phase": "M5.A",
-  "phase_status": "HUMAN_REQUIRED_PUBLICATION_AND_CALIDATA",
+  "phase_status": "M5A_READY_AWAITING_M5B_LIVE_AUTHORIZATION",
   "completed_gates": [
     "M0_SOURCE_BASELINE",
     "M1_NATIVE_ENGINE_OFFLINE",
@@ -17,27 +17,26 @@
   ],
   "host_modified": false,
   "relevant_artifacts": [
-    "ROADMAP.md",
     "production/build-public.py",
-    "production/build-milan-native.py",
+    "production/milan-native/source-manifest.json",
+    "production/milan-diagnostic.c",
+    "production/prepare-milan-diagnostic.py",
+    "libfprint-driver/goodix_milan.c",
     "deployment/install.py",
     "deployment/recovery/remove.py",
-    "libfprint-driver/goodix_milan.c",
-    "libfprint-driver/tests/test_goodix_milan_contract.c",
-    "docs/LICENSING_AND_PROVENANCE.md",
     "docs/INSTALLATION.md",
-    "docs/UNINSTALL.md",
-    "development/private-root/analysis/M5_milan/qualification.json",
-    "development/private-root/analysis/M4_milan/qualification.json"
+    "docs/LICENSING_AND_PROVENANCE.md",
+    "development/private-root/analysis/M5_milan/m5a-public-qualification.json",
+    "development/private-root/analysis/M5_milan/review-public-rc.json",
+    "development/private-root/analysis/M5_milan/M5_B_LIVE_GATE.md"
   ],
   "current_blockers": [
-    "Native MIT/RVA publication gate remains open; public source set intentionally absent and canonical installer stops before sudo.",
-    "Milan calibration source/device binding unqualified; production activation fails closed before protected calibration, interface claim or protocol/pairing commands; stock libfprint may open a USB handle.",
-    "M5.B physical Fedora installation/root/USB/pairing/biometrics require separate authorization after prerequisites."
+    "M5.B requires explicit separate authorization for physical Fedora installation, root, protected calibration/pairing state, one diagnostic USB capture and offline comparison.",
+    "Calibration acquisition/physical binding and original16-byte prefix semantics remain UNKNOWN. Ordinary authentication stays closed; explicit diagnostic-only path is ready."
   ],
-  "license_notes": "Decisione Utente 2026-10-18: milan/match/candidate.c (blob c416e882b73c9d564d5a5d91ac08e5eb73bd12d3) e policy.c (blob b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455) considerati LGPL-2.1-or-later con catena documentale seaweeduk PR#28 -> AndyHazz e68eb725 -> FreshHomie v0.1.0-19; blocker 'assenza grant' rimosso. Tracciabilità da riportare nella futura importazione pubblica. Le trascrizioni MIT/RVA del layer nativo C1 restano soggette al distinto gate di pubblicazione gia registrato; il PASS tecnico M3 non decide la redistribuzione.",
-  "next_action": "Resolve the recorded native MIT/RVA publication decision; qualify a reproducible 5125 calidata source/envelope/device binding under a separate protected-data gate. Offline private canonical build/recovery reviewed PASS; public RC and M5 live remain unqualified.",
-  "last_verified_head": "be678d4de71dbcef465bb9b5c6f1e1f502a5d4fe",
+  "license_notes": "User decisions: 2026-10-18 candidate.c/policy.c LGPL-2.1-or-later grant settled through seaweeduk PR28 -> AndyHazz e68eb725 -> C1. 2026-10-20 examined native MIT/RVA portions approved for redistribution under established upstream MIT/LGPL provenance; original notices, recipe and hashes preserved. Repository-owner distribution decision, not independent legal certification; no reader data, firmware or OEM binary publication authorized.",
+  "next_action": "Request M5_B_LIVE_CALIDATA_AND_AUTHORIZATION using the prepared private gate: canonical installation, one protected30s diagnostic capture with no E0, independent M3 comparison, then STOP and evaluate. No M5 live PASS, ordinary enrollment/auth or M6 authorized.",
+  "last_verified_head": "8f3695fbfe2d8832b837f702c360a03cc7979216",
   "relevant_corroborations": [
     "C1",
     "C2",
@@ -45,13 +44,14 @@
   ],
   "candidate": "Milan",
   "current_task": {
-    "GOAL": "Prepare canonical Milan-only RC offline",
-    "STATE_DELTA": "Canonical private source-only build and synthetic recovery verified; independent review accepted; public source publication and calibration source/binding remain gated.",
-    "SCOPE": "Canonical builder, driver lifecycle/template identity, deployment/recovery, affected user docs",
-    "REQUIRED_WORK": "Source-only private staging without reader data; build/ABI and install/update/removal/rollback fixtures",
-    "VERIFY": "Targeted synthetic regression and independent review; reuse pertinent M4 evidence",
-    "STOP_IF": "Protected operation, unapproved native publication, or M5.B/M6 boundary"
+    "GOAL": "Public installable Milan RC plus runnable diagnostic calibration experiment",
+    "STATE_DELTA": "Native source set promoted with original provenance; public source-only canonical build/ABI/install/recovery and diagnostic contract passed; independent review ACCEPT_AND_CONTINUE.",
+    "SCOPE": "Native source import/canonical builder, diagnostic-only loader and client, affected deployment/docs",
+    "REQUIRED_WORK": "Real source-only public build, integrity/ABI and targeted installer/recovery/diagnostic safety tests",
+    "VERIFY": "Reuse unchanged M4/M5 evidence; independent review before M5.A READY",
+    "STOP_IF": "Before host installation/root/protected data/USB/pairing/authentication without separate M5.B authorization."
   },
-  "offline_private_RC_source_id": "a9508347f9180b55ed4da0d74309b58d44b209120f2e2ec3f35408cdb2195618",
-  "independent_review": "ACCEPT_AND_CONTINUE (offline delta only)"
+  "independent_review": "ACCEPT_AND_CONTINUE (public RC offline; live NOT_RUN)",
+  "m5a_status": "READY",
+  "rc_source_id": "75d611ba175a1375142c4347465c7075a5e9b7a5d4f94bd55b14ad46d42393b8"
 }

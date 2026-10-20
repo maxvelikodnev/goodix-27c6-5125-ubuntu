@@ -117,30 +117,28 @@ subject to the licensing boundary described above.
 
 ## Experimental Milan candidate
 
-The canonical builder on this branch expects a pinned native C source set under
-`production/milan-native/`, including its recipe, per-file digests and original
-notices. The source set is intentionally not present in the public tree while
-the distinct MIT/RVA publication decision below remains open. An incomplete clone
-fails before privileged installation; no private path or binary is substituted.
-The complete source-only staging tree and combined output remain private.
+The canonical builder consumes the pinned C source set under
+`production/milan-native/`: the original recipe, source/header files, original
+notices, per-file digests and source manifest. It builds 94 PIC C objects in a
+static archive, without the upstream worker or transport. The set comes from
+FreshHomie/goodix521d-fprintd `v0.1.0-19`, commit
+`4f48c482f35976ea4fac27d5e598730581c4f380`, and Milan revision
+`e68eb725b1a7845b401b1a3c9b0790921f12133e`. The recipe digest is
+`c992bf284cc4d615807a635bf53e8f8ac96746bc3fbcf22e23393bae3ad5250b`.
+The build validates this source set and requires no private checkout or data.
 
-The separate M4 builder uses FreshHomie/goodix521d-fprintd `v0.1.0-19`, commit
-`4f48c482f35976ea4fac27d5e598730581c4f380`, and its Milan source snapshot at
-`e68eb725b1a7845b401b1a3c9b0790921f12133e`. It consumes C1's
-`package/native-engine/recipe.json` and its checked source digests, preserving the
-reference files and their original notices. Compile outputs are redirected into
-private `development/`; generated enum headers follow C1's libfprint templates,
-and the recipe's PIC objects form a static archive instead of a worker library.
-Source dependency hashes and actual build commands accompany the candidate.
+The repository owner's explicit distribution decision of 20 October 2026
+accepts the examined native MIT/RVA portions under the licenses established by
+upstream provenance (MIT/LGPL as applicable). This closes the recorded
+publication gate for this project; it is not an independent legal certification.
+Original per-file notices and upstream license texts are preserved in
+`production/milan-native/NOTICES.txt` and in the built payload. Reader data,
+firmware and OEM binaries are excluded from this decision.
 
-The settled grant for `milan/match/candidate.c` (blob
+The settled LGPL-2.1-or-later grant for `milan/match/candidate.c` (blob
 `c416e882b73c9d564d5a5d91ac08e5eb73bd12d3`) and `policy.c` (blob
-`b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455`) is LGPL-2.1-or-later through
-seaweeduk PR #28, AndyHazz's pinned Milan revision and C1. This does not change
-the distinct publication questions concerning other C1 MIT/RVA transcriptions.
-Those sources and the combined experimental binary remain private pending the
-existing publication decision. The public adapter and build script do not
-redistribute that native source, calibration, templates or fingerprint images.
+`b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455`) follows
+seaweeduk PR #28, AndyHazz's pinned Milan revision and C1.
 The SIGFM payload on `main` retains the licensing boundary above.
 
 ## Excluded material

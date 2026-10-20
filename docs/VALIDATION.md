@@ -4,21 +4,27 @@
 ## Milan branch boundary
 
 The Milan Type 17 candidate passed M4 offline actions, template serialization,
-retry and cleanup checks. Those results are not live Fedora/KDE authentication
-or biometric safety qualification. M5 prepares the canonical source build and
-synthetic install/update/removal/rollback transactions. Native MIT/RVA
-redistribution remains gated; no public self-contained RC is claimed.
+retry and cleanup checks. The canonical build now uses versioned native sources
+and retains the existing installer/update/removal/rollback paths. The repository
+owner has closed the native MIT/RVA distribution gate. These software checks do
+not qualify live Fedora/KDE authentication or biometric safety.
 
 The qualified M3 preprocessing and fresh `FDT_B0` differed in all 35 compared
-frames. `FDT_B0` is not a substitute for Milan calidata. A reproducible calibration
-source and device binding remain unknown; production activation fails closed
-before reading protected calibration, claiming the USB interface or sending
-protocol/pairing commands. Stock libfprint may already have opened a USB handle. The private M4 calidata is not shipped.
-Milan uses its own driver/template identity and requires new enrollment.
+frames; `FDT_B0` is not a substitute for Milan calidata. The existing M3 blob has
+validated payload format/integrity and user-declared Windows provenance. The
+meaning of its 16-byte prefix and its independent binding to the reader remain
+unknown. No private calibration, template, key or image is shipped.
+
+A controlled capture-only M5 diagnostic path can investigate that association
+after separate authorization. It does not permit ordinary enrollment, verify,
+identify or PAM with unqualified calibration. Milan uses a separate
+driver/template identity and requires new enrollment when live use is qualified.
+Stock libfprint may open a USB handle before a driver action is refused.
 
 All hardware, Windows and installation lifecycle evidence below concerns the
-SIGFM baseline on `main`. Milan M5 live qualification is pending and must run on
-the physical Fedora host after separate authorization.
+SIGFM baseline on `main`. Milan M5 live qualification is pending on the physical
+Fedora host; a successful diagnostic alone does not demonstrate device binding,
+FAR/FRR, liveness or general-use suitability.
 
 ## Tested configuration
 

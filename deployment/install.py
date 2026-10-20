@@ -215,7 +215,8 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         relative = name.removeprefix('runtime/')
         path = r.RUNTIME / relative
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
-        write_file(path, (payload / name).read_bytes())
+        write_file(path, (payload / name).read_bytes(),
+                   0o755 if relative == 'goodix-milan-diagnostic' else 0o644)
         hashes[relative] = digest
     links = {}
     for name, target in manifest['links'].items():
@@ -465,7 +466,8 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')
     print('Milan requires new enrollment for every finger/user; SIGFM templates are incompatible.')
-    print('Milan calibration acquisition and device binding require qualification before use. '
+    print('Ordinary Milan authentication requires qualified calibration. '
+          'Use the diagnostic tool only under separate M5 live authorization. '
           'The service was not started by installation.')
     print('Removal: goodix-uninstall. Emergency recovery: goodix-force-remove.')
 
@@ -500,7 +502,7 @@ def main():
         return 0
     require(os.geteuid() != 0, 'run ./install.sh as your ordinary user; it requests sudo itself')
     require(args.owner_uid is None and args.default_materials is None, 'invalid invocation')
-    # A publication-gated/incomplete clone must stop before sudo or packages.
+    # An incomplete or modified native source set must stop before sudo/packages.
     builder.validate_milan_sources()
     supported_system()
     if args.check:

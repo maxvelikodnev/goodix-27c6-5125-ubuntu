@@ -31,8 +31,11 @@ class PublicBuild(unittest.TestCase):
         self.test_symbol = False
         self.pam_test_failure = False
         self.material_test_failure = False
+        self.diagnostic_test_failure = False
         for relative in [b.LIBFPRINT_SOURCE / 'meson.build', Path('libfprint-driver/driver.c'),
                          b.native.NATIVE_SOURCE / 'NOTICES.txt',
+                         Path('production/milan-diagnostic.c'),
+                         Path('production/prepare-milan-diagnostic.py'),
                          *(Path('deployment') / name for name in
                            ('check-material.c', 'materials.py', 'test_material_native.c', 'test_materials.py')),
                          b.LOGIN_SOURCE / 'pam_goodix_login_gate.c', b.LOGIN_SOURCE / 'plasmalogin.pam',
@@ -65,9 +68,12 @@ class PublicBuild(unittest.TestCase):
         self.commands.append((args, env))
         program = args[0]
         if program == 'pkg-config':
-            self.assertEqual(args[1:], ('--cflags', '--libs', 'glib-2.0', 'openssl'))
+            self.assertIn(args[1:], (('--cflags', '--libs', 'glib-2.0', 'openssl'),
+                                    ('--cflags', '--libs', 'gio-2.0', 'gobject-2.0', 'gusb')))
             return '-I/synthetic/glib -lglib-2.0 -lssl -lcrypto'
         if program == 'readelf':
+            if args[-1].endswith('/goodix-milan-diagnostic'):
+                return ' (RUNPATH) Library runpath: [$ORIGIN]'
             return ' (SONAME) Library soname: [libfprint-2.so.2]'
         if program == 'meson':
             if args[1] == 'setup':
@@ -86,10 +92,21 @@ class PublicBuild(unittest.TestCase):
             if self.material_test_failure:
                 raise RuntimeError('synthetic native E4 binding test failed')
             return 'SYNTHETIC_NATIVE_MATERIAL=PASS'
+        if program == 'python3' and args[3].endswith('/prepare-milan-diagnostic.py'):
+            self.assertEqual(args[1:3], ('-I', '-B'))
+            self.assertEqual(args[4:], ('--offline-check',))
+            if self.diagnostic_test_failure:
+                raise RuntimeError('synthetic Milan preparer offline check failed')
+            return 'SYNTHETIC_DIAGNOSTIC_PREPARE=PASS'
         if Path(program).name == 'test_gate' or program == 'python3':
             if self.pam_test_failure:
                 raise RuntimeError('synthetic PAM assertion failed')
             return 'SYNTHETIC_PAM=PASS'
+        if Path(program).name == 'goodix-milan-diagnostic':
+            self.assertEqual(args[1:], ('--offline-check',))
+            if self.diagnostic_test_failure:
+                raise RuntimeError('synthetic Milan diagnostic offline check failed')
+            return 'SYNTHETIC_DIAGNOSTIC=PASS'
         if program == 'nm':
             if '--undefined-only' in args:
                 return ' U fp_context_new@LIBFPRINT_2.0.0'
@@ -99,7 +116,7 @@ class PublicBuild(unittest.TestCase):
             return '0000 T goodix_forbidden_test_seam' if self.test_symbol else ''
         if program == 'ldd':
             return 'libmissing.so => not found' if self.bad_link else \
-                   'libfprint-2.so.2 => ' + env['LD_LIBRARY_PATH'] + '/libfprint-2.so.2'
+                   'libfprint-2.so.2 => ' + str(self.output / 'runtime') + '/libfprint-2.so.2'
         if program == 'rpm':
             self.assertEqual(args[1], '-q')
             return '\n'.join(name + '-synthetic.fc44.x86_64' for name in args[2:])
@@ -120,6 +137,8 @@ class PublicBuild(unittest.TestCase):
         self.assertEqual((self.output / 'login/plasmalogin.pam').read_bytes(),
                          (self.root / b.LOGIN_SOURCE / 'plasmalogin.pam').read_bytes())
         self.assertEqual((self.output / 'check-material').stat().st_mode & 0o777, 0o755)
+        self.assertEqual((self.output / b.DIAGNOSTIC).stat().st_mode & 0o777, 0o755)
+        self.assertEqual((self.output / b.DIAGNOSTIC_PREPARE).stat().st_mode & 0o777, 0o644)
         self.assertFalse(any(path.name.startswith('goodix-source-build-') for path in self.base.iterdir()))
         programs = {args[0] for args, _ in self.commands}
         self.assertFalse(programs & {'git', 'sudo', 'dnf', 'flatpak', 'systemctl', 'fprintd'})
@@ -137,8 +156,8 @@ class PublicBuild(unittest.TestCase):
         self.assertFalse(any(arg.startswith('-Dcpp_args=') for arg in setup))
 
     def test_missing_native_sources_stops_before_build_or_output(self):
-        with patch.object(b, 'validate_milan_sources', side_effect=RuntimeError(b.native.PUBLICATION_GATE)):
-            with self.assertRaisesRegex(RuntimeError, 'MIT/RVA publication gate'):
+        with patch.object(b, 'validate_milan_sources', side_effect=RuntimeError(b.native.INCOMPLETE_SOURCE_SET)):
+            with self.assertRaisesRegex(RuntimeError, 'native source set is incomplete'):
                 self.build()
         self.assertEqual(self.commands, [])
         self.assertFalse(self.output.exists())
@@ -168,7 +187,8 @@ class PublicBuild(unittest.TestCase):
         self.assertEqual(material_env['GOODIX_MATERIAL_TEST_NATIVE'], native[-1])
         self.assertEqual(len([args for args, _ in self.commands if args[:2] == ('meson', 'compile')]), 1)
         self.assertTrue(any(Path(args[0]).name == 'test_gate' for args, _ in self.commands))
-        dispatch = next(args for args, _ in self.commands if args[0] == 'python3')
+        dispatch = next(args for args, _ in self.commands if args[0] == 'python3'
+                        and args[3].endswith('/test_dispatch.py'))
         self.assertEqual(dispatch[1:3], ('-I', '-B'))
         self.assertTrue(dispatch[3].endswith('/test_dispatch.py'))
         for path in dispatch[4:6] + dispatch[7:]:
@@ -185,6 +205,29 @@ class PublicBuild(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'native E4 binding test failed'):
             self.build()
         self.assertFalse((self.output / 'payload.json').exists())
+
+    def test_diagnostic_uses_colocated_library_and_offline_check_only(self):
+        self.build()
+        diagnostic = next(args for args, _ in self.commands
+                          if args[0] == 'cc' and args[-1].endswith('/goodix-milan-diagnostic'))
+        self.assertIn('-Wl,-rpath,$ORIGIN', diagnostic)
+        self.assertIn('-L' + str(self.output / 'runtime'), diagnostic)
+        self.assertIn('-lfprint-2', diagnostic)
+        executed = [args for args, _ in self.commands
+                    if Path(args[0]).name == 'goodix-milan-diagnostic']
+        self.assertEqual(executed, [(str(self.output / b.DIAGNOSTIC), '--offline-check')])
+
+    def test_failed_diagnostic_offline_check_prevents_payload_publication(self):
+        self.diagnostic_test_failure = True
+        with self.assertRaisesRegex(RuntimeError, 'diagnostic offline check failed'):
+            self.build()
+        self.assertFalse((self.output / 'payload.json').exists())
+
+    def test_diagnostic_executable_permission_drift_is_rejected(self):
+        self.build()
+        (self.output / b.DIAGNOSTIC).chmod(0o644)
+        with self.assertRaisesRegex(RuntimeError, 'unexpected payload permissions'):
+            b.validate_payload(self.output)
 
     def test_source_id_uses_content_not_clone_path_or_private_history(self):
         first = b.source_inventory()
@@ -288,6 +331,7 @@ class NativeSourceContract(unittest.TestCase):
                          'files': {name: b.native.digest(self.source / name) for name in
                                    (b.native.RECIPE_PATH.as_posix(), 'NOTICES.txt')}}
         (self.source / 'source-manifest.json').write_text(json.dumps(self.manifest))
+        self.original_recipe_pin = b.native.RECIPE_SHA256
         pin = patch.object(b.native, 'RECIPE_SHA256', b.native.digest(self.recipe))
         pin.start()
         self.addCleanup(pin.stop)
@@ -297,6 +341,23 @@ class NativeSourceContract(unittest.TestCase):
         (self.source / 'NOTICES.txt').write_text('tampered')
         with self.assertRaisesRegex(RuntimeError, 'native source drift'):
             b.native.validate_sources(self.root)
+
+    def test_incomplete_source_checkout_has_actionable_diagnostic(self):
+        with self.assertRaisesRegex(RuntimeError, 'native source set is incomplete'):
+            b.native.validate_sources(self.root / 'absent-checkout')
+
+    def test_native_revision_pins_are_required(self):
+        self.manifest['milan_commit'] = '0' * 40
+        (self.source / 'source-manifest.json').write_text(json.dumps(self.manifest))
+        with self.assertRaisesRegex(RuntimeError, 'invalid Milan native source manifest'):
+            b.native.validate_sources(self.root)
+
+    def test_promoted_source_checkout_retains_original_recipe_and_inventory(self):
+        with patch.object(b.native, 'RECIPE_SHA256', self.original_recipe_pin):
+            manifest = b.native.validate_sources(SOURCE.parents[1])
+        self.assertEqual(len(manifest['files']), 214)
+        self.assertEqual(b.native.digest(SOURCE.parents[1] / b.native.NATIVE_SOURCE /
+                                      b.native.RECIPE_PATH), self.original_recipe_pin)
 
     def test_unknown_files_and_symlinked_sources_are_rejected(self):
         extra = self.source / 'extra.c'

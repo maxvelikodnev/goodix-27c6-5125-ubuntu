@@ -14,6 +14,7 @@ typedef struct {
   guint8 pixels[GOODIX_MILAN_PIXELS];
   gint quality, coverage;
   gint feature_count, tag;
+  gchar feature_sha256[65], preprocess_sha256[65];
 } GoodixMilanSample;
 
 typedef enum {
@@ -25,9 +26,19 @@ typedef enum {
 
 /* Inert payload only; caller retains its bytes. No file or device access. */
 GoodixMilan *goodix_milan_new (const guint8 *payload, gsize size, GError **error);
-/* Production fails closed without file access until source, envelope and
- * device binding are qualified. Never creates or provisions calibration. */
-GoodixMilan *goodix_milan_load (GError **error);
+/* NULL means normal operation: no source/device association is qualified yet.
+ * A private directory is accepted only for explicit root-only M5.B capture.
+ * This reads the original envelope unchanged; it never provisions the sensor. */
+GoodixMilan *goodix_milan_load (const gchar *directory, GError **error);
+gboolean goodix_milan_is_diagnostic (GoodixMilan *milan);
+gboolean goodix_milan_begin_capture (GoodixMilan *milan, GError **error);
+gboolean goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
+                                     const GoodixMilanSample *sample,
+                                     const GError *capture_error, GError **error);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+/* Same validator and inode-safe reader, current UID and synthetic hashes only. */
+GoodixMilan *goodix_milan_test_load (const gchar *directory, GError **error);
+#endif
 void goodix_milan_free (GoodixMilan *milan);
 gboolean goodix_milan_enroll_start (GoodixMilan *milan, GError **error);
 void goodix_milan_enroll_clear (GoodixMilan *milan);

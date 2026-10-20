@@ -12,8 +12,8 @@ RECIPE_SHA256 = 'c992bf284cc4d615807a635bf53e8f8ac96746bc3fbcf22e23393bae3ad5250
 NATIVE_SOURCE = Path('production/milan-native')
 NATIVE_INCLUDE = Path('package/experiments/milan521d/native')
 RECIPE_PATH = Path('package/native-engine/recipe.json')
-PUBLICATION_GATE = ('Milan native sources unavailable: the recorded MIT/RVA publication '
-                    'gate is unresolved; no SIGFM fallback or private-source lookup is allowed')
+INCOMPLETE_SOURCE_SET = ('Milan native source set is incomplete: restore production/milan-native '
+                         'from the source checkout; no SIGFM fallback or private-source lookup is allowed')
 
 
 def require(condition, message):
@@ -34,7 +34,7 @@ def validate_sources(root):
     """No commands or host changes; safe for installer preflight and source archives."""
     source = Path(root) / NATIVE_SOURCE
     require(source.is_dir() and not source.is_symlink() and
-            source.resolve().is_relative_to(Path(root).resolve()), PUBLICATION_GATE)
+            source.resolve().is_relative_to(Path(root).resolve()), INCOMPLETE_SOURCE_SET)
     manifest_path = source / 'source-manifest.json'
     require(manifest_path.is_file() and not manifest_path.is_symlink(),
             'Milan native source manifest is missing')

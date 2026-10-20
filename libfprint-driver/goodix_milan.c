@@ -9,6 +9,10 @@
 #include "fpi-image.h"
 #include <openssl/crypto.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define MAX_TEMPLATE (384u * 1024u)
 #define PROBE_ID "goodix-27c6-5125-milan-type17-probe-v1"
@@ -20,6 +24,8 @@ int gx_worker_identify (void *, const uint8_t *, int, int, int, int32_t[4]);
 struct _GoodixMilan {
   guint8 calibration[GX521D_CALIDATA_BYTES];
   Gx521dEnrollmentSession *enrollment;
+  gboolean diagnostic, capture_started, capture_recorded;
+  int directory_fd;
 };
 
 static gboolean invalid (GError **error, const gchar *message)
@@ -40,20 +46,221 @@ goodix_milan_new (const guint8 *payload, gsize size, GError **error)
   }
   gx521d_calidata_image_free (context);
   milan = g_new0 (GoodixMilan, 1);
+  milan->directory_fd = -1;
   memcpy (milan->calibration, payload, size);
   return milan;
 }
 
-GoodixMilan *
-goodix_milan_load (GError **error)
+static gboolean
+same_snapshot (const struct stat *before, const struct stat *after)
 {
-  /* File permissions establish a trusted host writer, not that calibration
-   * belongs to this sensor. The legacy envelope's first 16 bytes and its
-   * acquisition/device binding have not been qualified. Do not read private
-   * calibration or activate production until that contract is demonstrated. */
-  g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-                       "Milan calibration source and device binding require qualification");
+  return before->st_dev == after->st_dev && before->st_ino == after->st_ino &&
+    before->st_uid == after->st_uid && before->st_mode == after->st_mode &&
+    before->st_nlink == after->st_nlink && before->st_size == after->st_size &&
+    before->st_mtim.tv_sec == after->st_mtim.tv_sec && before->st_mtim.tv_nsec == after->st_mtim.tv_nsec &&
+    before->st_ctim.tv_sec == after->st_ctim.tv_sec && before->st_ctim.tv_nsec == after->st_ctim.tv_nsec;
+}
+
+static int
+open_private_directory (const gchar *directory, uid_t uid, GError **error)
+{
+  int fd = -1;
+  struct stat st;
+  g_auto(GStrv) components = NULL;
+  if (!directory || !g_path_is_absolute (directory) || !strstr (directory, "/development/"))
+    goto fail;
+  components = g_strsplit (directory + 1, "/", -1);
+  fd = open ("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  if (fd < 0) goto fail;
+  /* Resolve each component with NOFOLLOW; only the final directory is a
+   * trusted writer boundary. Home/repository ancestors may belong to the user;
+   * the retained directory fd prevents later path swaps redirecting our I/O. */
+  for (guint i = 0; components[i]; i++)
+    {
+      int next;
+      if (!*components[i] || !strcmp (components[i], ".") || !strcmp (components[i], "..")) goto fail;
+      next = openat (fd, components[i], O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+      close (fd);
+      fd = next;
+      if (fd < 0) goto fail;
+    }
+  if (fstat (fd, &st) || !S_ISDIR (st.st_mode) || st.st_uid != uid || (st.st_mode & 07777) != 0700)
+    goto fail;
+  return fd;
+fail:
+  if (fd >= 0) close (fd);
+  invalid (error, "Milan diagnostic directory must be private, trusted and symlink-free inside development/");
+  return -1;
+}
+
+static guint8 *
+read_private_file (int directory_fd, const gchar *name, uid_t uid,
+                   gsize minimum, gsize maximum, gsize *size, GError **error)
+{
+  struct stat before, after, named;
+  int fd = openat (directory_fd, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+  guint8 *bytes = NULL;
+  gsize offset = 0;
+  if (fd < 0 || fstat (fd, &before) || !S_ISREG (before.st_mode) ||
+      before.st_uid != uid || (before.st_mode & 07777) != 0600 || before.st_nlink != 1 ||
+      before.st_size < 0 || (guint64) before.st_size < minimum || (guint64) before.st_size > maximum)
+    goto fail;
+  bytes = g_malloc0 ((gsize) before.st_size + 1);
+  while (offset < (gsize) before.st_size)
+    {
+      ssize_t count = read (fd, bytes + offset, (gsize) before.st_size - offset);
+      if (count < 0 && errno == EINTR) continue;
+      if (count <= 0) goto fail;
+      offset += (gsize) count;
+    }
+  if (fstat (fd, &after) || fstatat (directory_fd, name, &named, AT_SYMLINK_NOFOLLOW) ||
+      !same_snapshot (&before, &after) || !same_snapshot (&after, &named)) goto fail;
+  close (fd);
+  *size = offset;
+  return bytes;
+fail:
+  if (fd >= 0) close (fd);
+  if (bytes) { OPENSSL_cleanse (bytes, offset); g_free (bytes); }
+  invalid (error, "Milan diagnostic file missing, untrusted, malformed or changed during read");
   return NULL;
+}
+
+static gboolean
+receipt_value (GKeyFile *receipt, const gchar *key, const gchar *expected)
+{
+  g_autofree gchar *value = g_key_file_get_string (receipt, "M5B", key, NULL);
+  return g_strcmp0 (value, expected) == 0;
+}
+
+static GoodixMilan *
+load_experiment (const gchar *directory, uid_t uid, GError **error)
+{
+  GoodixMilan *milan = NULL;
+  g_autoptr(GKeyFile) receipt = g_key_file_new ();
+  g_autofree guint8 *metadata = NULL;
+  guint8 *envelope = NULL;
+  g_autofree gchar *envelope_hash = NULL, *payload_hash = NULL;
+  gsize metadata_size = 0, size = 0;
+  int fd = open_private_directory (directory, uid, error);
+  if (fd < 0) return NULL;
+  metadata = read_private_file (fd, "receipt.ini", uid, 1, 2048, &metadata_size, error);
+  if (!metadata) goto out;
+  if (memchr (metadata, 0, metadata_size) ||
+      !g_key_file_load_from_data (receipt, (const gchar *) metadata, metadata_size, G_KEY_FILE_NONE, NULL) ||
+      !receipt_value (receipt, "schema", "1") ||
+      !receipt_value (receipt, "purpose", "M5.B_CAPTURE_ONLY") ||
+      !receipt_value (receipt, "source", "M3_USER_DECLARED_WINDOWS_COPY") ||
+      !receipt_value (receipt, "device_binding", "UNKNOWN") ||
+      !receipt_value (receipt, "prefix_semantics", "UNKNOWN"))
+    { invalid (error, "Milan diagnostic provenance receipt invalid"); goto out; }
+  envelope = read_private_file (fd, "calidata.dat", uid, GOODIX_MILAN_CALIDATA_ENVELOPE,
+                                GOODIX_MILAN_CALIDATA_ENVELOPE, &size, error);
+  if (!envelope) goto out;
+  envelope_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, envelope, size);
+  payload_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, envelope + 16, size - 16);
+  if (!receipt_value (receipt, "envelope_sha256", envelope_hash) ||
+      !receipt_value (receipt, "payload_sha256", payload_hash))
+    { invalid (error, "Milan diagnostic calibration integrity or M3 provenance mismatch"); goto out; }
+  /* Fixed envelope size and hash are checked before entering the pinned native
+   * parser. Its import validates version, both map CRCs, sample_count 0..400,
+   * optional classifier magic/version and classifier history 0..50. The prefix
+   * is preserved byte-for-byte and deliberately never interpreted as an ID. */
+  milan = goodix_milan_new (envelope + 16, size - 16, error);
+  if (!milan) goto out;
+  milan->diagnostic = TRUE;
+  milan->directory_fd = fd;
+  fd = -1;
+out:
+  if (envelope) { OPENSSL_cleanse (envelope, size); g_free (envelope); }
+  if (fd >= 0) close (fd);
+  return milan;
+}
+
+GoodixMilan *
+goodix_milan_load (const gchar *directory, GError **error)
+{
+  if (!directory)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+                           "Milan normal authentication requires qualified calibration source and binding; use explicit M5.B diagnostics first");
+      return NULL;
+    }
+  if (geteuid () != 0)
+    { invalid (error, "Milan diagnostic capture requires explicit root authorization"); return NULL; }
+  return load_experiment (directory, 0, error);
+}
+
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+GoodixMilan *goodix_milan_test_load (const gchar *directory, GError **error)
+{ return load_experiment (directory, geteuid (), error); }
+#endif
+
+gboolean goodix_milan_is_diagnostic (GoodixMilan *milan)
+{ return milan && milan->diagnostic; }
+
+static gboolean write_private_result (int directory_fd, const gchar *name,
+                                       const guint8 *bytes, gsize size);
+
+gboolean goodix_milan_begin_capture (GoodixMilan *milan, GError **error)
+{
+  static const guint8 marker[] = "M5.B capture budget consumed; no automatic retry\n";
+  if (!goodix_milan_is_diagnostic (milan) || milan->capture_started)
+    return invalid (error, "Milan diagnostic session permits exactly one explicit capture");
+  /* Exclusive persistent session marker precedes all USB/resources. It also
+   * fences a second client/process or a cancelled attempt after reopening. */
+  if (!write_private_result (milan->directory_fd, "capture.started", marker, sizeof marker - 1) ||
+      fsync (milan->directory_fd))
+    return invalid (error, "Milan diagnostic capture budget already consumed or marker not durable");
+  milan->capture_started = TRUE;
+  return TRUE;
+}
+
+static gboolean
+write_private_result (int directory_fd, const gchar *name, const guint8 *bytes, gsize size)
+{
+  int fd = openat (directory_fd, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+  gsize offset = 0;
+  gboolean ok;
+  if (fd < 0) return FALSE;
+  while (offset < size)
+    {
+      ssize_t count = write (fd, bytes + offset, size - offset);
+      if (count < 0 && errno == EINTR) continue;
+      if (count <= 0) { close (fd); return FALSE; }
+      offset += (gsize) count;
+    }
+  ok = fsync (fd) == 0;
+  if (close (fd)) ok = FALSE;
+  return ok;
+}
+
+gboolean
+goodix_milan_record_capture (GoodixMilan *milan, const uint16_t *raw,
+                             const GoodixMilanSample *sample,
+                             const GError *capture_error, GError **error)
+{
+  guint8 raw_le[GOODIX_MILAN_PIXELS * 2];
+  g_autofree gchar *raw_hash = NULL, *image_hash = NULL, *metrics = NULL;
+  gboolean ok = FALSE;
+  if (!goodix_milan_is_diagnostic (milan) || !milan->capture_started || milan->capture_recorded || !raw)
+    return invalid (error, "Milan diagnostic result state invalid");
+  milan->capture_recorded = TRUE;
+  for (guint i = 0; i < GOODIX_MILAN_PIXELS; i++)
+    { raw_le[2 * i] = (guint8) (raw[i] & 0xff); raw_le[2 * i + 1] = (guint8) (raw[i] >> 8); }
+  raw_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, raw_le, sizeof raw_le);
+  image_hash = sample ? g_compute_checksum_for_data (G_CHECKSUM_SHA256, sample->pixels, sizeof sample->pixels) : g_strdup ("unavailable");
+  metrics = g_strdup_printf ("[M5B]\ndevice_binding=UNKNOWN\nprefix_semantics=UNKNOWN\nauthentication_qualified=false\nraw_sha256=%s\nimage_sha256=%s\nfeature_sha256=%s\npreprocess_sha256=%s\npreprocess=%s\nquality=%d\ncoverage=%d\nfeature_count=%d\ntag=%d\nerror_domain=%s\nerror_code=%d\n",
+    raw_hash, image_hash, sample ? sample->feature_sha256 : "unavailable", sample ? sample->preprocess_sha256 : "unavailable",
+    sample ? "PASS" : "REJECTED", sample ? sample->quality : -1,
+    sample ? sample->coverage : -1, sample ? sample->feature_count : -1, sample ? sample->tag : -1,
+    capture_error ? g_quark_to_string (capture_error->domain) : "none", capture_error ? capture_error->code : 0);
+  ok = write_private_result (milan->directory_fd, "capture.raw-u16le", raw_le, sizeof raw_le) &&
+    (!sample || write_private_result (milan->directory_fd, "capture.preprocessed-u8", sample->pixels, sizeof sample->pixels)) &&
+    write_private_result (milan->directory_fd, "metrics.ini", (const guint8 *) metrics, strlen (metrics)) &&
+    fsync (milan->directory_fd) == 0;
+  OPENSSL_cleanse (raw_le, sizeof raw_le);
+  if (!ok) return invalid (error, "Milan diagnostic private result write failed; stop without retry");
+  return TRUE;
 }
 
 void goodix_milan_enroll_clear (GoodixMilan *milan)
@@ -64,12 +271,13 @@ void goodix_milan_free (GoodixMilan *milan)
 {
   if (!milan) return;
   goodix_milan_enroll_clear (milan);
+  if (milan->directory_fd >= 0) close (milan->directory_fd);
   OPENSSL_cleanse (milan, sizeof *milan);
   g_free (milan);
 }
 gboolean goodix_milan_enroll_start (GoodixMilan *milan, GError **error)
 {
-  if (!milan) return invalid (error, "Milan calibration missing");
+  if (!milan || milan->diagnostic) return invalid (error, "Milan enrollment requires qualified calibration binding");
   goodix_milan_enroll_clear (milan);
   milan->enrollment = gx521d_enrollment_start (GOODIX_MILAN_ENROLL_STAGES);
   if (!milan->enrollment) return invalid (error, "Milan enrollment allocation failed");
@@ -84,8 +292,8 @@ gboolean goodix_5125_milan_preprocess (GoodixMilan *milan, const uint16_t *raw,
                                   gsize count, GoodixMilanSample *sample, GError **error)
 {
   Gx521dCalidataImage *context = NULL;
-  Gx521dDefaultResult out;
-  Gx521dFeatureObject feature;
+  Gx521dDefaultResult out = { 0 };
+  Gx521dFeatureObject feature = { 0 };
   gboolean ok = FALSE;
   if (!milan || !raw || !sample || count != GOODIX_MILAN_PIXELS)
     return invalid (error, "Milan sample geometry invalid");
@@ -112,6 +320,12 @@ gboolean goodix_5125_milan_preprocess (GoodixMilan *milan, const uint16_t *raw,
   if (sample->feature_count < 0 || sample->feature_count > 120) goto out;
   sample->quality = out.quality; sample->coverage = out.coverage;
   memcpy (sample->pixels, out.image, sizeof sample->pixels);
+  {
+    g_autofree gchar *feature_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) &feature, sizeof feature);
+    g_autofree gchar *preprocess_hash = g_compute_checksum_for_data (G_CHECKSUM_SHA256, (const guint8 *) &out, sizeof out);
+    g_strlcpy (sample->feature_sha256, feature_hash, sizeof sample->feature_sha256);
+    g_strlcpy (sample->preprocess_sha256, preprocess_hash, sizeof sample->preprocess_sha256);
+  }
   ok = TRUE;
 out:
   gx521d_calidata_image_free (context);

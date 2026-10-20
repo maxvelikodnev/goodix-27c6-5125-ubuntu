@@ -101,5 +101,6 @@ receipts for an update to Milan.
 Milan and SIGFM enrollments are incompatible. A new enrollment is mandatory for
 Milan; after returning to SIGFM, enroll again if no valid SIGFM enrollment remains.
 Neither removal command resets the sensor, changes its pairing, or deletes
-fingerprint files. Milan calidata, if later provisioned, belongs to protected host
-state and is outside software removal.
+fingerprint files. The Milan diagnostic executable and preparer belong to the
+runtime receipt and are removed with the runtime. Private diagnostic sessions,
+calibration and captures under `development/` are outside software removal.

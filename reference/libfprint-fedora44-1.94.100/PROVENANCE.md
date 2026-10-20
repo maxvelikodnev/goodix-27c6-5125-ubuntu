@@ -20,8 +20,7 @@ byte-identical to the upstream archive.
 The Milan build adds an internal RAW-print completion seam to the existing
 image-device lifecycle and a Meson link to the pinned native C engine. The
 canonical branch builder selects Milan and provides the archive built from its
-checked source set; that set remains private while the MIT/RVA publication gate
-is open. Meson configures C++ only for the SIGFM build. The exported libfprint
+checked versioned source set under `production/milan-native/`. Meson configures C++ only for the SIGFM build. The exported libfprint
 ABI remains unchanged.
 
 Upstream and Fedora source files retain their original per-file copyright and
