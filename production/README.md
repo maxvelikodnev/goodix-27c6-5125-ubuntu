@@ -51,7 +51,8 @@ action is refused.
 The private M3 calibration is neither a payload asset nor an installation
 requirement. A successful build and synthetic installation do not qualify live
 authentication, Windows coexistence or biometric safety. Live work uses the
-physical Fedora host and requires separate authorization.
+supported Fedora environment chosen by the operator, with exclusive access to
+the real Goodix USB reader, and requires separate authorization.
 
 The installed diagnostic helpers are
 `/usr/local/lib64/goodix-27c6-5125/goodix-milan-diagnostic` and

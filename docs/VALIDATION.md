@@ -22,8 +22,9 @@ driver/template identity and requires new enrollment when live use is qualified.
 Stock libfprint may open a USB handle before a driver action is refused.
 
 All hardware, Windows and installation lifecycle evidence below concerns the
-SIGFM baseline on `main`. Milan M5 live qualification is pending on the physical
-Fedora host; a successful diagnostic alone does not demonstrate device binding,
+SIGFM baseline on `main`. Milan M5 live qualification is pending on the Goodix
+reader in the supported Fedora environment chosen by the operator, with exclusive
+USB access; a successful diagnostic alone does not demonstrate device binding,
 FAR/FRR, liveness or general-use suitability.
 
 ## Tested configuration
