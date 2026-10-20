@@ -200,6 +200,8 @@ fp_image_device_constructed (GObject *obj)
   priv->algorithm = FPI_PRINT_NBIS;
   if (cls->bz3_threshold > 0)
     priv->bz3_threshold = cls->bz3_threshold;
+  if (cls->algorithm == FPI_DEVICE_ALGO_RAW)
+    priv->algorithm = FPI_PRINT_RAW;
   if (cls->algorithm == FPI_DEVICE_ALGO_SIGFM)
     priv->algorithm = FPI_PRINT_SIGFM;
 

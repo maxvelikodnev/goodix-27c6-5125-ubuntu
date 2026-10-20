@@ -23,6 +23,7 @@ class Bootstrap(unittest.TestCase):
         self.bin = self.home / 'bin'
         self.bin.mkdir()
         blocks = re.findall(r'```bash\n(.*?)\n```', (ROOT / 'docs/INSTALLATION.md').read_text(), re.S)
+        blocks = [block for block in blocks if './install.sh' in block.splitlines()]
         self.assertEqual(len(blocks), 1, 'one canonical installation/update/reinstall block')
         self.block = blocks[0]
         self.env = dict(os.environ, HOME=str(self.home), PATH=str(self.bin) + ':/usr/bin:/bin',

@@ -17,6 +17,10 @@ patch directives. `source/` includes downstream changes for the
 verification, and the production-minimal Meson option. It is therefore not
 byte-identical to the upstream archive.
 
+The experimental Milan build also adds an internal RAW-print completion seam
+to the existing image-device lifecycle and an opt-in Meson link to the private
+pinned native engine. The exported libfprint ABI remains unchanged.
+
 Upstream and Fedora source files retain their original per-file copyright and
 license notices. The downstream Goodix integration and imported components are
 described in [Licensing and provenance](../../docs/LICENSING_AND_PROVENANCE.md).

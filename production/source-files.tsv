@@ -44,6 +44,8 @@ libfprint-driver/goodix_image_decoder.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_image_decoder.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_live_preflight.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_live_preflight.h	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_milan.c	LGPL-2.1-or-later	LOCAL_C1_TYPE17_API_ADAPTER
+libfprint-driver/goodix_milan.h	LGPL-2.1-or-later	LOCAL_C1_TYPE17_API_ADAPTER
 libfprint-driver/goodix_post_tls_lifecycle.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_post_tls_lifecycle.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_pairing_crypto.c	LGPL-2.1-or-later	LOCAL_GOODIX

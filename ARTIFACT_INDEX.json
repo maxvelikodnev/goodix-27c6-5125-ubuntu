@@ -39,7 +39,13 @@
     "M4": [
       "production/README.md",
       "libfprint-driver/goodix_fpimage_device.c",
-      "docs/LICENSING_AND_PROVENANCE.md"
+      "docs/LICENSING_AND_PROVENANCE.md",
+      "libfprint-driver/goodix_milan.c",
+      "production/build-milan-candidate.py",
+      "libfprint-driver/tests/run_goodix_fpimage_device_test_inner.sh",
+      "development/private-root/analysis/M4_milan/qualification.json",
+      "libfprint-driver/tests/test_goodix_milan.c",
+      "development/private-root/m4-libfprint-candidate-final/build-provenance.json"
     ],
     "M5": [
       "docs/VALIDATION.md",

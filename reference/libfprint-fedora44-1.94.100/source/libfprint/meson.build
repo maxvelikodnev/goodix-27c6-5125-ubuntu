@@ -137,10 +137,6 @@ driver_sources = {
     'goodix_27c6_5125' : files(
         '../../../../libfprint-driver/goodix_u16_to_fpimage.c',
         '../../../../libfprint-driver/goodix_fpimage_pipeline.c',
-        '../../../../libfprint-driver/goodix_sigfm_preprocess.c',
-        '../../../../libfprint-driver/rockytkg-imgproc/goodix_imgproc.c',
-        '../../../../libfprint-driver/goodix_sigfm_metrics.cpp',
-        '../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp',
         '../../../../libfprint-driver/goodix_enrollment_model.c',
         '../../../../libfprint-driver/goodix_enrollment_diversity.c',
         '../../../../libfprint-driver/goodix_enrollment_pipeline.c',
@@ -197,19 +193,41 @@ drivers_cppflags = []
 libfprint_goodix_cflags = []
 goodix_sigfm_deps = []
 if 'goodix_27c6_5125' in drivers
-    drivers_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
-    drivers_cppflags += '-DGOODIX_LIBFPRINT_SIGFM'
-    # GCC/libstdc++ can emit a spurious array-bounds diagnostic from inlined
-    # std::vector copy/move code in the SIGFM C++ translation units. Keep the
-    # warning enabled, but do not promote this compiler/library diagnostic to
-    # an error for the Goodix C++ driver sources.
-    drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])
-    libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
-    goodix_sigfm_deps += dependency('opencv4', required: true)
-    goodix_sigfm_deps += declare_dependency(include_directories: [
-        include_directories('../../../../libfprint-driver'),
-        include_directories('../../../../Rockytkg/libfprint/libfprint/sigfm'),
-    ])
+    if get_option('goodix_milan')
+        archive = get_option('goodix_milan_native_archive')
+        native_include = get_option('goodix_milan_native_include')
+        if archive == '' or native_include == '' or not fs.is_file(archive)
+            error('Milan requires the explicitly pinned private native archive and headers')
+        endif
+        driver_sources += {'goodix_27c6_5125': driver_sources['goodix_27c6_5125'] + files(
+            '../../../../libfprint-driver/goodix_milan.c')}
+        drivers_cflags += '-DGOODIX_LIBFPRINT_MILAN'
+        libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_MILAN'
+        goodix_sigfm_deps += declare_dependency(
+            include_directories: [include_directories('../../../../libfprint-driver'), include_directories(native_include),
+                include_directories(native_include / '../upstream/goodix53x5-libfprint-e68eb725b1a7845b401b1a3c9b0790921f12133e/drivers/goodix53x5')],
+            link_args: [archive, '-l:libdeflate.so.0'],
+            dependencies: [cc.find_library('m')])
+    else
+        drivers_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
+        drivers_cppflags += '-DGOODIX_LIBFPRINT_SIGFM'
+        # GCC/libstdc++ can emit a spurious array-bounds diagnostic from inlined
+        # std::vector copy/move code in the SIGFM C++ translation units. Keep the
+        # warning enabled, but do not promote this compiler/library diagnostic to
+        # an error for the Goodix C++ driver sources.
+        drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])
+        libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
+        goodix_sigfm_deps += dependency('opencv4', required: true)
+        goodix_sigfm_deps += declare_dependency(include_directories: [
+            include_directories('../../../../libfprint-driver'),
+            include_directories('../../../../Rockytkg/libfprint/libfprint/sigfm'),
+        ])
+        driver_sources += {'goodix_27c6_5125': driver_sources['goodix_27c6_5125'] + files(
+            '../../../../libfprint-driver/goodix_sigfm_preprocess.c',
+            '../../../../libfprint-driver/rockytkg-imgproc/goodix_imgproc.c',
+            '../../../../libfprint-driver/goodix_sigfm_metrics.cpp',
+            '../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp')}
+    endif
 endif
 foreach driver: drivers
     drivers_sources += driver_sources[driver]

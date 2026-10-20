@@ -114,6 +114,27 @@ only after TLS.
 It introduces no copied external implementation; the combined library remains
 subject to the licensing boundary described above.
 
+## Experimental Milan candidate
+
+The separate M4 builder uses FreshHomie/goodix521d-fprintd `v0.1.0-19`, commit
+`4f48c482f35976ea4fac27d5e598730581c4f380`, and its Milan source snapshot at
+`e68eb725b1a7845b401b1a3c9b0790921f12133e`. It consumes C1's
+`package/native-engine/recipe.json` and its checked source digests, preserving the
+reference files and their original notices. Compile outputs are redirected into
+private `development/`; generated enum headers follow C1's libfprint templates,
+and the recipe's PIC objects form a static archive instead of a worker library.
+Source dependency hashes and actual build commands accompany the candidate.
+
+The settled grant for `milan/match/candidate.c` (blob
+`c416e882b73c9d564d5a5d91ac08e5eb73bd12d3`) and `policy.c` (blob
+`b74efbe8e4a1a97d13fa1fa6ff7d9413d035c455`) is LGPL-2.1-or-later through
+seaweeduk PR #28, AndyHazz's pinned Milan revision and C1. This does not change
+the distinct publication questions concerning other C1 MIT/RVA transcriptions.
+Those sources and the combined experimental binary remain private pending the
+existing publication decision. The public adapter and build script do not
+redistribute that native source, calibration, templates or fingerprint images.
+The ordinary public SIGFM payload retains the licensing boundary above.
+
 ## Excluded material
 
 Open-source licenses in this tree do not grant rights to distribute OEM firmware

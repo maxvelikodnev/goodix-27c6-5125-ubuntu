@@ -25,6 +25,9 @@
 #include "goodix_enrollment_fpi_usb_binding.h"
 #include "goodix_enrollment_diversity.h"
 #include "goodix_sigfm_metrics.h"
+#ifdef GOODIX_LIBFPRINT_MILAN
+#include "goodix_milan.h"
+#endif
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -160,6 +163,9 @@ struct _GoodixDeviceContext
   gboolean                   sigfm_baseline_reused_this_epoch;
 #endif
 
+#ifdef GOODIX_LIBFPRINT_MILAN
+  GoodixMilan *milan;
+#endif
   FpiImageDeviceState        last_framework_state;
 
   GError                  *terminal_error;
@@ -273,11 +279,16 @@ production_action_may_start_without_material (
   FpiDeviceAction                  action,
   GoodixRuntimeCoordinatorDecision decision)
 {
+#ifdef GOODIX_LIBFPRINT_MILAN
+  return production_action_requires_live_preflight (action) &&
+         decision == GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_LIVE_PREFLIGHT;
+#else
   return production_action_requires_live_preflight (action) &&
          (decision ==
             GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_LIVE_PREFLIGHT ||
           decision ==
             GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_INITIALIZATION);
+#endif
 }
 
 static void
@@ -434,9 +445,9 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 {
   GoodixPostTlsMaterial post_material = { .next_timestamp = production_timestamp };
   GoodixEnrollmentModelConfig enrollment_config = {
-    .required_stage_count = GOODIX_SIGFM_ENROLL_REQUIRED_STAGES,
-#ifdef GOODIX_LIBFPRINT_SIGFM
-    /* Fixed-21 policy: the accepted-sample count alone completes enrollment,
+    .required_stage_count = GOODIX_BIOMETRIC_ENROLL_STAGES,
+#if defined(GOODIX_LIBFPRINT_SIGFM) || defined(GOODIX_LIBFPRINT_MILAN)
+    /* Biometric accepted-stage policy: the accepted-sample count alone completes enrollment,
      * so the structural physical-contact counter must never bound retries. */
     .max_physical_stage_count =
       GOODIX_SIGFM_ENROLL_PHYSICAL_CONTACTS_UNBOUNDED,
@@ -613,10 +624,20 @@ production_live_preflight_acquire_state (
     .tls_proven = FALSE,
   };
 
-  return default_acquire_runtime_material_with_live (
+  gboolean ready = default_acquire_runtime_material_with_live (
     &live, &ctx->runtime_material, &ctx->runtime_secure_view,
     ctx->runtime_fdt_seed, &ctx->runtime_coordinator_audit,
     &ctx->runtime_material_audit, error);
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (ready && ctx->runtime_coordinator_audit.decision !=
+               GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+                           "Milan candidate requires an already active pairing");
+      return FALSE;
+    }
+#endif
+  return ready;
 }
 
 static void
@@ -748,6 +769,13 @@ production_start_pairing_activation (
 {
   GoodixPairingActivationPaths paths;
   GoodixPairingActivationPolicy policy;
+#ifdef GOODIX_LIBFPRINT_MILAN
+  /* M4 authorizes an offline biometric replacement, never new sensor pairing.
+   * Refuse before any journal, random PSK, persistent command or activation. */
+  g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+                       "Milan candidate requires the existing active pairing");
+  return FALSE;
+#endif
 
   /* Pairing activation is the only writer of persistent sensor pairing state.
    * An operator epoch is a host-tool session that must never be able to reach
@@ -798,6 +826,15 @@ production_start_pairing_activation (
   production_pairing_activation_progress (ctx);
   return !ctx->terminal_fence;
 }
+
+#if defined(GOODIX_LIBFPRINT_MILAN) && defined(GOODIX_ENABLE_TEST_SEAMS)
+gboolean
+goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx, GError **error)
+{
+  GoodixLivePreflightEvidence evidence = { 0 };
+  return production_start_pairing_activation (ctx, &evidence, error);
+}
+#endif
 
 static void
 production_live_preflight_finish (GoodixDeviceContext *ctx)
@@ -1498,6 +1535,9 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
   goodix_tls_server_free (ctx->tls_server);
   goodix_enrollment_fpi_usb_binding_free (ctx->enrollment_binding);
   goodix_enrollment_post_tls_events_free (ctx->pending_enrollment_events);
+#ifdef GOODIX_LIBFPRINT_MILAN
+  goodix_milan_free (ctx->milan);
+#endif
   goodix_enrollment_diversity_free (ctx->enrollment_diversity);
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
@@ -1703,6 +1743,15 @@ goodix_fpimage_device_acquire_action_resources (GoodixFpImageDevice *self,
                      ctx->runtime_fdt_seed, &ctx->runtime_coordinator_audit,
                      &ctx->runtime_material_audit, NULL, error) &&
                    ctx->runtime_material != NULL;
+#endif
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (material_ready && ctx->runtime_coordinator_audit.decision !=
+                        GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+                           "Milan candidate refuses legacy or inactive pairing");
+      goto fail;
+    }
 #endif
   if (!material_ready)
     {
@@ -2011,6 +2060,15 @@ goodix_fpimage_device_reopen_for_capture_action (
                      ctx->runtime_fdt_seed, &ctx->runtime_coordinator_audit,
                      &ctx->runtime_material_audit, NULL, error) &&
                    ctx->runtime_material != NULL;
+#endif
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (material_ready && ctx->runtime_coordinator_audit.decision !=
+                        GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+                           "Milan candidate refuses legacy or inactive pairing");
+      goto fail;
+    }
 #endif
   if (!material_ready)
     {
@@ -2361,6 +2419,37 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
             ctx->state == GOODIX_DEVICE_CONTEXT_STATE_POISONED);
 
   g_autoptr(GError) error = NULL;
+#ifdef GOODIX_LIBFPRINT_MILAN
+  if (!ctx->milan && goodix_fpimage_device_is_production_usb (self))
+    ctx->milan = goodix_milan_load (&error);
+  if (!ctx->milan || error)
+    {
+      if (!error) error = fpi_device_error_new_msg (FP_DEVICE_ERROR_DATA_INVALID, "Milan calibration missing");
+      fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+      return;
+    }
+  if (action == FPI_DEVICE_ACTION_ENROLL && !goodix_milan_enroll_start (ctx->milan, &error))
+    goto milan_activation_failed;
+  if (action == FPI_DEVICE_ACTION_VERIFY)
+    {
+      FpPrint *print;
+      fpi_device_get_verify_data (FP_DEVICE (self), &print);
+      if (!goodix_milan_validate_print (print, &error)) goto milan_activation_failed;
+    }
+  if (action == FPI_DEVICE_ACTION_IDENTIFY)
+    {
+      GPtrArray *gallery;
+      fpi_device_get_identify_data (FP_DEVICE (self), &gallery);
+      for (guint i = 0; i < gallery->len; i++)
+        if (!goodix_milan_validate_print (g_ptr_array_index (gallery, i), &error)) goto milan_activation_failed;
+    }
+  goto milan_activation_ready;
+milan_activation_failed:
+  goodix_milan_enroll_clear (ctx->milan);
+  fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+  return;
+milan_activation_ready:
+#endif
 
   if (ctx->login_preparing || ctx->login_series)
     {
@@ -2679,6 +2768,10 @@ goodix_fpimage_device_deactivate (FpImageDevice *dev)
   GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
   g_assert (ctx != NULL);
+#ifdef GOODIX_LIBFPRINT_MILAN
+  goodix_milan_enroll_clear (ctx->milan);
+#endif
+
 
   if (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING)
     return;
@@ -2826,7 +2919,7 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   device_class->full_name = "Goodix 27c6:5125 host-only shell";
   device_class->type      = FP_DEVICE_TYPE_VIRTUAL;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
-  device_class->nr_enroll_stages = GOODIX_SIGFM_ENROLL_REQUIRED_STAGES;
+  device_class->nr_enroll_stages = GOODIX_BIOMETRIC_ENROLL_STAGES;
 
   img_class->img_open     = goodix_fpimage_device_img_open;
   img_class->img_close    = goodix_fpimage_device_img_close;
@@ -2837,12 +2930,19 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   img_class->deactivate   = goodix_fpimage_device_deactivate;
   img_class->img_width    = (gint) GOODIX_CANONICAL_IMAGE_WIDTH;
   img_class->img_height   = (gint) GOODIX_CANONICAL_IMAGE_HEIGHT;
-#if defined(GOODIX_LIBFPRINT_SIGFM) || \
+#ifdef GOODIX_LIBFPRINT_MILAN
+  img_class->algorithm = FPI_DEVICE_ALGO_RAW;
+  img_class->raw_match = goodix_milan_match;
+#elif defined(GOODIX_LIBFPRINT_SIGFM) || \
     !defined(GOODIX_LIBFPRINT_1_94_100_NBIS)
   img_class->algorithm    = FPI_DEVICE_ALGO_SIGFM;
 #endif
 
   fpi_device_class_auto_initialize_features (device_class);
+#ifdef GOODIX_LIBFPRINT_MILAN
+  /* No native learning or enrollment update in the experimental candidate. */
+  device_class->features &= ~(guint) FP_DEVICE_FEATURE_UPDATE_PRINT;
+#endif
 }
 
 static void
@@ -3076,6 +3176,93 @@ context_secure_terminal (GoodixSecureSession *session,
   context_protocol_failure (ctx, error);
 }
 
+#ifdef GOODIX_LIBFPRINT_MILAN
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+gboolean
+goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,
+                                             const guint8 *payload, gsize size,
+                                             GError **error)
+{
+  GoodixMilan *milan;
+  if (!ctx || ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVE ||
+      ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_BUSY, "Milan calibration cannot change during an action");
+      return FALSE;
+    }
+  milan = goodix_milan_new (payload, size, error);
+  if (!milan) return FALSE;
+  goodix_milan_free (ctx->milan);
+  ctx->milan = milan;
+  return TRUE;
+}
+#endif
+
+static gboolean
+context_milan_image (GoodixDeviceContext *ctx, GoodixEnrollmentPipeline *pipeline,
+                     const uint16_t *samples, gsize count, GError **error)
+{
+  GoodixMilanSample sample;
+  g_autoptr(GBytes) bytes = NULL;
+  FpPrint *print = NULL;
+  guint progress = 0;
+  FpiDeviceAction action = fpi_device_get_current_action (FP_DEVICE (ctx->device));
+  if (goodix_device_context_is_stale_or_fenced (ctx) ||
+      fpi_device_action_is_cancelled (FP_DEVICE (ctx->device)))
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CANCELLED, "Milan callback fenced or cancelled");
+      return FALSE;
+    }
+  if (!goodix_5125_milan_preprocess (ctx->milan, samples, count, &sample, error))
+    {
+      if (!error || !*error || (*error)->domain != FP_DEVICE_RETRY) return FALSE;
+      if (action == FPI_DEVICE_ACTION_ENROLL)
+        {
+          g_clear_error (error);
+          if (pipeline && !goodix_enrollment_pipeline_retry_current_stage (pipeline, error)) return FALSE;
+          fpi_image_device_retry_scan (FP_IMAGE_DEVICE (ctx->device), FP_DEVICE_RETRY_GENERAL);
+        }
+      else
+        fpi_image_device_raw_image_captured (FP_IMAGE_DEVICE (ctx->device), NULL, NULL, 0, g_steal_pointer (error));
+      return TRUE;
+    }
+  if (action == FPI_DEVICE_ACTION_ENROLL)
+    {
+      GoodixMilanEnrollmentResult result = goodix_milan_enroll (ctx->milan, &sample, &bytes, error);
+      if (result == GOODIX_MILAN_ERROR) { OPENSSL_cleanse (&sample, sizeof sample); return FALSE; }
+      if (result == GOODIX_MILAN_RETRY)
+        {
+          if (pipeline && !goodix_enrollment_pipeline_retry_current_stage (pipeline, error))
+            { OPENSSL_cleanse (&sample, sizeof sample); return FALSE; }
+          fpi_image_device_retry_scan (FP_IMAGE_DEVICE (ctx->device),
+              sample.coverage < 65 ? FP_DEVICE_RETRY_CENTER_FINGER : FP_DEVICE_RETRY_GENERAL);
+          OPENSSL_cleanse (&sample, sizeof sample);
+          return TRUE;
+        }
+      progress = goodix_milan_enroll_progress (ctx->milan);
+      if (result == GOODIX_MILAN_COMPLETE)
+        {
+          if (pipeline && !goodix_enrollment_pipeline_finish_current_stage (pipeline, error))
+            { OPENSSL_cleanse (&sample, sizeof sample); return FALSE; }
+          print = goodix_milan_template_print (FP_DEVICE (ctx->device), bytes);
+          if (ctx->terminal_delivery_at_release_ready)
+            {
+              fpi_image_device_hold_enroll_completion (FP_IMAGE_DEVICE (ctx->device));
+              ctx->terminal_enroll_completion_held = TRUE;
+              ctx->terminal_enroll_completion_hold_count++;
+            }
+        }
+    }
+  else if (action != FPI_DEVICE_ACTION_CAPTURE)
+    print = goodix_milan_probe_print (FP_DEVICE (ctx->device), &sample);
+  fpi_image_device_raw_image_captured (FP_IMAGE_DEVICE (ctx->device),
+      goodix_milan_sample_image (&sample), print, (gint) progress, NULL);
+  OPENSSL_cleanse (&sample, sizeof sample);
+  /* Native completion can synchronously begin normal/cancel deactivation. */
+  return !ctx->poisoned;
+}
+#endif
+
 static gboolean
 context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
                         guint                   acquisition_index,
@@ -3103,7 +3290,9 @@ context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
       goodix_fpimage_pipeline_free (pipeline);
       return TRUE;
     }
-#ifdef GOODIX_LIBFPRINT_SIGFM
+#ifdef GOODIX_LIBFPRINT_MILAN
+  return context_milan_image (ctx, NULL, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT, error);
+#elif defined(GOODIX_LIBFPRINT_SIGFM)
   {
     uint16_t session_baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
     GoodixFpImagePipeline *pipeline = NULL;
@@ -3251,7 +3440,12 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
     }
   if (!ctx->operator_epoch)
     {
-#ifdef GOODIX_LIBFPRINT_SIGFM
+#ifdef GOODIX_LIBFPRINT_MILAN
+      size_t count = 0;
+      const uint16_t *samples = goodix_enrollment_pipeline_get_pending_source_samples (pipeline, &count);
+      (void) stage_index;
+      return context_milan_image (ctx, pipeline, samples, count, error);
+#elif defined(GOODIX_LIBFPRINT_SIGFM)
       GoodixFpImagePipeline *sigfm_pipeline = NULL;
       GoodixFpImagePipelineResult result;
       GoodixEnrollmentDiversityDecision diversity_decision;
@@ -4293,6 +4487,15 @@ goodix_device_context_emit_image_ready (GoodixDeviceContext *ctx,
                                         const uint16_t      *samples,
                                         size_t               sample_count)
 {
+#ifdef GOODIX_LIBFPRINT_MILAN
+  g_return_if_fail (ctx != NULL);
+  if (goodix_device_context_is_stale_or_fenced (ctx)) return;
+  g_autoptr(GError) milan_error = NULL;
+  if (!context_milan_image (ctx, NULL, samples, sample_count, &milan_error))
+    context_protocol_failure (ctx, milan_error);
+  return;
+#endif
+
   GoodixFpImagePipeline *pipeline = NULL;
   GoodixFpImagePipelineResult result;
   FpImage *image;

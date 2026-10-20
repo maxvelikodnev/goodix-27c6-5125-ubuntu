@@ -22,6 +22,17 @@ includes="-I$test_dir/support/post_tls -I$test_dir/support -I$git_root/libfprint
 strict_flags="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-DGOODIX_LIBFPRINT_SIGFM -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 
+milan_link=""
+algorithm_objects="$build_dir/r2.o $build_dir/preprocess.o $build_dir/metrics.o -lstdc++"
+if [ "${GOODIX_MILAN_TEST:-0}" = 1 ]; then
+  test_source="$test_dir/test_goodix_milan.c"
+  strict_flags="$strict_flags -DGOODIX_LIBFPRINT_MILAN"
+  local_flags=$(printf '%s' "$local_flags" | sed 's/GOODIX_LIBFPRINT_SIGFM/GOODIX_LIBFPRINT_MILAN/g')
+  includes="$includes -I$GOODIX_MILAN_NATIVE_INCLUDE -I$GOODIX_MILAN_NATIVE_INCLUDE/../upstream/goodix53x5-libfprint-e68eb725b1a7845b401b1a3c9b0790921f12133e/drivers/goodix53x5"
+  milan_link="$GOODIX_MILAN_NATIVE_ARCHIVE /usr/lib64/libdeflate.so.0"
+  algorithm_objects="$build_dir/goodix_milan.o"
+fi
+
 if [ "${GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST:-0}" = 1 ]; then
   strict_flags="$strict_flags -DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
 fi
@@ -202,15 +213,19 @@ fi
 echo "goodix_fpimage_device forbidden-symbol audit: PASS"
 
 # ---- Link ----
-gcc $local_flags $glib_cflags $includes -c "$git_root/libfprint-driver/rockytkg-imgproc/goodix_imgproc.c" -o "$build_dir/r2.o"
-gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_sigfm_preprocess.c" -o "$build_dir/preprocess.o"
-g++ -std=c++17 -O2 -g $includes -c "$git_root/libfprint-driver/goodix_sigfm_metrics.cpp" -o "$build_dir/metrics.o"
-gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
+if [ "${GOODIX_MILAN_TEST:-0}" = 1 ]; then
+  gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_milan.c" -o "$build_dir/goodix_milan.o"
+else
+  gcc $local_flags $glib_cflags $includes -c "$git_root/libfprint-driver/rockytkg-imgproc/goodix_imgproc.c" -o "$build_dir/r2.o"
+  gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_sigfm_preprocess.c" -o "$build_dir/preprocess.o"
+  g++ -std=c++17 -O2 -g $includes -c "$git_root/libfprint-driver/goodix_sigfm_metrics.cpp" -o "$build_dir/metrics.o"
+fi
+gcc -Wl,--gc-sections $algorithm_objects \
   "$build_dir/fp-device.o" \
   "$build_dir/fpi-device.o" \
   "$build_dir/fp-image-device.o" \
   "$build_dir/fpi-image-device.o" \
-  "$build_dir/fpi-image.o" "$build_dir/r2.o" "$build_dir/preprocess.o" \
+  "$build_dir/fpi-image.o" \
   "$build_dir/fp-image.o" \
   "$build_dir/fp-print.o" \
   "$build_dir/fpi-print.o" \
@@ -254,7 +269,7 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   "$build_dir/test_goodix_fpimage_device.o" \
   "$build_dir/gusb_stub.o" \
   "$build_dir/fpimage_link_stubs.o" \
-  $glib_libs -lm -o "$build_dir/test_goodix_fpimage_device"
+  $milan_link $glib_libs -lm -o "$build_dir/test_goodix_fpimage_device"
 
 set +e
 timeout --signal=TERM "$test_timeout" "$build_dir/test_goodix_fpimage_device" "$@"
@@ -266,6 +281,11 @@ case $normal_rc in
   *) echo "Normal test run: FAIL/crash (exit $normal_rc)" >&2 ;;
 esac
 set -e
+
+if [ "${GOODIX_MILAN_TEST:-0}" = 1 ]; then
+  echo "Milan host fixture uses the pinned unsanitized native archive; no sanitizer PASS claimed"
+  exit "$normal_rc"
+fi
 
 echo "Running address/undefined-behavior sanitized build..."
 san_common="-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"

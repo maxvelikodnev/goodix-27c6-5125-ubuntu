@@ -38,3 +38,10 @@ option('goodix_production_minimal',
        type: 'boolean',
        value: false,
        description: 'Build the Goodix production library without configuring test targets')
+
+option('goodix_milan', type: 'boolean', value: false,
+       description: 'Experimental offline Milan-only Goodix candidate (not installed)')
+option('goodix_milan_native_archive', type: 'string', value: '',
+       description: 'Pinned private C1 native PIC archive for experimental Milan')
+option('goodix_milan_native_include', type: 'string', value: '',
+       description: 'Pinned private C1 native header directory for experimental Milan')

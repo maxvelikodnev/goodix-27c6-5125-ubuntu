@@ -25,6 +25,7 @@
 
 typedef enum {
   FPI_DEVICE_ALGO_NBIS = FPI_PRINT_NBIS,
+  FPI_DEVICE_ALGO_RAW = FPI_PRINT_RAW,
   FPI_DEVICE_ALGO_SIGFM = FPI_PRINT_SIGFM,
 } FpiImageDeviceAlgorithm;
 
@@ -118,6 +119,8 @@ struct _FpImageDeviceClass
 {
   FpDeviceClass parent_class;
 
+  /* RAW image drivers supply their own matcher and complete native prints. */
+  FpiMatchResult (*raw_match) (FpImageDevice *, FpPrint *, FpPrint *, GError **);
   gint          bz3_threshold;
   FpiImageDeviceAlgorithm algorithm;
   gint          img_width;
@@ -174,3 +177,10 @@ void fpi_image_device_hold_enroll_completion (FpImageDevice *self);
 void fpi_image_device_release_enroll_completion (FpImageDevice *self);
 void fpi_image_device_retry_scan (FpImageDevice *self,
                                   FpDeviceRetry  retry);
+
+/* Internal native biometric seam; owns image/print/error, preserves image-device
+ * finger state, cancellation and terminal enrollment hold/release semantics.
+ * Intermediate enrollment has print=NULL and native stage>0. */
+void fpi_image_device_raw_image_captured (FpImageDevice *self, FpImage *image,
+                                         FpPrint *print, gint enroll_stage,
+                                         GError *error);

@@ -37,3 +37,29 @@ and is not required to install, use, update or remove the driver.
 A successful source build does not by itself establish hardware behavior or every
 Fedora authentication/SELinux path. The qualified scope and remaining limits are
 documented in [Validation](../docs/VALIDATION.md).
+
+## Private Milan candidate
+
+`build-milan-candidate.py` builds the experimental M4 Milan Type 17 library
+without installing it. It reuses this builder's environment, source checks and
+stock fprintd ABI checks, and executes the pinned C1 native recipe as PIC objects
+in a static archive. Meson selects Milan at build time; the resulting library has
+no SIGFM/OpenCV symbols or dependencies. The ordinary installer and its SIGFM
+payload remain unchanged.
+
+With the private C1 reference already present, run as an ordinary Fedora 44 user:
+
+```sh
+python3 production/build-milan-candidate.py \
+  --output "$PWD/development/private-root/m4-candidate"
+```
+
+The output must be a new Git-ignored directory inside `development/`. It contains
+the candidate library, redirected native commands, source hashes, source pins,
+package versions and static ABI/dependency evidence. It is deliberately not an
+installer payload and contains no calibration or fingerprint data. The native
+sources and combined output remain private under the existing publication gate;
+see [licensing and provenance](../docs/LICENSING_AND_PROVENANCE.md#experimental-milan-candidate).
+Offline build and ABI checks establish neither live authentication nor system
+rollback behavior. The running SIGFM installation is the rollback; M5 needs
+separate authorization and calibration provisioning before any activation.

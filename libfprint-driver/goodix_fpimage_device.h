@@ -67,6 +67,12 @@ typedef struct _GUsbDevice GUsbDevice;
  * contact; completion is driven solely by the 21st accepted sample. */
 #define GOODIX_SIGFM_ENROLL_PHYSICAL_CONTACTS_UNBOUNDED G_MAXUINT
 
+#ifdef GOODIX_LIBFPRINT_MILAN
+#define GOODIX_BIOMETRIC_ENROLL_STAGES 18u
+#else
+#define GOODIX_BIOMETRIC_ENROLL_STAGES GOODIX_SIGFM_ENROLL_REQUIRED_STAGES
+#endif
+
 typedef enum
 {
   GOODIX_PRE_SESSION_RX_SYNC_NOT_STARTED = 0,
@@ -380,6 +386,15 @@ void goodix_device_context_emit_terminal_error       (GoodixDeviceContext *ctx,
 #endif
 void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext *ctx,
                                                             guint64 generation);
+
+#if defined(GOODIX_LIBFPRINT_MILAN) && defined(GOODIX_ENABLE_TEST_SEAMS)
+gboolean goodix_device_context_test_milan_pairing_activation (GoodixDeviceContext *ctx,
+                                                              GError **error);
+/* Offline inert-byte seam; no file, key, sensor or privileged operation. */
+gboolean goodix_device_context_set_milan_calibration (GoodixDeviceContext *ctx,
+                                                       const guint8 *payload,
+                                                       gsize size, GError **error);
+#endif
 
 G_END_DECLS
 
