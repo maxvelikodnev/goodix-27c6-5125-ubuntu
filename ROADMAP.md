@@ -91,8 +91,9 @@ Prima dell'integrazione definitiva in `main` e della release 3.0.0:
    **3.0.0** e rimuovere il ramo temporaneo; nessuna esecuzione automatica
    di questi passaggi.
 
-Il manuale tecnico contiene soltanto conoscenza tecnica durevole. Non è un
-diario dei test. Non è un diario dei test. Non è un diario dei test.
-Evidenze, rapporti e materiale sensibile restano nei percorsi privati
-gitignored; la documentazione pubblica di validazione riporta solo
-risultati aggregati e limiti qualificati.
+Il manuale tecnico documenta esclusivamente le proprietà durevoli del
+dispositivo e della sua integrazione Fedora. Non contiene il diario dei
+test, le istruzioni passo-passo dell'esecuzione o la cronaca delle prove.
+Evidenze operative, rapporti di sviluppo e materiale sensibile restano
+nei percorsi privati gitignored; la documentazione pubblica di validazione
+riporta soltanto risultati aggregati, limiti e conoscenza verificata.
