@@ -87,7 +87,7 @@ the separate job of building the reference that later logins will use.
 ## What the project adds
 
 Fedora already provides `fprintd`, PAM, KDE integration, and most of
-`libfprint`. This ChicagoHS branch adds the Goodix-specific device path and
+`libfprint`. The Goodix driver adds the target-specific device path and
 the native ChicagoHS biometric backend needed for this reader. The backend
 prepares a calibration from the no-finger image, extracts fingerprint features,
 and matches native Type 24 templates. The project also adds a small, removable
