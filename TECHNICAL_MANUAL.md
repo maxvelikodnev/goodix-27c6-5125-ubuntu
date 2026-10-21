@@ -7,9 +7,12 @@ USB reader to Fedora authentication consumers, including the secure session,
 image and biometric pipeline, system integration, installation, recovery, and
 qualification boundary.
 
-This branch uses ChicagoHS. Transport and integration code inherited from the
-SIGFM baseline was complemented by an initial operator-supervised live check
-of ChicagoHS enrollment, matching and Fedora KDE authentication on one reader.
+ChicagoHS is the canonical biometric engine of the Goodix 27c6:5125 driver
+for the planned 3.0.0 major release. It supersedes SIGFM within the project's
+standard `main` source line; it is not a separate long-term distribution.
+Transport and integration code inherited from the historical SIGFM releases
+was complemented by an initial operator-supervised live check of ChicagoHS
+enrollment, matching and Fedora KDE authentication on one reader.
 The limited observations do not establish biometric accuracy statistics,
 multi-device reliability or physical uniqueness. The software contracts below
 are independent of any such performance claim.
@@ -69,8 +72,9 @@ configuration is incompatible.
 
 Recognition of APP12508 does not establish the full Fedora qualification for
 that revision. Its contributor hardware evidence and limits are described in
-the baseline reference on `main`; the initial ChicagoHS live check covers only
-the tested reader, not APP12508 or the full recognized device population.
+historical versioned releases, such as `v2.2.1`; the initial ChicagoHS live
+check covers only the tested reader, not APP12508 or the full recognized device
+population.
 
 ### 1.2 Support boundary
 
@@ -1214,7 +1218,7 @@ flowchart TD
     Quiet --> Recheck["Recheck host state and software"]
     Recheck --> Snapshot["Snapshot project-owned integration"]
     Snapshot --> Replace["If present, remove an existing<br/>valid project installation"]
-    Replace --> Recovery["Install recovery tools<br/>and SELinux module"]
+    Replace --> Recovery["Install recovery tools<br/>and remove verified legacy SELinux suppression"]
     Recovery --> Native["Create or preserve the root-only<br/>host pairing state directory"]
     Native --> Deploy["Labels, runtime, selector,<br/>PAM entry last"]
     Deploy --> Verify["Verify receipts and stopped service"]
@@ -1303,8 +1307,9 @@ Fedora to activate it.
 
 ### 16.4 Update and state retention
 
-The single documented bootstrap fast-forwards an existing clone or clones it
-again when absent, then runs the same installer. The installer reports
+The canonical `main` bootstrap fast-forwards an existing clean `main` clone
+or clones it when absent, then runs the same installer. The temporary porting
+branch is not an end-user installation channel. The installer reports
 `GOODIX_INSTALL_MODE` automatically:
 
 | Project software | Host pairing state | Mode |
@@ -1320,6 +1325,19 @@ A valid existing installation is removed and replaced transactionally while
 fprintd is quiescent. Existing templates and the host pairing state directory are
 never part of replacement: the reader identity is retained across the software
 transaction and there is no implicit reader re-pairing.
+
+The 3.0.0 engine change is an **in-place project-software upgrade**, not
+coexistence of two active biometric engines. The installation and recovery
+contracts recognize supported earlier SIGFM receipts, including those without
+a `matcher` field, and use the same owned-software removal transaction before
+installing the ChicagoHS-only runtime. Old OpenCV-dependent runtime components
+are removed; stock Fedora fprintd/PAM and user-specific stored data remain.
+Templates in the historical `GSF1`/SIGFM format cannot be used by the new
+ChicagoHS driver identity: users must enroll their desired fingers again.
+The migration code is covered by offline simulated tests, but a real populated
+SIGFM 2.x → ChicagoHS 3.0.0 update and failed-update rollback require separate
+live qualification before release. A clean installation is not evidence of
+that migration.
 
 The repository clone may be removed after successful installation; runtime and
 removal commands are independent of it.
@@ -1341,6 +1359,17 @@ Rollback is not a host snapshot. It does not remove Fedora packages installed
 earlier by the package manager, undo unrelated host changes, or delete preserved
 host pairing state. A missing final success marker or an
 `incomplete rollback` result is failure and requires recovery.
+
+Transaction rollback after a failed upgrade is distinct from a deliberate
+**downgrade** to SIGFM. Once ChicagoHS is installed successfully, returning
+to a historical SIGFM implementation requires the ChicagoHS remover, password
+recovery check and a separate checkout at a pinned old release such as
+[`v2.2.1`](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
+It must not use the canonical `main` branch after the 3.0.0 merge.
+The older installer is not promised to recognize the new ChicagoHS runtime;
+removal must precede an optional downgrade. Protected host state and
+historical template files are preserved by project removal, but reuse is
+conditional on their compatibility with the selected old matcher.
 
 ## 17. Removal and emergency recovery
 
