@@ -71,8 +71,8 @@ new touch → new features → compare → MATCH / NO MATCH
 
 ### Enrollment
 
-Enrollment asks: **can we collect enough useful views to make a reusable
-template?**
+Enrollment asks: **can the system collect enough useful views to make a
+reusable template?**
 
 ```text
 touch 1 ─┐
