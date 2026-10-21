@@ -15,11 +15,13 @@ That reusable representation is called a **template**.
 
 ## The project-specific image pipeline
 
-The current ChicagoHS branch uses the **native ChicagoHS Type 24** engine.
+The Goodix driver's canonical biometric engine is **native ChicagoHS Type 24**.
 Its calibration, preprocessing, feature extraction, enrollment and matching
 come from a pinned open-source implementation of the ChicagoHS backend
-integrated into the Goodix-enabled `libfprint` build. SIGFM is the historical
-engine available separately on the `main` branch.
+integrated into the Goodix-enabled `libfprint` build. The former SIGFM
+implementation belongs to historical tagged releases, such as
+[`v2.2.1`](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1);
+it is not a separate active engine on `main`.
 
 The path is:
 
