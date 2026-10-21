@@ -1,6 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Uninstall and emergency recovery
 
+Goodix Manager's **Remove** performs the ordinary uninstall described below and
+keeps the Manager installed. Removing the **Manager RPM** itself leaves an active
+driver and these standalone recovery commands in place; remove the driver first
+in the Manager, or use `goodix-uninstall` afterwards. RPM transactions do not
+implicitly change authentication or erase protected data.
+
 ## Emergency: graphical login is unavailable
 
 1. Press **Ctrl+Alt+F3**.

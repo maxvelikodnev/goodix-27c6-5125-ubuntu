@@ -1,0 +1,20 @@
+.\" SPDX-License-Identifier: GPL-2.0-or-later
+.TH GOODIX-MANAGER 1
+.SH NAME
+goodix-manager \- manage the Goodix fingerprint driver on Fedora KDE
+.SH SYNOPSIS
+.B goodix-manager
+.SH DESCRIPTION
+Opens the unprivileged Goodix Manager application. Install and update use a
+verified local driver payload. PolicyKit requests administrative authorization
+for changes. Removal performs the normal integrity-checked driver uninstall.
+.PP
+Installing or removing the Manager RPM does not activate or remove the driver.
+An existing runtime retains its standalone recovery commands when the Manager
+package is removed. Host pairing state and fingerprint templates are preserved.
+.SH RECOVERY
+Use goodix-uninstall for ordinary removal. If the desktop is unavailable or
+project receipts are damaged, consult the documented goodix-force-remove TTY
+procedure. These commands still require working password authentication.
+.SH DOCUMENTATION
+https://github.com/sorguido/goodix-27c6-5125

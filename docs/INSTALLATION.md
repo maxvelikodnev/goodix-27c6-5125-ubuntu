@@ -1,6 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Installation and updates
 
+For the native RPM and graphical Goodix Manager path, see
+[RPM installation and updates](../packaging/rpm/README.md). Installing the RPM
+stages an offline payload; activation remains an explicit Manager action.
+The source-based CLI procedure below remains available.
+
 ## Supported configuration
 
 Fedora 44 KDE on x86_64, a local user account, Goodix USB `27c6:5125` running

@@ -51,6 +51,13 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def project_version():
+    value = (ROOT / 'VERSION').read_text().strip()
+    require(re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', value),
+            'VERSION must contain a stable major.minor.patch version')
+    return value
+
+
 def missing_packages():
     return [name for name in BUILD_PACKAGES if subprocess.run(
         ['rpm', '-q', name], env=BASE_ENV, stdout=subprocess.DEVNULL,
@@ -73,7 +80,7 @@ def source_inventory():
     roots = [LIBFPRINT_SOURCE, Path('libfprint-driver')]
     if (ROOT / native.NATIVE_SOURCE).is_dir():
         roots.append(native.NATIVE_SOURCE)
-    files = [ROOT / 'production/build-public.py',
+    files = [ROOT / 'VERSION', ROOT / 'production/build-public.py',
              ROOT / 'production/build-chicago-native.py',
              *(ROOT / 'deployment' / name for name in
                ('check-material.c', 'materials.py', 'test_material_native.c', 'test_materials.py')),
@@ -177,7 +184,7 @@ def pam_synthetic_tests(work):
         source / 'plasmalogin.pam', gate, fixtures)
 
 
-def build_payload(output):
+def build_payload(output, *, work_root=None):
     output = Path(output)
     validate_chicago_sources()
     prerequisites()
@@ -192,7 +199,7 @@ def build_payload(output):
     login.mkdir()
     # PAM module paths cannot contain whitespace; this private build directory
     # is independent of the source clone and output directory names.
-    with tempfile.TemporaryDirectory(prefix='goodix-source-build-', dir='/tmp') as temporary:
+    with tempfile.TemporaryDirectory(prefix='goodix-source-build-', dir=work_root or '/tmp') as temporary:
         work = Path(temporary)
         archive, native_include, native_provenance = native.build_native(ROOT, work, run)
         env = dict(BASE_ENV, CC='cc')
@@ -254,7 +261,7 @@ def build_payload(output):
     for name in LICENSES:
         shutil.copyfile(ROOT / 'LICENSES' / (name + '.txt'), runtime / 'licenses' / (name + '.txt'))
     (runtime / 'source-files.sha256').write_text(inventory)
-    provenance = {'source_id': source_id, 'matcher': 'chicago-type24',
+    provenance = {'source_id': source_id, 'version': project_version(), 'matcher': 'chicago-type24',
                   'native': native_provenance,
                   'packages': run('rpm', '-q', *BUILD_PACKAGES, 'fprintd').splitlines()}
     (runtime / 'build-provenance.json').write_text(json.dumps(provenance, sort_keys=True) + '\n')

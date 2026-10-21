@@ -11,7 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = 'https://github.com/sorguido/goodix-27c6-5125.git'
-BRANCH = 'porting_ChicagoHS'
+BRANCH = 'main'
 
 
 class Bootstrap(unittest.TestCase):
@@ -40,7 +40,7 @@ args = sys.argv[1:]
 with open(os.environ['BOOTSTRAP_LOG'], 'a') as log:
     log.write(json.dumps(args) + '\\n')
 if args[0] == 'clone':
-    assert args[1:4] == ['--branch', 'porting_ChicagoHS', '--single-branch']
+    assert args[1:4] == ['--branch', 'main', '--single-branch']
     assert args[4] == os.environ['BOOTSTRAP_URL']
     if os.environ['BOOTSTRAP_FAIL'] == 'clone': sys.exit(9)
     repo = pathlib.Path(args[5])
@@ -109,10 +109,10 @@ else:
 
     def test_existing_other_branch_is_preserved_without_pull_or_install(self):
         self.existing_clone()
-        self.env['BOOTSTRAP_BRANCH'] = 'main'
+        self.env['BOOTSTRAP_BRANCH'] = 'some-other-branch'
         result = self.run_block()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('current branch is preserved', result.stdout)
+        self.assertIn('no branch switch was made', result.stdout)
         self.assertFalse((self.home / 'installed').exists())
         self.assertFalse(any('pull' in args or 'checkout' in args or 'switch' in args
                              for args in self.commands()))

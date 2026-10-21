@@ -78,9 +78,13 @@ administrative authentication; it cannot bypass them or repair unrelated damage.
 ## Reporting a problem
 
 The runtime ships no telemetry and performs no network access; its TLS traffic
-terminates on the reader over USB through in-memory buffers. The only network use
-in the documented flow is the Fedora package manager during installation, plus
-the public `git clone`/`pull` that the bootstrap block runs as your normal user.
+terminates on the reader over USB through in-memory buffers. Network use in the
+source installation flow is the Fedora package manager plus the public
+`git clone`/`pull` that the bootstrap runs as your normal user.
+Goodix Manager also makes an asynchronous request to the official GitHub Release
+API at startup. It never executes downloaded code; local activation and removal
+work offline. Its narrow PolicyKit helper exposes only verified software status
+and fixed operation codes, not protected pairing data or raw diagnostic output.
 Normal-level journal messages can contain biometric-derived metadata such as
 keypoint counts and per-sample match outcomes, so treat journal exports as
 sensitive and redact them to the minimum a report needs.

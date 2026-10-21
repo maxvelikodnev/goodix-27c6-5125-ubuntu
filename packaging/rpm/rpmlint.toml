@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Preserve original license texts and notices; do not rewrite their FSF address.
+# This suppresses only that known upstream-text diagnostic, not security checks.
+Filters = ["incorrect-fsf-address"]
