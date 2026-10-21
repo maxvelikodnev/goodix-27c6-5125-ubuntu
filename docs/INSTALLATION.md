@@ -1,22 +1,35 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ChicagoHS: installation and updates
+# Installation and updates
 
-The canonical Goodix driver targets **Fedora 44 KDE x86_64**, Goodix USB
-`27c6:5125` and APP12509/APP12508 firmware. The ChicagoHS engine supersedes
-the earlier SIGFM engine in the planned 3.0.0 release; it is **not** a
-separately maintained edition. An initial supervised live functional check
-passed on one reader in a Fedora KDE VM; see the precise evidence and
-remaining limitations in [Validation](VALIDATION.md). Start software-only
-installation and recovery checks without USB passthrough.
+## Supported configuration
+
+Fedora 44 KDE on x86_64, a local user account, Goodix USB `27c6:5125` running
+`GF_ST411SEC_APP_12509` or `GF_ST411SEC_APP_12508`, Fedora's stock fprintd, PAM
+and Plasma Login, and SELinux Enforcing. Fedora qualification concerns one
+APP12509 reader, where the current biometric implementation has also passed
+initial supervised VM/live checks. APP12508 recognition has contributor hardware
+evidence from the earlier driver on Ubuntu GNOME, not a complete qualification
+of the current biometric implementation on Fedora.
+Other hardware, unlisted firmware, distributions and network accounts are
+unsupported. See [validation](VALIDATION.md) for the qualification boundary.
+
+## Prerequisites
+
+Use a working, supported Fedora installation with SELinux Enforcing, password
+login and ordinary sudo access. Finish authentication dialogs and close fingerprint settings.
+The reader may be absent during installation, update, reinstall and removal.
+When it is present, keep your finger off it during administrative prompts.
+
+You need Git, network access for the public clone and Fedora packages, and disk
+space for a native source build. Nothing has to be prepared for the reader: no
+Windows machine, no capture tooling, no private key material and no
+reader-specific file. The installer builds from the source you clone; it requires
+no previously compiled output, and it does not open USB.
 
 ## Install, update or reinstall
 
-Use the same command for first installation, update and reinstall **after
-the 3.0.0 ChicagoHS code has been merged into `main`**. The stable public
-installation source is `main`; the temporary porting branch is not a user
-installation or maintenance channel. Existing clones must select `main`;
-the block never switches a user's working branch automatically. Run as
-your ordinary administrative user. Git must already be available.
+Use this same block in a normal desktop terminal for first installation, update,
+or reinstall after normal or emergency removal, including after deleting the clone:
 
 ```bash
 (
@@ -29,7 +42,7 @@ if [ -d "$REPO/.git" ] && [ ! -L "$REPO" ]; then
         *) echo "STOP: $REPO is not the Goodix Git repository."; exit 1 ;;
     esac
     if [ "$(git -C "$REPO" branch --show-current)" != "main" ]; then
-        echo "STOP: use a clean main clone for canonical installation; the current branch is preserved."
+        echo "STOP: use a main checkout for canonical installation; no branch switch was made."
         exit 1
     fi
     git -C "$REPO" pull --ff-only
@@ -46,79 +59,169 @@ cd "$REPO"
 ```
 
 The subshell stops on errors without closing your terminal. A failed clone or
-fast-forward pull does not launch installation. `./install.sh` calls
-`deployment/install.py`, validates the pinned ChicagoHS source inventory, checks
-host prerequisites, installs Fedora build dependencies when needed, builds with
-`production/build-public.py` as the ordinary user, and requests sudo only for
-host checks and installation. No external matcher checkout, Windows calibration,
-DLL, manual library copy or `development/` directory is required.
+fast-forward pull does not launch the installer.
 
-The installer selects `FIRST_INSTALL` or `UPDATE`, retains stock Fedora fprintd,
-PAM and desktop packages, installs its private library and Plasma login selector,
-and installs `goodix-uninstall` and `goodix-force-remove`. It checks the stock
-fprintd ABI and dependency resolution. Installation never opens USB or starts an
-authentication action. After success the source clone may be removed.
+`install.sh` automatically selects `FIRST_INSTALL` or `UPDATE`.
+It handles the host state check, supported Fedora prerequisites, source
+build, installation and failure reporting. All package-manager,
+build and installer output remains visible in the same terminal; the script does
+not clear or replace the terminal, redirect the user-visible output, or run the
+installation in the background.
 
-### Upgrade from SIGFM 2.x to ChicagoHS 3.0.0
+Fedora may ask for your sudo password and confirmation before installing packages.
+The installer first requests sudo for a read-only host state check, and later for
+packages and system changes. If Fedora offers fingerprint first, leave the reader
+untouched and wait about 30 seconds for the
+password prompt. If password authentication is unavailable, stop; do not bypass it.
 
-The major upgrade changes the biometric engine and stored template format.
-Every user will have to **enroll each desired finger again**. Existing
-SIGFM/GSF1 templates remain on disk but are incompatible with ChicagoHS;
-the installer does not convert or delete them. The pairing state and
-password fallback remain preserved.
+The installer builds the Goodix library and Plasma Login selector as your normal
+user. It always creates or preserves
+`/var/lib/fprint/goodix-5125-state-v2/` as the root-only host pairing state
+location, labels it and verifies its permissions. It does not
+open the reader or initialize pairing.
+It installs the runtime and login entry, and
+`goodix-uninstall` and `goodix-force-remove` in the normal command search path.
+It quiesces fprintd during replacement and does not start a fingerprint test.
+Fedora's daemon, greeter and vendor authentication files remain package-owned.
 
-An existing **recognized** SIGFM or Milan installation is designed to be
-removed automatically inside the same controlled, transactional update before
-the ChicagoHS software is installed. Failure restores the previous project
-software when possible. Therefore **manual uninstallation is not normally
-required**, but a populated real SIGFM → ChicagoHS upgrade and rollback are
-still pending live qualification before the 3.0.0 release. An unrecognized,
-partial or drifted installation must stop rather than be forcibly overwritten;
-use the documented emergency recovery path as appropriate.
+### Fingerprint temporary suspension
 
-The installer preserves fingerprint templates and
-`/var/lib/fprint/goodix-5125-state-v2/`, including host pairing state.
-Reinstallation also preserves them. Historical SIGFM can be obtained from
-[versioned releases](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1),
-**not** from the post-merge `main` branch. The downgrade procedure is in
-[Uninstall and emergency recovery](UNINSTALL.md).
+When a temporary password-only session is needed, for example during remote access
+where the physical reader cannot be used, fingerprint authentication can be
+suspended without uninstalling the driver, deleting templates, changing host
+pairing state, or rewriting PAM/authselect policy:
 
-## Checks and software-only VM qualification
+```bash
+sudo systemctl mask --runtime --now fprintd.service
+```
 
-`./install.sh --help` and `./install.sh --check` do not install packages or request
-privileged changes. `--check` validates prerequisites; it does not certify a live
-reader or existing protected state. A missing package can therefore cause the
-check to stop before a regular installation installs dependencies.
+The runtime mask prevents stock fingerprint consumers from activating `fprintd`
+for the current boot, so authentication falls back to the remaining Fedora policy
+instead of waiting for an unavailable fingerprint interaction. Restore fingerprint
+availability at any time, without rebooting, with:
 
-For software-only VM validation, leave USB passthrough disabled, run the
-canonical installation block, then repeat `./install.sh` for UPDATE. Check
-password login remains available and exercise both documented removal paths
-separately, including `goodix-force-remove` from TTY when appropriate.
-Require `GOODIX_INSTALL=PASS` and `GOODIX_REMOVAL=PASS`; on failure preserve the
-error and follow recovery. The initial clean-VM sequence has been observed PASS,
-but such software checks alone never qualify authentication or protection of
-previously populated biometric data.
+```bash
+sudo systemctl unmask --runtime fprintd.service
+```
 
-## Enrollment and authentication
+There is no need to start `fprintd` manually after the unmask: the next normal
+fingerprint consumer can activate it through the stock D-Bus/systemd path. Because
+the mask is runtime-only, a reboot also clears it automatically; reboot is not
+required for either suspension or restoration.
 
-ChicagoHS implements twelve accepted enrollment stages and requires a new
-enrollment for every finger and user. SIGFM/`GSF1` and Milan templates use different
-identities and are not accepted or converted. Stock fprintd isolates users'
-galleries. Manage fingerprints through KDE's normal fingerprint settings;
-explicit user-requested deletion uses the stock database.
+Expect **`GOODIX_BUILD=PASS`**, a **`GOODIX_INSTALL_MODE`** of **`FIRST_INSTALL`**
+or **`UPDATE`**, then **`GOODIX_PAIRING_STATE=READY`** confirming the
+host pairing state root is ready, followed by
+**`GOODIX_INSTALL=PASS`** with **`READER_PRESENT_ALLOWED=true`**, and finally
+**`GOODIX_INSTALL_BLOCK=PASS`**. Any error or missing final success marker means
+installation did not complete. Neither runtime nor either removal command needs the
+clone after successful installation. The repository clone may be removed; the
+same bootstrap block clones it again automatically when needed.
 
-Use KDE's normal place/lift prompts and lift between contacts. Do not run another
-fingerprint client simultaneously. Calibration is derived from the no-finger
-background; there is no private diagnostic enrollment path or Windows file
-prerequisite. Hardware binding and calibration must pass the driver's checks;
-unsafe or unqualified binding fails closed.
+A fresh install creates only the empty host pairing state root. The runtime then
+initializes the reader itself on the first fingerprint action: it confirms the
+target identity, derives the configuration from the reader's own OTP, stores a
+locally generated pairing key and records it with a single bounded pairing write.
+Ordinary later use reuses that stored key and writes nothing to the reader.
+Password and desktop access remain available throughout.
 
-At Plasma Login, a nonempty password uses password authentication. Submitting an
-empty password explicitly selects fingerprint authentication, with at most three
-attempts and a stop on the first match. Keep password access available; fingerprint
-authentication does not unlock a password-encrypted KWallet. The first supervised live session has exercised enrollment, selected-finger
-verification, a different-finger negative result, KScreenLocker, sudo, PolicyKit,
-Plasma Login, reboot login, limited Windows coexistence and password fallback.
-Further live qualification, including multiuser and failure-path coverage,
-remains necessary. See [validation](VALIDATION.md) and
-[removal/recovery](UNINSTALL.md).
+Advanced users may clone elsewhere: the installer resolves its own location.
+The standard procedure above needs no override.
+
+## Enrollment and basic verification
+
+After successful installation, use KDE's normal fingerprint settings to manage
+your enrolled fingers. The first fingerprint action takes slightly longer while
+the reader is initialized; later actions do not repeat that step. If already
+enrolled with the current driver, the existing compatible template remains
+available. **Fingerprints enrolled with the earlier 2.x/SIGFM engine must be
+enrolled again** after the major upgrade: the old format is preserved but cannot
+be read by the new matcher. Otherwise enroll one finger following the normal
+prompts, without opening simultaneous fingerprint applications.
+
+### Recommended enrollment practice
+
+For reliable recognition, do not place your finger in exactly the same position
+for all enrollment samples.
+
+During enrollment:
+
+- lift your finger completely after each accepted sample;
+- place it again with a slightly different position or angle;
+- include the center of the fingertip as well as slightly higher, lower, left
+  and right areas;
+- vary the angle naturally so that the enrollment represents different parts
+  of the fingerprint;
+- keep the finger reasonably flat on the sensor and avoid deliberately
+  repeating the same contact area.
+
+The goal is not to repeat one identical touch. The native biometric engine
+advances through twelve accepted enrollment stages, but physical contacts and
+retained subtemplates may exceed that number because of quality or position
+prompts. Good coverage remains more important than repeating one position.
+
+Windows Hello follows a similar principle and explicitly encourages capturing
+the finger from different angles. KDE's standard enrollment dialog may provide
+less positional guidance, so following these recommendations manually can
+improve day-to-day recognition reliability.
+
+Check ordinary password login first. For the fingerprint check at Plasma Login,
+submit the empty password field once and follow its prompts with the enrolled
+finger. Stop on the first successful match. If it does not match, allow at most
+three explicit physical attempts in that series; after the third failure use
+password and report the result. Do not start repeated test series or add a fourth
+attempt. A password-encrypted KWallet may ask for its own password after login.
+Other consumers offer fingerprint where the current Fedora authentication
+configuration enables it. The installer does not modify authselect or global PAM
+policy. The supported Fedora configuration uses authselect `with-fingerprint`;
+systems with an altered Fedora authentication policy may not offer fingerprint
+to those consumers until that host policy is corrected.
+
+## If installation or authentication fails
+
+Stop at the first error and keep its exact non-secret message. A failed
+prerequisite does not authorize bypassing a safety check. The installer reports
+rollback if a system change fails; incomplete rollback is an error, not success.
+
+If project software remains installed or authentication regresses, use
+**`goodix-uninstall`** from the working desktop. If normal removal refuses damaged
+project state or the desktop is unavailable, use **`goodix-force-remove`** according
+to [the emergency instructions](UNINSTALL.md). Follow its final restart instruction
+and verify password login. Do not delete templates or host pairing state, change
+Fedora PAM by hand, disable SELinux or hide the reader.
+
+Report the command, error, failure point and whether password/desktop access works.
+Never attach host pairing state, templates, fingerprint images or raw USB captures.
+
+## What updates and reinstalls preserve
+
+The same bootstrap block checks dependencies and rebuilds from current source.
+When moving from version 2.x to 3.0.0, the installer is designed to recognize
+the previous project software and replace it transactionally; a preliminary
+manual uninstall is not normally necessary. The direct upgrade with populated
+historical templates and real pairing state is still awaiting final VM
+qualification. A failed ownership, receipt or state check must stop instead
+of trying to guess how to migrate. After successful upgrade, new fingerprint
+enrollment is required; this is a format incompatibility, not loss of the
+preserved old template files. A deliberate downgrade uses a pinned historical
+version (see [removal and recovery](UNINSTALL.md)), not the current main branch.
+
+Existing project software is replaced while fprintd is quiescent. Host pairing
+state and existing templates are preserved; a reader's pairing identity is never
+changed by an update, and reinstallation after removal does not re-pair it.
+
+After normal or emergency removal, the block reinstalls the software and
+restores its SELinux labels. Existing templates remain available. Incompatible
+Fedora changes may disable fingerprint functionality; report them or remove the
+project instead of replacing Fedora's own authentication components.
+
+## Using the reader with Windows
+
+The same reader can be shared with Windows. Windows may replace the reader's
+pairing when it initializes the device; Linux classifies that change read-only,
+preserves the Windows record byte-for-byte and restores its own stored key with
+one qualified write on the next fingerprint action. No reinstall, re-enrollment
+or manual key handling is needed, and no key is shared between the two operating
+systems. Initial Windows/Linux switching with the current driver was observed
+to succeed on one reader. The exact pairing-write/readback/TLS audit remains
+separate from that functional result; see [validation](VALIDATION.md).
