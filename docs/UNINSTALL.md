@@ -93,9 +93,8 @@ desktop work. Do not send protected files, templates or fingerprint images.
 
 ## Optional downgrade to a historical SIGFM release
 
-ChicagoHS is the canonical engine of the planned version 3.0.0 and subsequent
-`main` releases. SIGFM is **not** a parallel active branch or an automatic
-fallback. A deliberate downgrade, when needed for diagnosis or recovery, must
+The current driver is the canonical implementation on `main`. The older
+SIGFM engine is **not** a parallel active branch or an automatic fallback. A deliberate downgrade, when needed for diagnosis or recovery, must
 select a **pinned historical release**, such as the existing
 [`v2.2.1` tag](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
 
@@ -110,8 +109,8 @@ cd "$HOME/goodix-5125-sigfm-v2.2.1"
 ```
 
 Choose a new destination if that directory exists. No library is copied
-manually. The ChicagoHS remover accepts ChicagoHS, legacy Milan and SIGFM
-receipts; remove ChicagoHS **before** installing historical SIGFM because
+manually. The current remover recognizes current, legacy Milan and SIGFM
+receipts; remove the newer runtime **before** installing historical SIGFM because
 the older installer/remover is not guaranteed to understand a newer runtime.
 Historical templates remain on disk and are usable only when compatible with
 the selected old driver and reader. Enroll again with SIGFM only if no valid
