@@ -8,9 +8,9 @@
   "manager_ui_correction": {
     "operation_indicator": "QT_BUSY_INDICATOR_44PX; NO_PROGRESS_BAR",
     "verification": "PASS_QT_ANIMATION_LIFECYCLE_CLEANUP_LIGHT_DARK_COMPACT",
-    "packaging": "NOT_REBUILT; LAST_SIGNED_RPM_3.0.0-12_PREDATES_SPINNER_CORRECTION",
+    "packaging": "SIGNED_RPM_AND_SRPM_3.0.0-13; PACKAGED_QML_VERIFIED",
     "kde_vm": "NOT_TESTED_FOR_THIS_CORRECTION",
-    "report": "development/rpm/reports/restore-spinner/REPORT.md"
+    "report": "development/rpm/reports/finalize-spinner/REPORT.md"
   },
   "software_rc_ready_for_vm": "PASS",
   "completed_gates": [
@@ -70,25 +70,25 @@
   "rpm_distribution": {
     "branch": "development",
     "version": "3.0.0",
-    "release": 12,
+    "release": 13,
     "fedora": 44,
     "architecture": "x86_64",
     "signature": "VERIFIED",
     "fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
-    "source_archive_sha256": "2f8f97e2b2c17100144f5e26dea1b1deb301aa3c5436ecffe4442c53bf6ee842",
+    "source_archive_sha256": "6d18cd1a253d79b6886193667ad27a8ea479c4bf6bafaeb7da794ddb9592a611",
     "payload_source_id": "f259f6f10a60e5facc5a8404f951bce3eb18da2aaefebc8c9a167e4540938d97",
     "public_unit_tests_passed": 81,
     "qml_render": "PASS_SYSTEM_LIGHT_DARK_STARTUP_LIVE_DIALOG_DISABLED_COMPACT",
     "runtime_modified_on_host": false,
     "release_published": false,
     "operator_vm_testing": "RPM5_INSTALL_REPORTED_PASS_RPM8_GATE_B_NOT_TESTED",
-    "report": "development/rpm/reports/ui-refinement/REPORT.md",
+    "report": "development/rpm/reports/finalize-spinner/REPORT.md",
     "ui_refinement": {
       "UI-04": "PASS_QT_THIS_RPM_LABEL",
       "UI-05": "PASS_QT_STABLE_SOFTWARE_UPDATES_TITLE",
       "UI-06": "PASS_QT_USB_ROW_REMOVED_DIAGNOSTICS_PRESERVED",
       "UI-07": "PASS_QT_FIVE_PUBLIC_STATES_WITH_TEXT",
-      "UI-08": "PASS_QT_INDETERMINATE_LIFECYCLE_CLEANUP_AND_CLOSE_GUARDS",
+      "UI-08": "PASS_QT_NATIVE_SPINNER_44PX_ANIMATION_CLEANUP_AND_CLOSE_GUARDS",
       "review": "ACCEPT_AND_CONTINUE",
       "kde_vm": "NOT_TESTED_FOR_THIS_REVISION",
       "reserved_failed_release": 11,
