@@ -1,17 +1,21 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ChicagoHS validation and limitations
+# Validation scope and known limitations
 
-ChicagoHS has passed an **initial operator-supervised live functional check**
-on one Goodix USB `27c6:5125` reader in a Fedora 44 KDE virtual machine with USB
-passthrough. These observations supplement the offline build and corpus evidence;
-they do not establish FAR/FRR, liveness, multi-device support, or exhaustive
-fault tolerance. Historical SIGFM results from earlier tagged versions,
-including [v2.2.1](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1),
-remain separate regression evidence, not evidence of ChicagoHS performance.
-ChicagoHS is intended to become the sole canonical biometric engine on
-`main` in version 3.0.0.
+## Tested configuration
 
-## Evidence boundaries
+Initial operator-supervised functional testing concerns one Goodix USB
+`27c6:5125` reader, Fedora 44 KDE x86_64 with SELinux Enforcing and local
+accounts, using stock fprintd, PAM and KDE authentication consumers. The
+reader was passed through to a Fedora VM and also used with a Windows VM.
+Software installation and removal were separately exercised on an isolated
+Fedora VM without reader access.
+
+These results supplement offline build and biometric corpus checks. They
+do not establish FAR/FRR, liveness, multi-reader compatibility or exhaustive
+fault tolerance. Firmware APP12508 is recognized by the software but has not
+undergone this reader's full biometric qualification.
+
+## Functional qualification and remaining limits
 
 | Area | Offline verification | Initial live functional observation | Remaining qualification |
 | --- | --- | --- | --- |
@@ -39,7 +43,7 @@ The table distinguishes reported, bounded live observations from contracts
 supported only by software checks. A successful initial live path is not a
 general release qualification or proof of every fail-closed recovery path.
 
-## Reproducible software checks
+## Offline evidence and reproducible checks
 
 From a complete source tree, the public tests use no hardware:
 
@@ -57,7 +61,7 @@ they neither install on the owner host nor prove Fedora runtime behavior. A real
 canonical build validates actual C compilation, shared-library ABI and dependency
 resolution independently of those fixtures. See [production](../production/README.md).
 
-## VM observations and subsequent live checks
+## Installation and live-device qualification
 
 On 21 October 2026 the operator reported the following **initial bounded
 functional observations** from a clean Fedora 44 KDE VM. Without USB passthrough,
@@ -95,3 +99,18 @@ migration still requires a populated real-installation validation before
 3.0.0. An optional return to SIGFM uses the two ordinary recovery commands
 and a separate pinned historical checkout such as `v2.2.1`, **not `main`**,
 without deleting templates, host state or factory data.
+
+## Earlier driver qualification
+
+The full test and integration record of the former SIGFM-based Goodix driver
+is preserved in the [historical validation archive](VALIDATION_SIGFM_LEGACY.md).
+That record documents the preceding implementation; its recognition statistics,
+enrollment acceptance and pairing observations must not be represented as
+biometric qualification of the current engine.
+
+The change in template format introduced for version 3.0.0 requires new
+fingerprint enrollment. A direct upgrade from a real, populated 2.x
+installation, including fail-closed rollback and preservation checks, remains
+a release gate. The reference for an optional older-version installation is
+the historical `v2.2.1` tag, not the current `main` branch.
+
