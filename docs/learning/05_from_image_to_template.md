@@ -15,23 +15,20 @@ That reusable representation is called a **template**.
 
 ## The project-specific image pipeline
 
-The Goodix driver's canonical biometric engine is **native ChicagoHS Type 24**.
-Its calibration, preprocessing, feature extraction, enrollment and matching
-come from a pinned open-source implementation of the ChicagoHS backend
-integrated into the Goodix-enabled `libfprint` build. The former SIGFM
-implementation belongs to historical tagged releases, such as
-[`v2.2.1`](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1);
-it is not a separate active engine on `main`.
+The driver uses a native biometric engine called **ChicagoHS**. The image is
+calibrated, processed and converted into features that form a stored Type 24
+template. Those operations happen in the Goodix-enabled `libfprint` runtime,
+not inside Fedora's login screen.
 
 The path is:
 
 ```mermaid
 flowchart LR
     A["80 x 64 raw sensor raster"] --> B["Same-session FDT_B0 no-finger image"]
-    B --> C["Generate native ChicagoHS calibration"]
-    A --> D["ChicagoHS native preprocessing"]
+    B --> C["Generate no-finger calibration"]
+    A --> D["Native image preprocessing"]
     C --> D
-    D --> E["ChicagoHS feature extraction"]
+    D --> E["Extract fingerprint features"]
     E --> F["Native feature records and subtemplates"]
     F --> G["Type 24 template inside sensor-bound FpPrint"]
 ```
@@ -44,7 +41,7 @@ sensor.
 ### 2. Preprocessing
 
 The current driver uses the same-session no-finger `FDT_B0` image as the
-input to ChicagoHS calibration generation. The original ChicagoHS engine
+input to calibration generation. The native biometric engine
 generates gain/offset state and processes the 80×64 unsigned 12-bit finger
 raster with its own native preprocessing. It is not fed the old SIGFM
 8-bit normalization output. A separate 8-bit rendering, if supplied to
@@ -58,7 +55,7 @@ results, but not proven physically identical across devices.
 
 ### 3. Feature extraction
 
-ChicagoHS extracts its own **native feature records** from each processed
+The matcher extracts **native feature records** from each processed
 finger image. These records are used to construct subtemplates with the native
 Type 24 enrollment and matching policy. This is not the old SIGFM
 keypoint-and-descriptor format; the native feature format and its scoring
@@ -67,11 +64,11 @@ must not be reduced to an ordinary pixel-by-pixel image comparison.
 Many fingerprint explanations use the word **minutiae** for ridge endings and
 bifurcations. That is a useful general concept, but it would be misleading to
 say this driver's saved Type 24 data is only a classic minutiae list. Its
-actual stored representation is the original ChicagoHS subtemplate format.
+actual stored representation uses the engine's native subtemplate format.
 
 ### 4. Template sample
 
-The extracted representation becomes a ChicagoHS subtemplate. The original
+The extracted representation becomes a native subtemplate. The original
 twelve-stage enrollment policy can retain several subtemplates, including
 some contacts that do not advance the visible enrollment stage because of
 position guidance. When complete, the packed native template is wrapped
@@ -80,7 +77,7 @@ inside a sensor-bound `FpPrint` so later touches have useful references.
 ## What is saved—and what is not
 
 The template is not meant to be a normal photograph. `libfprint` serializes
-the native ChicagoHS Type 24 representation within a RAW FpPrint envelope,
+the native Type 24 representation within a RAW FpPrint envelope,
 including its backend identity and OTP-bound device information. The raw
 fingerprint raster is not the normal stored identity record. Historical
 SIGFM and Milan templates are incompatible and remain in separate galleries.
@@ -91,16 +88,16 @@ to source control.
 
 ## Matching is a score, then a decision
 
-During verification, ChicagoHS preprocesses the new probe once and uses
+During verification, the driver preprocesses the new probe once and uses
 its original matching algorithm to evaluate the stored Type 24 template.
 The native selector threshold is 207; the final match decision is
 `score > 0`, without application-specific threshold adjustments.
 
 ```text
-new native ChicagoHS probe
+new extracted probe
     │
     ├─ validate current reader and stored Type 24 template
-    ├─ evaluate stored ChicagoHS subtemplates
+    ├─ evaluate stored native subtemplates
     └─ apply the original native match policy
 
 valid native match score > 0  → MATCH
@@ -123,19 +120,19 @@ The sensor does not receive a list of local Linux users and does not choose one.
 > 🔎 **Want to see this in the repository?**
 > The USB background and capture lifecycle are connected in
 > [`goodix_fpimage_device.c`](../../libfprint-driver/goodix_fpimage_device.c).
-> The current ChicagoHS adapter, native probe, enrollment, matching and
+> The native biometric adapter, probe, enrollment, matching and
 > sensor-bound serialization are in
 > [`goodix_chicago.c`](../../libfprint-driver/goodix_chicago.c)
-> and the pinned [native ChicagoHS sources](../../production/chicago-native/).
+> and the pinned [native source files](../../production/chicago-native/).
 
 ## ✅ What to remember
 
 - Pixel-for-pixel comparison would be too fragile.
 - Preprocessing prepares the image; it does not identify the user.
-- The current ChicagoHS representation is native Type 24 subtemplates,
+- The stored representation is native Type 24 subtemplates,
   not the historical SIGFM keypoint-and-descriptor format.
 - Enrollment can retain more subtemplates than the twelve stages it advances.
-- The original ChicagoHS matcher applies its native scoring and decision
+- The native matcher applies its original scoring and decision
   without relaxing quality or matching conditions.
 - Templates are sensitive biometric data even though they are not ordinary
   fingerprint photographs.
