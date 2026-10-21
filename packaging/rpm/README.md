@@ -124,17 +124,12 @@ and digests. `result.json` records the final signed hashes. The exported `.asc`
 contains only public material. See upstream [rpmsign](https://rpm.org/docs/6.0.x/man/rpmsign.1)
 and [rpmkeys](https://rpm.org/docs/6.0.x/man/rpmkeys.8).
 
-On another Fedora machine, first compare the complete fingerprint with the
-publisher through an independent trusted channel:
-
-```sh
-gpg --show-keys --with-fingerprint Guido-Soraru-public.asc
-sudo rpmkeys --import Guido-Soraru-public.asc
-rpmkeys --define '_pkgverify_level all' --checksig --verbose goodix-manager-VERSION-RELEASE.fc44.x86_64.rpm
-```
-
-Only then open the RPM in Discover. A valid signature does not establish trust
-by itself. No automatic key import or disabled signature checking is provided.
+On another Fedora machine, follow the
+[public installation procedure](../../docs/INSTALLATION.md#install-update-or-reinstall):
+compare the complete certificate fingerprint through an independent trusted
+channel, then import the key and verify both the RPM signature and its expected
+signer before opening Discover. A valid signature does not establish trust by
+itself. No automatic key import or disabled signature checking is provided.
 Discover/PackageKit behavior must be qualified on a clean Fedora 44 KDE VM;
 successful command-line signature verification alone is not that qualification.
 

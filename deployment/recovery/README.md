@@ -1,11 +1,14 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Standalone removal commands
 
-The root [installer](../../docs/INSTALLATION.md) installs complete copies of
+The shared [installation backend](../../docs/INSTALLATION.md), invoked by Goodix
+Manager or the optional source installer, installs complete copies of
 `remove.py` as `/usr/local/bin/goodix-uninstall` and
 `/usr/local/bin/goodix-force-remove`, with a receipt under
 `/usr/local/share/goodix-recovery/`. Neither command imports code from the clone
-or needs a build directory after installation.
+or needs a build directory after installation. These copies are outside RPM
+ownership and remain available if the Manager package is removed. The Manager's
+**Remove** action uses this same ordinary removal path.
 
 Normal removal verifies project-owned software. Emergency removal follows a
 fixed inventory and tolerates missing receipts or partial installation. Both

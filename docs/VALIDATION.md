@@ -10,6 +10,12 @@ reader was passed through to a Fedora VM and also used with a Windows VM.
 Software installation and removal were separately exercised on an isolated
 Fedora VM without reader access.
 
+Those installation observations concern the source-based CLI. The signed RPM
+and Goodix Manager have offline build, payload, signature and UI checks, but
+Discover installation, interactive PolicyKit and the complete RPM lifecycle
+still require VM qualification. Fedora 45 is not qualified; the package targets
+Fedora 44 x86_64. These boundaries also apply to the RPM installation guidance.
+
 These results supplement offline build and biometric corpus checks. They
 do not establish FAR/FRR, liveness, multi-reader compatibility or exhaustive
 fault tolerance. Firmware APP12508 is recognized by the software but has not
@@ -77,8 +83,9 @@ observations; raw audit traces for E0/readback/TLS and an independent repeat
 of the hardware tests were not supplied with this documentation revision.
 
 For reproducible software-only validation, leave USB passthrough disabled,
-install from the [documented canonical block](INSTALLATION.md), then exercise
-update, reinstall and both [removal/recovery](UNINSTALL.md) paths. Preserve
+follow the [documented RPM procedure](INSTALLATION.md), then exercise
+Manager update, reinstall, package removal and both [removal/recovery](UNINSTALL.md)
+paths. Record these RPM results separately from the earlier CLI observations. Preserve
 password access. For preservation claims involving previously populated
 templates or host state, collect and compare authorized protected before/after
 evidence; a clean VM does not demonstrate byte-level preservation.

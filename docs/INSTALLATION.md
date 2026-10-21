@@ -1,10 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Installation and updates
 
-For the native RPM and graphical Goodix Manager path, see
-[RPM installation and updates](../packaging/rpm/README.md). Installing the RPM
-stages an offline payload; activation remains an explicit Manager action.
-The source-based CLI procedure below remains available.
+Install the signed RPM with KDE Discover, then use Goodix Manager to install,
+update or remove the driver. Installing the package and activating the driver
+are separate actions.
 
 ## Supported configuration
 
@@ -25,69 +24,87 @@ login and ordinary sudo access. Finish authentication dialogs and close fingerpr
 The reader may be absent during installation, update, reinstall and removal.
 When it is present, keep your finger off it during administrative prompts.
 
-You need Git, network access for the public clone and Fedora packages, and disk
-space for a native source build. Nothing has to be prepared for the reader: no
-Windows machine, no capture tooling, no private key material and no
-reader-specific file. The installer builds from the source you clone; it requires
-no previously compiled output, and it does not open USB.
+You need the signed RPM for Fedora 44 x86_64, its verified public signing key,
+and administrative access. Discover handles the Fedora runtime dependencies;
+network access may be needed to obtain those packages. Once the RPM and its
+dependencies are installed, driver installation, update and removal work offline.
+No Git checkout, compiler, Windows machine, capture tooling or reader-specific
+file is required.
 
 ## Install, update or reinstall
 
-Use this same block in a normal desktop terminal for first installation, update,
-or reinstall after normal or emergency removal, including after deleting the clone:
+Download the matching `goodix-manager-…fc44.x86_64.rpm` from the
+[official releases](https://github.com/sorguido/goodix-27c6-5125/releases).
+Use a stable release with a compatible RPM asset; if none is available, do not
+substitute a package for another Fedora version or architecture. The RPM/Discover
+qualification boundary is recorded in [validation](VALIDATION.md).
+
+Before the first installation, download the
+[public certificate](../packaging/rpm/keys/Guido-Soraru.asc) as `Guido-Soraru.asc`.
+Inspect it and compare the full fingerprint with an independently trusted copy:
 
 ```bash
-(
-set -e
-REPO="$HOME/goodix-27c6-5125"
-
-if [ -d "$REPO/.git" ] && [ ! -L "$REPO" ]; then
-    case "$(git -C "$REPO" remote get-url origin)" in
-        https://github.com/sorguido/goodix-27c6-5125.git|git@github.com:sorguido/goodix-27c6-5125.git) ;;
-        *) echo "STOP: $REPO is not the Goodix Git repository."; exit 1 ;;
-    esac
-    if [ "$(git -C "$REPO" branch --show-current)" != "main" ]; then
-        echo "STOP: use a main checkout for canonical installation; no branch switch was made."
-        exit 1
-    fi
-    git -C "$REPO" pull --ff-only
-elif [ ! -e "$REPO" ] && [ ! -L "$REPO" ]; then
-    git clone --branch main --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
-else
-    echo "STOP: $REPO exists but is not the Goodix Git repository."
-    exit 1
-fi
-
-cd "$REPO"
-./install.sh
-)
+gpg --show-keys --with-fingerprint Guido-Soraru.asc
 ```
 
-The subshell stops on errors without closing your terminal. A failed clone or
-fast-forward pull does not launch the installer.
+```text
+5FB2 0F58 3C83 1729 D5FF 073F E99A DAE5 B7EA 4918
+```
 
-`install.sh` automatically selects `FIRST_INSTALL` or `UPDATE`.
-It handles the host state check, supported Fedora prerequisites, source
-build, installation and failure reporting. All package-manager,
-build and installer output remains visible in the same terminal; the script does
-not clear or replace the terminal, redirect the user-visible output, or run the
-installation in the background.
+Only after that comparison, import the public key and verify the RPM. Replace
+`VERSION-RELEASE` below with the downloaded package's version and revision:
 
-Fedora may ask for your sudo password and confirmation before installing packages.
-The installer first requests sudo for a read-only host state check, and later for
-packages and system changes. If Fedora offers fingerprint first, leave the reader
-untouched and wait about 30 seconds for the
-password prompt. If password authentication is unavailable, stop; do not bypass it.
+```bash
+sudo rpmkeys --import Guido-Soraru.asc
+rpmkeys --define '_pkgverify_level all' --checksig --verbose goodix-manager-VERSION-RELEASE.fc44.x86_64.rpm
+```
 
-The installer builds the Goodix library and Plasma Login selector as your normal
-user. It always creates or preserves
-`/var/lib/fprint/goodix-5125-state-v2/` as the root-only host pairing state
-location, labels it and verifies its permissions. It does not
-open the reader or initialize pairing.
-It installs the runtime and login entry, and
-`goodix-uninstall` and `goodix-force-remove` in the normal command search path.
-It quiesces fprintd during replacement and does not start a fingerprint test.
-Fedora's daemon, greeter and vendor authentication files remain package-owned.
+Require the signature and digest checks to report `OK`, and the signature's
+`key fingerprint` to match the full fingerprint above. Stop on a different signer,
+missing signature or verification failure; a signature trusted by another key
+is not sufficient. Do not disable signature checking. The key is reused for
+subsequent releases; a key change requires a new fingerprint comparison, not an
+automatic import.
+
+Open the verified RPM with **KDE Discover** and complete its installation. This
+installs **Goodix Manager** and a compiled local payload. It does not activate the
+driver, modify PAM or pairing state, or start a fingerprint action.
+
+Open **Goodix Manager** from the KDE application menu. With no driver installed,
+choose **Install** and approve the PolicyKit authorization. For an update, install
+the newer signed RPM with Discover, reopen the Manager and choose **Apply Update**
+when the local payload is newer than the installed driver. Updating the RPM alone
+leaves the previous runtime in place. A packaging-only revision does not require
+reapplying an unchanged driver. Downgrades are not offered.
+
+The Manager checks official public releases in the background and links to a
+compatible RPM when one is available. Download and verify it, install it with
+Discover, then return to the Manager. **Check unavailable** means the public
+release check could not complete; local operations remain available offline.
+
+After normal or emergency driver removal, reopen the Manager and choose
+**Install** to reinstall from its local payload. If the Manager itself was
+removed, reinstall the signed RPM first. A legacy or unverified runtime can block
+Update: stop and review the explanation. Where ordinary removal is available,
+follow [removal and recovery](UNINSTALL.md) before installing again; do not force
+a migration past a failed integrity check.
+
+The Manager stays unprivileged and requests authorization only through its fixed
+installed helper. Keep password access available throughout. Wait for the final
+operation result, follow any restart or enrollment instruction and use
+**Copy diagnostics** if an error needs reporting.
+
+The installation backend creates or preserves the root-only host pairing state
+location, installs the runtime and login entry, and copies standalone
+`goodix-uninstall` and `goodix-force-remove` commands into the normal command
+search path. It quiesces fprintd during replacement without opening the reader
+or initializing pairing. Fedora's daemon, greeter and vendor authentication
+files remain package-owned.
+
+Source-based CLI installation remains an
+[advanced alternative](../production/README.md#source-installation-advanced).
+For package building and future releases, see the
+[RPM maintainer instructions](../packaging/rpm/README.md).
 
 ### Fingerprint temporary suspension
 
@@ -114,24 +131,12 @@ fingerprint consumer can activate it through the stock D-Bus/systemd path. Becau
 the mask is runtime-only, a reboot also clears it automatically; reboot is not
 required for either suspension or restoration.
 
-Expect **`GOODIX_BUILD=PASS`**, a **`GOODIX_INSTALL_MODE`** of **`FIRST_INSTALL`**
-or **`UPDATE`**, then **`GOODIX_PAIRING_STATE=READY`** confirming the
-host pairing state root is ready, followed by
-**`GOODIX_INSTALL=PASS`** with **`READER_PRESENT_ALLOWED=true`**, and finally
-**`GOODIX_INSTALL_BLOCK=PASS`**. Any error or missing final success marker means
-installation did not complete. Neither runtime nor either removal command needs the
-clone after successful installation. The repository clone may be removed; the
-same bootstrap block clones it again automatically when needed.
-
 A fresh install creates only the empty host pairing state root. The runtime then
 initializes the reader itself on the first fingerprint action: it confirms the
 target identity, derives the configuration from the reader's own OTP, stores a
 locally generated pairing key and records it with a single bounded pairing write.
 Ordinary later use reuses that stored key and writes nothing to the reader.
 Password and desktop access remain available throughout.
-
-Advanced users may clone elsewhere: the installer resolves its own location.
-The standard procedure above needs no override.
 
 ## Enrollment and basic verification
 
@@ -185,40 +190,40 @@ to those consumers until that host policy is corrected.
 ## If installation or authentication fails
 
 Stop at the first error and keep its exact non-secret message. A failed
-prerequisite does not authorize bypassing a safety check. The installer reports
-rollback if a system change fails; incomplete rollback is an error, not success.
+prerequisite does not authorize bypassing a safety check. The Manager reports
+failed operations and verified rollback; incomplete recovery is an error, not
+success.
 
 If project software remains installed or authentication regresses, use
-**`goodix-uninstall`** from the working desktop. If normal removal refuses damaged
-project state or the desktop is unavailable, use **`goodix-force-remove`** according
+**Remove** in Goodix Manager, or `goodix-uninstall` from a working terminal. If
+normal removal refuses damaged project state or the desktop is unavailable,
+use **`goodix-force-remove`** according
 to [the emergency instructions](UNINSTALL.md). Follow its final restart instruction
 and verify password login. Do not delete templates or host pairing state, change
 Fedora PAM by hand, disable SELinux or hide the reader.
 
-Report the command, error, failure point and whether password/desktop access works.
+Report the Manager diagnostics or CLI error, failure point and whether
+password/desktop access works.
 Never attach host pairing state, templates, fingerprint images or raw USB captures.
 
 ## What updates and reinstalls preserve
 
-The same bootstrap block checks dependencies and rebuilds from current source.
-When moving from version 2.x to 3.0.0, the installer is designed to recognize
-the previous project software and replace it transactionally; a preliminary
-manual uninstall is not normally necessary. The direct upgrade with populated
-historical templates and real pairing state is still awaiting final VM
-qualification. A failed ownership, receipt or state check must stop instead
-of trying to guess how to migrate. After successful upgrade, new fingerprint
-enrollment is required; this is a format incompatibility, not loss of the
-preserved old template files. A deliberate downgrade uses a pinned historical
-version (see [removal and recovery](UNINSTALL.md)), not the current main branch.
+The Manager applies the verified local payload through the same transactional
+backend used by the source installer. Direct migration from a populated 2.x
+installation is still awaiting qualification and is blocked in the Manager.
+**New fingerprint enrollment is required** with the 3.x engine because historical
+templates are incompatible; the old files are preserved. A failed ownership,
+receipt or state check must stop instead of guessing how to migrate. A deliberate
+downgrade uses a pinned historical version (see [removal and recovery](UNINSTALL.md)).
 
 Existing project software is replaced while fprintd is quiescent. Host pairing
 state and existing templates are preserved; a reader's pairing identity is never
 changed by an update, and reinstallation after removal does not re-pair it.
 
-After normal or emergency removal, the block reinstalls the software and
-restores its SELinux labels. Existing templates remain available. Incompatible
-Fedora changes may disable fingerprint functionality; report them or remove the
-project instead of replacing Fedora's own authentication components.
+After normal or emergency removal, **Install** in Goodix Manager reinstalls
+the software and restores its SELinux labels. Existing templates remain available.
+Incompatible Fedora changes may disable fingerprint functionality; report them
+or remove the project instead of replacing Fedora's own authentication components.
 
 ## Using the reader with Windows
 

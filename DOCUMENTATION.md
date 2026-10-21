@@ -28,8 +28,8 @@ project.
   entry point, authentication behavior, removal, security boundaries, and links to
   the main documentation.
 - **[Installation and updates](docs/INSTALLATION.md)** — Supported installation,
-  update, and reinstall procedure, prerequisites, first-use initialization,
-  installer behavior, and Windows coexistence.
+  update, and reinstall through the signed RPM and Goodix Manager, signing-key
+  trust, first-use initialization, and Windows coexistence.
 - **[Login, lock screen, sudo, and PolicyKit](docs/learning/08_desktop_authentication.md)** —
   User-facing explanation of how the same fingerprint stack appears in Plasma
   Login, KScreenLocker, `sudo`, PolicyKit, and KDE enrollment settings.
@@ -39,8 +39,8 @@ project.
 
 ## 2. Removal, recovery, and troubleshooting
 
-- **[Uninstall and emergency recovery](docs/UNINSTALL.md)** — Normal removal,
-  text-console emergency recovery, preserved data, removal scope, and restart
+- **[Uninstall and emergency recovery](docs/UNINSTALL.md)** — Remove in Goodix
+  Manager, package removal, text-console recovery, preserved data, and restart
   requirements.
 - **[Standalone removal commands](deployment/recovery/README.md)** — Technical
   overview of the installed `goodix-uninstall` and `goodix-force-remove`
@@ -153,7 +153,9 @@ not need them for installation or daily use.
 - **[Standalone removal commands](deployment/recovery/README.md)** — Implementation
   and test boundary of the installed normal and emergency removal tools.
 - **[Public source build](production/README.md)** — Build architecture, payload
-  composition, source ledger, validation boundary, and maintainer checks.
+  composition, source ledger, advanced CLI installation, and maintainer checks.
+- **[RPM build and signing](packaging/rpm/README.md)** — Package lifecycle,
+  personal signing key, offline builds, and future release procedure.
 
 ### Source and build provenance
 

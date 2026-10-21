@@ -34,26 +34,38 @@ authentication fails, **stop and seek Fedora recovery/support**.
 ## Normal uninstall from a working desktop
 
 Finish authentication dialogs and close fingerprint settings. Keep your finger
-off the reader. In a normal terminal, run:
+off the reader. Open **Goodix Manager**, choose **Remove** and approve the
+PolicyKit authorization. This runs the ordinary integrity-checked removal and
+keeps the Manager available for a later **Install**.
+
+The equivalent CLI remains available, including after the Manager RPM has been
+removed. In a normal terminal, run:
 
 ```text
 goodix-uninstall
 ```
 
-The command requests ordinary sudo authentication itself. It checks the project's
-software ownership, receipts and hashes. Missing or changed Fedora vendor files
-do not block removal of project-owned files. Unrecognized project changes produce
+The CLI command requests ordinary sudo authentication itself. Both paths check
+the project's software ownership, receipts and hashes. Missing or changed Fedora
+vendor files do not block removal of project-owned files. Unrecognized project changes produce
 a clear refusal; retain the error and report it, or use the documented emergency
 removal when you need to remove a partial or damaged project installation.
 
-Success prints **`GOODIX_REMOVAL=PASS`** and:
+The Manager reports successful removal and requests a restart. The CLI prints
+**`GOODIX_REMOVAL=PASS`** and:
 
 > Restart the computer normally to close any old authentication sessions.
 
 Follow that instruction, then log in using your password. Recovery tools remove
 themselves last after successful cleanup, so a later invocation may report
 “command not found”. If removal reports an error, keep the error text and do not
-assume that cleanup completed.
+assume that cleanup completed. To reinstall afterwards, reopen the Manager and
+choose **Install**; reinstall its signed RPM first if the application was removed.
+
+To remove both the driver and the application, complete **Remove** and its
+restart instruction first, then uninstall **Goodix Manager** through Discover.
+Removing only the RPM leaves the runtime active and preserves the normal and
+emergency CLI tools; it does not remove fingerprint templates or host pairing state.
 
 ## Removal scope
 
@@ -104,8 +116,9 @@ SIGFM engine is **not** a parallel active branch or an automatic fallback. A del
 select a **pinned historical release**, such as the existing
 [`v2.2.1` tag](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
 
-Remove the installed driver with `goodix-uninstall`, or use
-`goodix-force-remove` for damaged software. Follow the restart instruction and confirm password login.
+Remove the installed driver with **Remove** in Goodix Manager or
+`goodix-uninstall`, or use `goodix-force-remove` for damaged software. Follow the
+restart instruction and confirm password login.
 Then use a **separate clean checkout** of the historical version:
 
 ```bash

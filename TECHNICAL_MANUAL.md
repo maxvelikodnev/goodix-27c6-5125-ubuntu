@@ -1175,7 +1175,8 @@ service sandbox. Its only current setting is the private runtime
 
 | Purpose | Packages |
 | --- | --- |
-| Bootstrap | `git`, `python3` |
+| Optional source bootstrap | `git`, `python3` |
+| Manager | `python3-pyside6`, `qt6-qtdeclarative`, `kf6-kirigami`, `polkit` |
 | Build toolchain | `gcc`, `meson`, `ninja-build`, `pkgconf-pkg-config`, `binutils` |
 | Development headers | `glib2-devel`, `libgusb-devel`, `libusb1-devel`, `openssl-devel`, `json-glib-devel`, `pam-devel` |
 | Runtime/integration | `fprintd`, `fprintd-pam`, `policycoreutils-python-utils` |
@@ -1186,6 +1187,10 @@ not depend on Git history. It builds the Goodix-enabled libfprint, selector, and
 native validation helper; verifies ABI and stock-fprintd symbol resolution;
 performs validation checks; and records relevant package versions and source
 digests.
+
+The RPM performs this build before distribution and declares runtime dependencies.
+Goodix Manager applies the packaged payload without downloading sources or
+requiring the build toolchain on the user machine.
 
 ### 15.2 Private and system libraries
 
@@ -1203,16 +1208,24 @@ claim of a byte-reproducible build or an exhaustive software bill of materials.
 
 ## 16. Installation, update, and rollback
 
-`install.sh` is the public entry point. It must be run by a normal user, resolves
-its own source directory, and invokes the build/install orchestrator. A read-only
-privileged host preflight precedes package installation. The build runs as the
-normal user, then a privileged apply phase revalidates host state and replaces the
-project-owned integration. No secret byte enters the clone or build output, and no
-phase opens USB. The package-manager step also
-uses sudo to install Fedora prerequisites.
+The signed RPM and Goodix Manager are the user-facing entry point. RPM owns the
+Manager, fixed helper and inactive compiled payload. Its transactions do not
+activate or remove the runtime, modify PAM, or initialize pairing. The GUI stays
+unprivileged; explicit Install/Apply Update actions use PolicyKit to invoke the
+fixed root-owned helper, which verifies package integrity and delegates to
+`deployment/install.py`. No source download or compilation occurs at activation.
+
+`install.sh` remains the optional source entry point. It resolves its own source
+directory, builds as the normal user and requests sudo for prerequisites and
+application. Both paths share the privileged apply phase that revalidates host
+state and replaces project-owned integration. No secret byte enters the clone
+or build output, and neither installation path opens USB.
 
 ```mermaid
 flowchart TD
+    RPM["RPM package and inactive local payload"] --> Manager["Explicit Manager Install/Apply Update<br/>PolicyKit authorization"]
+    Manager --> Preflight
+    Source["Optional source installation"] --> Material
     Material["Privileged read-only host state check"] --> Packages["Fedora prerequisites"]
     Packages --> Build["Normal-user source build<br/>and validation checks"]
     Build --> Preflight["Privileged host and authentication preflight"]
@@ -1264,7 +1277,8 @@ state metadata is revalidated under the lifecycle lock before replacement, and
 failure rolls back the software transaction. No preserved directory is recreated
 from a stale snapshot if it disappears during preparation.
 
-`--check` remains unprivileged and does not request sudo or install packages.
+The source installer's `--check` remains unprivileged and does not request sudo
+or install packages.
 The PAM selector
 separately checks the exact vendor, `password-auth`, and `postlogin` shapes at
 authentication time before it enables the fingerprint path.
@@ -1286,15 +1300,19 @@ A mask that predates the operation is preserved. A temporary mask created by the
 operation is removed only after its inode and target still prove ownership.
 Unknown ownership is retained and reported rather than deleted by assumption.
 
-Lifecycle tools do not enumerate the reader, open USB, send commands, initiate
+Installation and removal backends do not enumerate the reader, open USB, send commands, initiate
 capture, or start any post-install biometric action, whether or not the reader is
 connected. Stopping an already active daemon may allow that daemon to perform its
-normal cleanup.
+normal cleanup. The Manager detects reader presence from existing kernel sysfs
+metadata without opening the USB device.
 
 ### 16.3 Installed paths
 
 | Path | Owner and purpose |
 | --- | --- |
+| `/usr/bin/goodix-manager` | RPM-owned unprivileged GUI launcher |
+| `/usr/lib/goodix-manager/` | RPM-owned GUI, backend and inactive payload |
+| `/usr/libexec/goodix-manager-helper` | RPM-owned fixed PolicyKit entry point |
 | `/usr/local/lib64/goodix-27c6-5125/` | Private libfprint/biometric runtime, links, notices, and receipts |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Private runtime environment for stock fprintd |
 | `/var/lib/fprint/goodix-5125-state-v2/` | Preserved root-only crash-safe host pairing state |
@@ -1311,10 +1329,12 @@ Fedora to activate it.
 
 ### 16.4 Update and state retention
 
-The canonical `main` bootstrap fast-forwards an existing clean `main` clone
-or clones it when absent, then runs the same installer. The temporary porting
-branch is not an end-user installation channel. The installer reports
-`GOODIX_INSTALL_MODE` automatically:
+An RPM update replaces the Manager and its local payload while leaving the
+installed runtime unchanged. The Manager compares the verified runtime version
+with the local payload and offers Apply Update only for a newer driver. A
+packaging-only revision does not trigger a driver update; an unknown version or
+different source identity at the same version blocks it. The backend reports
+`GOODIX_INSTALL_MODE` for the software transaction:
 
 | Project software | Host pairing state | Mode |
 | --- | --- | --- |
@@ -1341,9 +1361,11 @@ current driver identity: users must enroll their desired fingers again.
 The migration code is covered by offline simulated tests, but a real populated
 2.x → 3.0.0 upgrade and failed-update rollback require separate
 live qualification before release. A clean installation is not evidence of
-that migration.
+that migration. The Manager therefore blocks direct legacy migration until it
+is qualified; it retains ordinary verified removal for recognized legacy software.
 
-The repository clone may be removed after successful installation; runtime and
+Neither the Manager nor its payload needs a source clone. For optional source
+installation, the clone may be removed afterwards; runtime and standalone
 removal commands are independent of it.
 
 ### 16.5 Rollback boundary
@@ -1376,6 +1398,12 @@ historical template files are preserved by project removal, but reuse is
 conditional on their compatibility with the selected old matcher.
 
 ## 17. Removal and emergency recovery
+
+Goodix Manager's Remove action delegates to the ordinary receipt-validating
+removal path and leaves the Manager package installed. Removing only the RPM
+leaves an activated runtime and its independently copied recovery CLI in place.
+RPM owns none of the active `/usr/local` runtime or recovery files and runs no
+uninstall scriptlet to remove them.
 
 Two standalone commands are installed because the safe choice depends on the
 integrity of the project installation.
