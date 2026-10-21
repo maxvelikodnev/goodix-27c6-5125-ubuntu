@@ -3,12 +3,20 @@
 
 ## Upstream projects
 
-This project builds on libfprint, fprintd, Linux-PAM, KDE Plasma, OpenCV, libgusb
-and OpenSSL, and on the work of their contributors and Fedora maintainers.
+This ChicagoHS branch builds on libfprint, fprintd, Linux-PAM, KDE Plasma,
+libgusb, OpenSSL and the open-source ChicagoHS backend, and on the work of
+their contributors and Fedora maintainers. OpenCV belonged to the historical
+SIGFM runtime and is not a dependency of the current ChicagoHS payload.
 
 [Rockytkg's Goodix project](https://github.com/Rockytkg/goodix-linux-27c6-5125)
-provided an **important** implementation reference and the reused matching and
-image-processing source described in [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
+provided an **important** historical SIGFM implementation reference and the
+reused device-configuration research described in
+[Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
+
+[Berke Kabagöz's ChicagoHS project](https://github.com/berkekbgz/libfprint-goodix-spi)
+provides the current native biometric backend (calibration, preprocessing,
+feature extraction, enrollment, and matching), imported at the pinned source
+revision and retaining its original copyright notices.
 The projects remain independently maintained and may differ in scope and
 behavior. Original copyright notices are retained.
 
