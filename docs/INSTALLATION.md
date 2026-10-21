@@ -1,18 +1,22 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # ChicagoHS: installation and updates
 
-This branch targets **Fedora 44 KDE x86_64**, Goodix USB `27c6:5125`, and
-APP12509/APP12508 firmware. An initial supervised live functional check
-has passed on one reader in a Fedora KDE VM; see the precise evidence and
+The canonical Goodix driver targets **Fedora 44 KDE x86_64**, Goodix USB
+`27c6:5125` and APP12509/APP12508 firmware. The ChicagoHS engine supersedes
+the earlier SIGFM engine in the planned 3.0.0 release; it is **not** a
+separately maintained edition. An initial supervised live functional check
+passed on one reader in a Fedora KDE VM; see the precise evidence and
 remaining limitations in [Validation](VALIDATION.md). Start software-only
-installation and recovery checks without USB passthrough. The historical
-SIGFM driver on `main` remains the recovery baseline.
+installation and recovery checks without USB passthrough.
 
 ## Install, update or reinstall
 
-Use the same command for first installation, update and reinstall. Existing
-clones must already select `porting_ChicagoHS`; the block preserves other branches.
-Run as your ordinary administrative user. Git must already be available.
+Use the same command for first installation, update and reinstall **after
+the 3.0.0 ChicagoHS code has been merged into `main`**. The stable public
+installation source is `main`; the temporary porting branch is not a user
+installation or maintenance channel. Existing clones must select `main`;
+the block never switches a user's working branch automatically. Run as
+your ordinary administrative user. Git must already be available.
 
 ```bash
 (
@@ -24,13 +28,13 @@ if [ -d "$REPO/.git" ] && [ ! -L "$REPO" ]; then
         https://github.com/sorguido/goodix-27c6-5125.git|git@github.com:sorguido/goodix-27c6-5125.git) ;;
         *) echo "STOP: $REPO is not the Goodix Git repository."; exit 1 ;;
     esac
-    if [ "$(git -C "$REPO" branch --show-current)" != "porting_ChicagoHS" ]; then
-        echo "STOP: select a separate ChicagoHS clone; the current branch is preserved."
+    if [ "$(git -C "$REPO" branch --show-current)" != "main" ]; then
+        echo "STOP: use a clean main clone for canonical installation; the current branch is preserved."
         exit 1
     fi
     git -C "$REPO" pull --ff-only
 elif [ ! -e "$REPO" ] && [ ! -L "$REPO" ]; then
-    git clone --branch porting_ChicagoHS --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
+    git clone --branch main --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
 else
     echo "STOP: $REPO exists but is not the Goodix Git repository."
     exit 1
@@ -55,14 +59,29 @@ and installs `goodix-uninstall` and `goodix-force-remove`. It checks the stock
 fprintd ABI and dependency resolution. Installation never opens USB or starts an
 authentication action. After success the source clone may be removed.
 
-An existing recognized SIGFM or Milan installation is removed through the same
-owned-software transaction before ChicagoHS installation. Failure restores the
-previous project software when possible. A damaged or unrecognized receipt fails
-closed; use `goodix-force-remove`, follow its restart instruction and reinstall.
+### Upgrade from SIGFM 2.x to ChicagoHS 3.0.0
+
+The major upgrade changes the biometric engine and stored template format.
+Every user will have to **enroll each desired finger again**. Existing
+SIGFM/GSF1 templates remain on disk but are incompatible with ChicagoHS;
+the installer does not convert or delete them. The pairing state and
+password fallback remain preserved.
+
+An existing **recognized** SIGFM or Milan installation is designed to be
+removed automatically inside the same controlled, transactional update before
+the ChicagoHS software is installed. Failure restores the previous project
+software when possible. Therefore **manual uninstallation is not normally
+required**, but a populated real SIGFM → ChicagoHS upgrade and rollback are
+still pending live qualification before the 3.0.0 release. An unrecognized,
+partial or drifted installation must stop rather than be forcibly overwritten;
+use the documented emergency recovery path as appropriate.
+
 The installer preserves fingerprint templates and
-`/var/lib/fprint/goodix-5125-state-v2/`, including host pairing state. Reinstall
-also preserves them. No automatic deletion or conversion of historical templates
-is performed.
+`/var/lib/fprint/goodix-5125-state-v2/`, including host pairing state.
+Reinstallation also preserves them. Historical SIGFM can be obtained from
+[versioned releases](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1),
+**not** from the post-merge `main` branch. The downgrade procedure is in
+[Uninstall and emergency recovery](UNINSTALL.md).
 
 ## Checks and software-only VM qualification
 
