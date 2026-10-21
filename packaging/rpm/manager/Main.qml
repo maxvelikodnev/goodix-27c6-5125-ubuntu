@@ -124,16 +124,16 @@ Kirigami.ApplicationWindow {
                             Accessible.ignored: true
                         }
                         Kirigami.Heading { color: window.inkColor; text: info.busy ? "Working on your driver" : info.title; level: 2; font.pointSize: 17; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                        Controls.BusyIndicator { running: info.busy && info.operation === "status"; visible: running; implicitWidth: 30; implicitHeight: 30 }
+                        Controls.BusyIndicator {
+                            objectName: "driverBusyIndicator"
+                            running: info.busy
+                            visible: running
+                            implicitWidth: 44
+                            implicitHeight: 44
+                            Accessible.name: info.notice
+                        }
                     }
                     Controls.Label { text: info.notice; wrapMode: Text.WordWrap; Layout.fillWidth: true; Accessible.role: Accessible.StaticText }
-                    Controls.ProgressBar {
-                        objectName: "driverProgress"
-                        Layout.fillWidth: true
-                        visible: window.driverOperationActive
-                        indeterminate: true
-                        Accessible.name: info.notice
-                    }
                     Controls.Label {
                         text: "Do not close Goodix Manager or interrupt the operation."
                         visible: window.driverOperationActive

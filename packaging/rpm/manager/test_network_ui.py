@@ -394,7 +394,7 @@ class NetworkUiTests(unittest.TestCase):
                     self.assertNotIn('current', controller.view['remoteMessage'].lower())
                 self.capture(window, 'indicator-' + expected)
 
-    def test_driver_progress_and_cleanup_for_all_lifecycle_results(self):
+    def test_driver_spinner_and_cleanup_for_all_lifecycle_results(self):
         cases = {
             'install': ('install', status(state='absent', runtime_version=None, message_code='not_installed')),
             'update': ('update', status(runtime_version='2.9.0', message_code='update_available')),
@@ -407,14 +407,17 @@ class NetworkUiTests(unittest.TestCase):
                 with self.subTest(action=name, result=result):
                     SyntheticProcess.delay_ms = 0
                     controller, window = self.client(local)
-                    progress = window.findChild(QObject, 'driverProgress')
-                    self.assertFalse(progress.property('visible'))
+                    spinner = window.findChild(QObject, 'driverBusyIndicator')
+                    self.assertFalse(spinner.property('visible'))
+                    self.assertFalse(spinner.property('running'))
+                    self.assertFalse(any('ProgressBar' in obj.metaObject().className()
+                                         for obj in window.findChildren(QObject)))
                     SyntheticProcess.responses[action] = status(result=result, message_code='ready')
                     SyntheticProcess.delay_ms = None  # Complete only after inspecting the active UI.
                     controller.perform(action)
                     self.app.processEvents()
-                    self.assertTrue(progress.property('visible'))
-                    self.assertTrue(progress.property('indeterminate'))
+                    self.assertTrue(spinner.property('visible'))
+                    self.assertTrue(spinner.property('running'))
                     self.assertTrue(self.item(window, controller.notice).property('visible'))
                     self.assertTrue(self.item(window, 'Do not close Goodix Manager or interrupt the operation.').property('visible'))
                     for label in ('Verify status', 'Remove', 'Upgrade to 3.0.0' if name == 'legacy'
@@ -422,7 +425,7 @@ class NetworkUiTests(unittest.TestCase):
                         self.assertFalse(self.item(window, label).property('enabled'))
                     self.assertNotIn('%', controller.notice)
                     if result == 'success':
-                        self.capture(window, 'progress-' + name)
+                        self.capture(window, 'spinner-' + name)
                     self.assertFalse(window.close(), 'Lifecycle must reject closing the window')
                     busy_dialog = next(obj for obj in window.findChildren(QObject)
                                        if obj.property('title') == 'Operation in progress')
@@ -430,7 +433,8 @@ class NetworkUiTests(unittest.TestCase):
                     QMetaObject.invokeMethod(busy_dialog, 'close')
                     controller.process.complete()
                     self.wait_for(lambda: not controller.busy)
-                    self.assertFalse(progress.property('visible'))
+                    self.assertFalse(spinner.property('visible'))
+                    self.assertFalse(spinner.property('running'))
                     self.assertFalse(self.item(window, 'Do not close Goodix Manager or interrupt the operation.').property('visible'))
                     self.assertTrue(self.item(window, controller.notice).property('visible'))
                     self.assertTrue(self.item(window, 'Verify status').property('enabled'))
@@ -440,23 +444,29 @@ class NetworkUiTests(unittest.TestCase):
                     self.assertIn('"sensor_present": false', self.app.clipboard().text())
                     self.assertTrue(window.close(), 'Completed operation must allow closing')
 
-    def test_status_and_failed_process_never_leave_driver_progress_active(self):
+    def test_status_spinner_and_failed_process_cleanup(self):
         controller, window = self.client(status(state='absent', runtime_version=None))
-        progress = window.findChild(QObject, 'driverProgress')
+        spinner = window.findChild(QObject, 'driverBusyIndicator')
         SyntheticProcess.delay_ms = None
         controller.refresh()
         self.app.processEvents()
         self.assertTrue(controller.busy)
-        self.assertFalse(progress.property('visible'), 'Status must not display installation progress')
+        self.assertTrue(spinner.property('visible'))
+        self.assertTrue(spinner.property('running'))
+        self.assertFalse(self.item(window, 'Do not close Goodix Manager or interrupt the operation.').property('visible'))
         controller.process.complete()
         self.wait_for(lambda: not controller.busy)
+        self.assertFalse(spinner.property('visible'))
+        self.assertFalse(spinner.property('running'))
         SyntheticProcess.responses['install'] = status()
         controller.perform('install')
-        self.assertTrue(progress.property('visible'))
+        self.assertTrue(spinner.property('visible'))
+        self.assertTrue(spinner.property('running'))
         controller.process.errorOccurred.emit(QProcess.ProcessError.FailedToStart)
         self.app.processEvents()
         self.assertFalse(controller.busy)
-        self.assertFalse(progress.property('visible'))
+        self.assertFalse(spinner.property('visible'))
+        self.assertFalse(spinner.property('running'))
         self.assertTrue(self.item(window, controller.notice).property('visible'))
         self.assertEqual(controller.last_result, 'helper_unavailable')
 

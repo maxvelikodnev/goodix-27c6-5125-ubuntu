@@ -10,7 +10,7 @@ os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from main import Controller, load_interface
 from model import Status
-from PySide6.QtCore import QObject, QMetaObject, QTimer, qInstallMessageHandler
+from PySide6.QtCore import QObject, QMetaObject, QPointF, QRect, QSize, QTimer, qInstallMessageHandler
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
@@ -88,9 +88,11 @@ def main():
                         if obj.property('text') == 'Apply Update')
     notice_label = next(obj for obj in window.findChildren(QObject)
                         if obj.property('text') == backend.notice)
-    progress = window.findChild(QObject, 'driverProgress')
+    spinner = window.findChild(QObject, 'driverBusyIndicator')
+    assert not any('ProgressBar' in obj.metaObject().className() for obj in window.findChildren(QObject))
     indicator = window.findChild(QObject, 'softwareUpdatesIndicator')
     results = {}
+    spinner_frames = {}
     failures = []
 
     def save(name, dark):
@@ -99,14 +101,20 @@ def main():
             assert window.property(name_in_qml) == expected.color(getattr(QPalette.ColorRole, role)), name_in_qml
         assert notice_label.property('color') == expected.color(QPalette.ColorRole.WindowText)
         assert indicator.property('color') == expected.color(QPalette.ColorRole.Mid)
-        assert progress.property('visible') == backend.busy
-        assert progress.property('indeterminate') is True
+        assert spinner.property('visible') == backend.busy
+        assert spinner.property('running') == backend.busy
+        assert spinner.width() == spinner.height() == 44
         if not backend.busy:
             assert apply_button.property('contentItem').property('color') == expected.color(QPalette.ColorRole.ButtonText)
         assert contrast(window.property('inkColor'), window.property('cardColor')) >= 7
         assert contrast(window.property('inkColor'), window.property('surfaceColor')) >= 7
         picture = window.grabWindow()
         assert not picture.isNull()
+        if backend.busy:
+            position = spinner.mapToScene(QPointF(0, 0)).toPoint()
+            bounds = QRect(position, QSize(44, 44))
+            assert picture.rect().contains(bounds), 'Active spinner must fit the window'
+            spinner_frames[name] = picture.copy(bounds)
         if args.render_dir:
             args.render_dir.mkdir(parents=True, exist_ok=True)
             assert picture.save(str(args.render_dir / ('manager-' + name + '.png')))
@@ -126,6 +134,7 @@ def main():
         lambda: save('dark', True),
         lambda: set_busy(True),
         lambda: save_disabled('dark-disabled', True),
+        lambda: save_disabled('dark-disabled-next-frame', True),
         lambda: app.setPalette(system_palette(False)),
         lambda: save_disabled('light-disabled-live', False),
         lambda: set_busy(False),
@@ -134,6 +143,11 @@ def main():
         lambda: save('compact-light', False),
         lambda: app.setPalette(system_palette(True)),
         lambda: save('compact-dark-live', True),
+        lambda: set_busy(True),
+        lambda: save_disabled('compact-dark-active', True),
+        lambda: app.setPalette(system_palette(False)),
+        lambda: save_disabled('compact-light-active', False),
+        lambda: set_busy(False),
     ]
 
     def set_busy(value):
@@ -152,7 +166,7 @@ def main():
 
     def compact():
         window.setWidth(520)
-        window.setHeight(640)
+        window.setHeight(560)
 
     def advance():
         try:
@@ -170,13 +184,14 @@ def main():
     app.exec()
     if failures:
         raise failures[0]
-    assert not steps and len(results) == 10, 'Incomplete render sequence'
+    assert not steps and len(results) == 13, 'Incomplete render sequence'
+    assert spinner_frames['dark-disabled'] != spinner_frames['dark-disabled-next-frame'], 'Native spinner must animate'
     assert results['light'] != results['dark'], 'System palettes must differ'
     # Focus moves after the confirmation dialog; compare the restored background,
     # while save() already checked every bound palette role after the live change.
     assert results['light'].pixelColor(4, 100) == results['light-live'].pixelColor(4, 100)
     assert results['compact-light'].width() == 520
-    print('PASS: system light/dark, live palette changes, dialogs, disabled controls and compact QML render; no host theme, privileged or network changes')
+    print('PASS: system light/dark, live palette changes, dialogs, disabled controls, animated 44px spinner and compact QML render; no host theme, privileged or network changes')
     return 0
 
 

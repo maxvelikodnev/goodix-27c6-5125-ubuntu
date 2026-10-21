@@ -5,6 +5,13 @@
   "candidate": "ChicagoHS",
   "phase": "RPM_DISTRIBUTION",
   "phase_status": "UI_REFINEMENT_OFFLINE_PASS_AWAITING_OPERATOR_VM",
+  "manager_ui_correction": {
+    "operation_indicator": "QT_BUSY_INDICATOR_44PX; NO_PROGRESS_BAR",
+    "verification": "PASS_QT_ANIMATION_LIFECYCLE_CLEANUP_LIGHT_DARK_COMPACT",
+    "packaging": "NOT_REBUILT; LAST_SIGNED_RPM_3.0.0-12_PREDATES_SPINNER_CORRECTION",
+    "kde_vm": "NOT_TESTED_FOR_THIS_CORRECTION",
+    "report": "development/rpm/reports/restore-spinner/REPORT.md"
+  },
   "software_rc_ready_for_vm": "PASS",
   "completed_gates": [
     "CH0_SOURCE_BASELINE",
