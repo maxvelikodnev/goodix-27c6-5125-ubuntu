@@ -10,20 +10,26 @@ reader was passed through to a Fedora VM and also used with a Windows VM.
 Software installation and removal were separately exercised on an isolated
 Fedora VM without reader access.
 
-Those installation observations concern the source-based CLI. The operator also
-reports successful RPM installation and the application icon in KDE. The signed
-RPM and Goodix Manager have offline build, payload, signature and UI checks;
-interactive PolicyKit migration and the complete RPM lifecycle still require
-their own VM qualification. Fedora 45 is not qualified; the package targets
-Fedora 44 x86_64. These boundaries also apply to the RPM installation guidance.
+The full source-based CLI installation/recovery observations must be distinguished
+from the newer RPM/Manager path. The operator reports that a signed local RPM
+installed successfully through Discover, that the Goodix icon appeared in KDE,
+and that ordinary driver removal through Goodix Manager succeeded (PASS).
+Screenshots additionally show recognition of an installed SIGFM 2.2.1 driver
+with an upgrade offered, and subsequently a 3.0.0 driver status. Those screens
+alone do not establish a complete, recorded 2.x -> 3.0.0 migration sequence,
+a post-upgrade reboot/login, or byte-for-byte preservation of populated pairing
+state and templates. Interactive migration/rollback and the complete RPM
+lifecycle remain separate qualification checks. Fedora 45 is not qualified;
+the package targets Fedora 44 x86_64.
 
-Driver qualification, historical CLI recognition and Manager migration are
-separate claims. A recognized 2.x installation can use the direct transactional
-Manager upgrade; qualification on a real populated installation, including
-rollback and preservation, remains required before release. Synthetic checks of
-a future 3.0.1 API response and local package exercise update continuity without
-publishing that release. They do not claim public GitHub availability or replace
-the real 2.x migration check; an additional 3.0.1 VM exercise is a separate test.
+The maintainer considers the 3.0.0 biometric driver qualified. Driver acceptance,
+historical CLI recognition, and RPM/Manager migration remain distinct evidence
+categories. Synthetic tests cover recognized 2.2.1 -> 3.0.0 transitions,
+historical ChicagoHS CLI receipts, and a fictional GitHub 3.0.1 release/local
+update. These are software-contract results, not a published 3.0.1 release
+or a populated-device migration with independently recorded preservation and
+rollback. An additional 3.0.1 VM run is not required to run those synthetic
+checks, but operator VM qualification of the real 2.x migration remains open.
 
 These results supplement offline build and biometric corpus checks. They
 do not establish FAR/FRR, liveness, multi-reader compatibility or exhaustive
@@ -38,8 +44,9 @@ undergone this reader's full biometric qualification.
 | Sensor binding | CRC-checked A6 OTP source; opaque 16-byte identity and full OTP SHA-256 envelope; malformed/mismatch rejection | Enrollment, reboot and limited Windows/Linux switching operated on one reader | Cross-device uniqueness, stability across more units and failure histories |
 | Templates and users | Backend identity separation; stock fprintd per-user galleries; historical files preserved by recovery | One local user/finger was enrolled and verified after reboot | Multiple real users/fingers, corrupted gallery live paths, partial-input behavior |
 | USB/TLS and pairing | Existing APP12509/APP12508 transport contracts and offline error/cleanup tests | First-use enrollment from empty host pairing state, reboot and bounded Windows/Linux ping-pong passed as reported by operator | Review live audit for E0/readback/TLS invariants; fault/recovery/timeout and APP12508 ChicagoHS |
-| Installer | Canonical source build and payload validation; simulated install/update/reinstall/rollback, including SIGFM receipt migration | FIRST_INSTALL, UPDATE, reinstall, source identity and SELinux Enforcing verified in clean Fedora VM | Real 2.x → 3.0.0 update with preexisting templates/pairing material, failed update and rollback |
-| Removal | Simulated normal and emergency removal, damaged/missing receipts, state/template preservation | Normal remove and recovery from TTY succeeded; subsequent password login and vendor fprintd restored | Real damaged-install recovery; byte-for-byte before/after comparison of preexisting templates/host state |
+| Installer | Canonical source build and payload validation; simulated install/update/reinstall/rollback, including SIGFM receipt migration | FIRST_INSTALL, UPDATE, reinstall, source identity and SELinux Enforcing verified in clean Fedora VM via CLI | Real 2.x -> 3.0.0 RPM/Manager migration with populated pairing/templates, failed update and rollback |
+| Signed RPM / Goodix Manager | Offline packaging/signature checks and synthetic future-release continuity | Operator reports local Discover install PASS, installed KDE icon, 2.2.1 detection and upgrade offer, later 3.0.0 status | Complete interactive RPM migration and subsequent password/reboot verification, with protected-state comparison |
+| Removal | Simulated normal and emergency removal, damaged/missing receipts, state/template preservation | CLI normal remove/TTY recovery with password and vendor fprintd restored; operator additionally reports ordinary Goodix Manager **Remove PASS** | Real damaged-install recovery; byte-for-byte before/after comparison of preexisting templates/host state |
 | Desktop integration | PAM selector and stock fprintd ABI/dependency checks | KScreenLocker, sudo, PolicyKit, Plasma Login, reboot login, three failed fingerprint attempts then password fallback PASS | Broader policy/system versions and repeated cold-start latency/reliability |
 
 The existing private CH0 corpus established 35/35 admissions, twelve enrollment
@@ -54,9 +61,15 @@ OTP and also binds the print envelope to the full OTP SHA-256. This is not a
 claim that a sixteen-byte prefix alone proves physical uniqueness. Missing,
 invalid or mismatched binding fails closed; no synthetic sensorID, Windows file,
 alternate matcher or diagnostic-only flag is accepted in production.
-The table distinguishes reported, bounded live observations from contracts
-supported only by software checks. A successful initial live path is not a
-general release qualification or proof of every fail-closed recovery path.
+The table distinguishes reported operator observations from software-only
+contracts. A successful initial live path is not a general accuracy or
+fail-closed recovery qualification. The 3.0.0 architecture retains Fedora's
+stock fprintd/PAM/KDE consumers and the same project-owned Plasma Login PAM
+selector and fprintd systemd library drop-in used in 2.x. It replaces the
+private SIGFM/OpenCV matcher with ChicagoHS and removes the previous SELinux
+huge-page `dontaudit` module. Restored SELinux audit visibility does not
+prove absence of all AVCs. No measured improvement in cold-login behavior is
+claimed.
 
 ## Offline evidence and reproducible checks
 
@@ -68,13 +81,20 @@ python3 -B deployment/test_install.py
 python3 -B deployment/test_install_selection.py
 python3 -B deployment/test_bootstrap.py
 python3 -B deployment/recovery/test_remove.py
+python3 -B packaging/rpm/test_helper.py
+python3 -B packaging/rpm/test_compat_transactions.py
+python3 -B packaging/rpm/manager/test_model.py
+python3 -B packaging/rpm/manager/test_network_ui.py
+python3 -B packaging/rpm/test_verify_release.py
 ```
 
-Builder tests use synthetic compiler/package output to exercise contract errors.
-Deployment/recovery tests use temporary directories and mocked host operations;
-they neither install on the owner host nor prove Fedora runtime behavior. A real
-canonical build validates actual C compilation, shared-library ABI and dependency
-resolution independently of those fixtures. See [production](../production/README.md).
+Builder tests use synthetic compiler/package output. Deployment/recovery and
+RPM compatibility tests use isolated fixtures/mocked host operations; they do
+not perform a real system migration or independently prove password login and
+protected-data preservation. The synthetic publication/signature contracts
+do not prove public GitHub asset availability. A real canonical build validates
+C compilation, shared-library ABI and dependency resolution independently.
+See [production](../production/README.md) and [RPM packaging](../packaging/rpm/README.md).
 
 ## Installation and live-device qualification
 
@@ -94,10 +114,14 @@ of the hardware tests were not supplied with this documentation revision.
 For reproducible software-only validation, leave USB passthrough disabled,
 follow the [documented RPM procedure](INSTALLATION.md), then exercise
 Manager update, reinstall, package removal and both [removal/recovery](UNINSTALL.md)
-paths. Record these RPM results separately from the earlier CLI observations. Preserve
-password access. For preservation claims involving previously populated
-templates or host state, collect and compare authorized protected before/after
-evidence; a clean VM does not demonstrate byte-level preservation.
+paths. Record RPM results separately from CLI observations. The operator has
+reported ordinary Manager removal PASS; no claim is made here about every
+failure/rollback or removal of damaged software through the GUI. Preserve
+password access. Without actual pre-populated pairing state and templates,
+a clean VM cannot establish their byte-for-byte preservation. KDE Discover's
+local-RPM page also showed a generic icon and unknown author despite the
+correct installed KDE icon; the KDE menu's Uninstall action could not resolve
+the local AppStream package. These are UI observations, not driver failures.
 
 Additional live qualification requires supervised authorization and should
 cover sensor binding stability and cross-device separation, multiple users and

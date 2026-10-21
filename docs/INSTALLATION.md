@@ -73,7 +73,12 @@ driver, modify PAM or pairing state, or start a fingerprint action.
 Discover 6.7.5's local-RPM page may show a generic icon and “Unknown author” even for
 this correctly signed package; its local-file view does not use the embedded
 application metadata. See the [Discover metadata limitation](../packaging/rpm/README.md#discover-metadata-and-system-appearance).
-The KDE menu and Manager use the installed Goodix icon.
+The KDE menu and Manager use the installed Goodix icon. On the observed KDE
+configuration, the application menu's **Uninstall** action could not resolve
+the locally installed package in Discover. To remove only the Manager RPM,
+use `sudo dnf remove goodix-manager`; this does not remove an activated
+Goodix driver. To remove the driver, use **Remove** in Goodix Manager or the
+normal `goodix-uninstall` command. Do not confuse the two operations.
 
 Open **Goodix Manager** from the KDE application menu. With no driver installed,
 choose **Install** and approve the PolicyKit authorization. For an update, install

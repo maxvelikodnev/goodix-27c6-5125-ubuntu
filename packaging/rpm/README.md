@@ -64,6 +64,13 @@ menu and Manager use the installed icon. See the upstream
 and [AppStream resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/AppPackageKitResource.cpp).
 Changing RPM publisher fields or duplicating AppStream fields does not change
 that local-file path. Signature verification remains a separate trust check.
+On the tested KDE installation, the application's menu **Uninstall** entry
+also opened an unresolved Discover AppStream URL for the locally installed
+RPM. Use `sudo dnf remove goodix-manager` for the Manager package; it does
+not remove an active driver, which retains its own ordinary **Remove** /
+`goodix-uninstall` lifecycle. The operator reports successful ordinary
+driver removal through Goodix Manager (PASS), not a complete damaged-state
+or rollback qualification.
 
 The Manager follows the system light or dark palette without an application
 theme selector. Palette changes take effect while the window is open when the
