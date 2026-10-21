@@ -2,7 +2,9 @@
 # Documentation index
 
 This page is the complete thematic index for the Goodix `27c6:5125` Fedora KDE
-project.
+project. It describes the canonical ChicagoHS implementation intended for
+`main` with the planned 3.0.0 release; SIGFM is retained in historical
+versioned source, not as a parallel current engine.
 
 ## Quick access
 
