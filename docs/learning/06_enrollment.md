@@ -67,17 +67,12 @@ the reader:
 - The driver does not bypass image-quality or position rules to force
   a completed enrollment, nor does it reinterpret rejected images as valid.
 
-The CH0 offline corpus completed twelve policy stages in twenty contacts.
-The subsequent initial live test through KDE also completed the enrollment;
-some strongly shifted touches produced normal requests to reposition.
-These limited results do not prove that every possible finger will enroll
-reliably or establish statistical biometric accuracy.
-
-For historical context only, the prior **SIGFM** driver from older tagged
-releases (such as `v2.2.1`) used a fixed-21 accepted-sample policy and
-measured three all-zero scoring probes
-among 100 in one qualification set (3.00%). That statistic does **not**
-describe the current engine and must not be used to estimate its error rate.
+A request to reposition the finger is normal feedback. The visible progress
+does not necessarily advance after every physical touch, and a successful
+enrollment may therefore take more than twelve contacts. The distinction
+between policy stages and physical touches matters more than the count alone.
+Evidence and limitations of the tested reader are recorded in
+[Validation](../VALIDATION.md).
 
 ## Why lifting the finger matters
 
@@ -139,7 +134,7 @@ preserve the user's templates for later reinstallation.
 > [`goodix-chicago-enrollment.c`](../../production/chicago-native/chicago/goodix-chicago-enrollment.c).
 > The device's protocol-stage model remains in
 > [`goodix_enrollment_model.c`](../../libfprint-driver/goodix_enrollment_model.c);
-> the historical SIGFM diversity helper is not the current
+> the earlier diversity helper does not determine the current
 > admission policy.
 
 ## ✅ What to remember
