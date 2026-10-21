@@ -102,7 +102,7 @@ unlimited pictures while you hold the finger in place.
 
 ## What happens when a sample is poor or repetitive?
 
-Three outcomes are easy to confuse:
+Four outcomes are easy to confuse:
 
 - **accepted:** the contact has usable fingerprint features and the native
   position policy advances one of the twelve stages;
