@@ -43,8 +43,8 @@ sensor.
 The current driver uses the same-session no-finger `FDT_B0` image as the
 input to calibration generation. The native biometric engine
 generates gain/offset state and processes the 80×64 unsigned 12-bit finger
-raster with its own native preprocessing. It is not fed the old SIGFM
-8-bit normalization output. A separate 8-bit rendering, if supplied to
+raster with its own native preprocessing. The display-ready 8-bit image
+is not an input to the biometric matcher. A separate 8-bit rendering, if supplied to
 libfprint, is for display and is not the matching input.
 
 This is closer to preparing a scanned page before optical character recognition
@@ -57,8 +57,7 @@ results, but not proven physically identical across devices.
 
 The matcher extracts **native feature records** from each processed
 finger image. These records are used to construct subtemplates with the native
-Type 24 enrollment and matching policy. This is not the old SIGFM
-keypoint-and-descriptor format; the native feature format and its scoring
+Type 24 enrollment and matching policy. The feature format and its scoring
 must not be reduced to an ordinary pixel-by-pixel image comparison.
 
 Many fingerprint explanations use the word **minutiae** for ridge endings and
@@ -80,7 +79,8 @@ The template is not meant to be a normal photograph. `libfprint` serializes
 the native Type 24 representation within a RAW FpPrint envelope,
 including its backend identity and OTP-bound device information. The raw
 fingerprint raster is not the normal stored identity record. Historical
-SIGFM and Milan templates are incompatible and remain in separate galleries.
+Templates made by older biometric engines are preserved but cannot be
+matched or converted by the current implementation.
 
 This does not make templates harmless. A biometric template is sensitive
 personal data and must not be published, attached to bug reports, or committed
@@ -130,7 +130,7 @@ The sensor does not receive a list of local Linux users and does not choose one.
 - Pixel-for-pixel comparison would be too fragile.
 - Preprocessing prepares the image; it does not identify the user.
 - The stored representation is native Type 24 subtemplates,
-  not the historical SIGFM keypoint-and-descriptor format.
+  rather than an ordinary grayscale image or classic minutiae list.
 - Enrollment can retain more subtemplates than the twelve stages it advances.
 - The native matcher applies its original scoring and decision
   without relaxing quality or matching conditions.
