@@ -91,21 +91,31 @@ Report the result, exact error, failure point and whether password login and the
 desktop work. Do not send protected files, templates or fingerprint images.
 [Validation scope](VALIDATION.md) records the current evidence and limitations.
 
-## Return from ChicagoHS to SIGFM
+## Optional downgrade to a historical SIGFM release
 
-Remove ChicagoHS with `goodix-uninstall`, or use `goodix-force-remove` for damaged
-software. Follow the restart instruction and verify password login. Then use a
-separate clean `main` clone and its ordinary installer:
+ChicagoHS is the canonical engine of the planned version 3.0.0 and subsequent
+`main` releases. SIGFM is **not** a parallel active branch or an automatic
+fallback. A deliberate downgrade, when needed for diagnosis or recovery, must
+select a **pinned historical release**, such as the existing
+[`v2.2.1` tag](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
+
+Remove ChicagoHS with `goodix-uninstall`, or use `goodix-force-remove` for
+damaged software. Follow the restart instruction and confirm password login.
+Then use a **separate clean checkout** of the historical version:
 
 ```bash
-git clone --branch main --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$HOME/goodix-5125-sigfm"
-cd "$HOME/goodix-5125-sigfm"
+git clone --branch v2.2.1 --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$HOME/goodix-5125-sigfm-v2.2.1"
+cd "$HOME/goodix-5125-sigfm-v2.2.1"
 ./install.sh
 ```
 
-Choose a new destination if that directory exists. No library is copied manually.
-The ChicagoHS remover accepts current ChicagoHS, legacy Milan and SIGFM receipts;
-remove ChicagoHS before installing SIGFM so an older remover need not interpret a
-new receipt. Historical templates remain on disk. Enroll again with SIGFM only if
-no valid SIGFM enrollment remains. Private captures and calibration are outside
+Choose a new destination if that directory exists. No library is copied
+manually. The ChicagoHS remover accepts ChicagoHS, legacy Milan and SIGFM
+receipts; remove ChicagoHS **before** installing historical SIGFM because
+the older installer/remover is not guaranteed to understand a newer runtime.
+Historical templates remain on disk and are usable only when compatible with
+the selected old driver and reader. Enroll again with SIGFM only if no valid
+SIGFM enrollment remains. Keep password authentication available and do not
+assume this optional downgrade has been qualified as a real-device 3.0.0
+recovery until it is tested. Private captures and calibration are outside
 software removal. There is no purge command or automatic biometric deletion.
