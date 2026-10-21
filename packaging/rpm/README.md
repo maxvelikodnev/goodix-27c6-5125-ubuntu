@@ -58,7 +58,7 @@ application theme selector.
 At startup the GUI asynchronously checks the official GitHub stable Release API.
 It compares the verified local Manager package and public versions numerically. Only a
 matching Fedora/architecture RPM asset produces a download action. The flow is
-**Download update → Discover → reopen Manager → Apply Update**; no remote code
+**Download RPM → verify its signature → Discover → reopen Manager → Apply Update**; no remote code
 is executed by the helper. Prereleases, malformed replies, missing compatible
 RPMs, rate limits and offline failures do not disable local operations.
 The UI distinguishes an unavailable check, no compatible public release and a

@@ -13,6 +13,7 @@ Kirigami.ApplicationWindow {
     minimumHeight: 560
     property var info: backend.view
     property string requestedAction: ""
+    readonly property bool driverOperationActive: info.busy && ["install", "update", "remove"].indexOf(info.operation) !== -1
     // Bind all system groups at startup and on paletteChanged; no application theme override.
     SystemPalette { id: systemPalette; colorGroup: SystemPalette.Active }
     SystemPalette { id: inactivePalette; colorGroup: SystemPalette.Inactive }
@@ -123,9 +124,22 @@ Kirigami.ApplicationWindow {
                             Accessible.ignored: true
                         }
                         Kirigami.Heading { color: window.inkColor; text: info.busy ? "Working on your driver" : info.title; level: 2; font.pointSize: 17; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                        Controls.BusyIndicator { running: info.busy; visible: info.busy; implicitWidth: 30; implicitHeight: 30 }
+                        Controls.BusyIndicator { running: info.busy && info.operation === "status"; visible: running; implicitWidth: 30; implicitHeight: 30 }
                     }
                     Controls.Label { text: info.notice; wrapMode: Text.WordWrap; Layout.fillWidth: true; Accessible.role: Accessible.StaticText }
+                    Controls.ProgressBar {
+                        objectName: "driverProgress"
+                        Layout.fillWidth: true
+                        visible: window.driverOperationActive
+                        indeterminate: true
+                        Accessible.name: info.notice
+                    }
+                    Controls.Label {
+                        text: "Do not close Goodix Manager or interrupt the operation."
+                        visible: window.driverOperationActive
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
                     GridLayout {
                         columns: 2
                         columnSpacing: 26
@@ -133,12 +147,10 @@ Kirigami.ApplicationWindow {
                         Layout.fillWidth: true
                         Controls.Label { text: "Installed driver"; opacity: 0.7 }
                         Controls.Label { text: info.runtime; Layout.fillWidth: true; wrapMode: Text.Wrap }
-                        Controls.Label { text: "Local payload"; opacity: 0.7 }
+                        Controls.Label { text: "This RPM"; opacity: 0.7 }
                         Controls.Label { text: info.payload }
                         Controls.Label { text: "Manager package"; opacity: 0.7 }
                         Controls.Label { text: info.package; Layout.fillWidth: true; wrapMode: Text.Wrap }
-                        Controls.Label { text: "USB reader"; opacity: 0.7 }
-                        Controls.Label { text: info.sensor }
                     }
                     Kirigami.InlineMessage {
                         Layout.fillWidth: true
@@ -185,7 +197,15 @@ Kirigami.ApplicationWindow {
                     spacing: Kirigami.Units.largeSpacing
                     RowLayout {
                         Layout.fillWidth: true
-                        Kirigami.Heading { color: window.inkColor; text: info.remoteAvailable ? "New version available · " + info.remoteVersion : "Public releases"; level: 3; font.pointSize: 15; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        Rectangle {
+                            objectName: "softwareUpdatesIndicator"
+                            implicitWidth: 10
+                            implicitHeight: 10
+                            radius: 5
+                            color: info.remoteState === "current" ? "#27ae60" : info.remoteState === "available" ? "#e5a24b" : window.lineColor
+                            Accessible.ignored: true
+                        }
+                        Kirigami.Heading { color: window.inkColor; text: "Software Updates"; level: 3; font.pointSize: 15; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                         Controls.BusyIndicator { running: info.remoteChecking; visible: info.remoteChecking; implicitWidth: 24; implicitHeight: 24 }
                     }
                     Controls.Label { text: info.remoteMessage; wrapMode: Text.WordWrap; Layout.fillWidth: true }

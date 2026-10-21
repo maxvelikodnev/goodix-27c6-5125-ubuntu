@@ -88,6 +88,8 @@ def main():
                         if obj.property('text') == 'Apply Update')
     notice_label = next(obj for obj in window.findChildren(QObject)
                         if obj.property('text') == backend.notice)
+    progress = window.findChild(QObject, 'driverProgress')
+    indicator = window.findChild(QObject, 'softwareUpdatesIndicator')
     results = {}
     failures = []
 
@@ -96,6 +98,9 @@ def main():
         for name_in_qml, role in [('surfaceColor', 'Window'), ('cardColor', 'Base'), ('inkColor', 'Text')]:
             assert window.property(name_in_qml) == expected.color(getattr(QPalette.ColorRole, role)), name_in_qml
         assert notice_label.property('color') == expected.color(QPalette.ColorRole.WindowText)
+        assert indicator.property('color') == expected.color(QPalette.ColorRole.Mid)
+        assert progress.property('visible') == backend.busy
+        assert progress.property('indeterminate') is True
         if not backend.busy:
             assert apply_button.property('contentItem').property('color') == expected.color(QPalette.ColorRole.ButtonText)
         assert contrast(window.property('inkColor'), window.property('cardColor')) >= 7
@@ -133,6 +138,8 @@ def main():
 
     def set_busy(value):
         backend.busy = value
+        backend.operation = 'update' if value else ''
+        backend.notice = 'Applying the local driver update…' if value else 'A newer verified local payload is ready to apply.'
         backend.changed.emit()
 
     def save_disabled(name, dark):

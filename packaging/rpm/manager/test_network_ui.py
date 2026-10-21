@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import main as manager
 from model import LATEST_API, REPOSITORY
 from PySide6.QtCore import QByteArray, QIODevice, QMetaObject, QObject, QProcess, QTimer
+from PySide6.QtGui import QColor
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
@@ -124,7 +125,8 @@ class SyntheticProcess(QProcess):
         response = copy.deepcopy(type(self).responses[action])
         self.output = json.dumps(response).encode()
         self.exit_value = 0 if response['result'] == 'success' else 1
-        QTimer.singleShot(type(self).delay_ms, self.complete)
+        if type(self).delay_ms is not None:
+            QTimer.singleShot(type(self).delay_ms, self.complete)
 
     def readAllStandardOutput(self):
         chunk, self.output = self.output, b''
@@ -187,7 +189,9 @@ class NetworkUiTests(unittest.TestCase):
         return controller, window
 
     def item(self, window, text):
-        return next(obj for obj in window.findChildren(QObject) if obj.property('text') == text)
+        # Palette objects also expose a `text` property, as QColor rather than a label.
+        return next(obj for obj in window.findChildren(QObject)
+                    if isinstance(value := obj.property('text'), str) and value == text)
 
     def capture(self, window, name):
         if RENDER_DIR:
@@ -200,7 +204,8 @@ class NetworkUiTests(unittest.TestCase):
     def assert_banner(self, controller, window, package='3.0.1-1.fc44'):
         self.assertEqual(controller.view['remoteState'], 'available')
         self.assertTrue(controller.view['remoteAvailable'])
-        self.assertTrue(self.item(window, 'New version available · ' + package).property('visible'))
+        self.assertTrue(self.item(window, 'Software Updates').property('visible'))
+        self.assertTrue(self.item(window, 'New public package: ' + package).property('visible'))
         for label in ('Download RPM', 'Release notes'):
             self.assertTrue(self.item(window, label).property('visible'))
         QMetaObject.invokeMethod(self.item(window, 'Download RPM'), 'clicked')
@@ -357,6 +362,103 @@ class NetworkUiTests(unittest.TestCase):
         self.assertFalse(self.item(window, 'Download RPM').property('visible'))
         controller.open_release(True)
         self.open_url.assert_not_called()
+
+    def test_update_indicator_and_labels_follow_public_result_only(self):
+        cases = {
+            'current': {'body': release('3.0.0', 7)},
+            'available': {'body': FUTURE},
+            'checking': {'stall': True},
+            'no-compatible': {'body': dict(FUTURE, assets=[])},
+            'unavailable': {'error': QNetworkReply.NetworkError.HostNotFoundError},
+        }
+        for expected, scenario in cases.items():
+            with self.subTest(state=expected):
+                controller, window = self.client(scenario=scenario, wait=expected != 'checking')
+                self.wait_for(lambda: not controller.busy)
+                self.assertEqual(controller.view['remoteState'], expected)
+                indicator = window.findChild(QObject, 'softwareUpdatesIndicator')
+                color = {'current': QColor('#27ae60'), 'available': QColor('#e5a24b')}.get(
+                    expected, window.property('lineColor'))
+                self.assertEqual(indicator.property('color'), color)
+                self.assertTrue(self.item(window, 'Software Updates').property('visible'))
+                self.assertTrue(self.item(window, 'This RPM').property('visible'))
+                self.assertTrue(self.item(window, controller.view['remoteMessage']).property('visible'))
+                labels = [obj.property('text') for obj in window.findChildren(QObject)]
+                for old in ('Local payload', 'Public releases', 'USB reader', 'Not connected'):
+                    self.assertNotIn(old, labels)
+                for label in ('Download RPM', 'Release notes'):
+                    self.assertEqual(self.item(window, label).property('visible'), expected == 'available')
+                self.assertEqual(self.item(window, 'Check again').property('enabled'), expected != 'checking')
+                if expected in ('checking', 'no-compatible', 'unavailable'):
+                    self.assertNotEqual(color, QColor('#27ae60'))
+                    self.assertNotIn('current', controller.view['remoteMessage'].lower())
+                self.capture(window, 'indicator-' + expected)
+
+    def test_driver_progress_and_cleanup_for_all_lifecycle_results(self):
+        cases = {
+            'install': ('install', status(state='absent', runtime_version=None, message_code='not_installed')),
+            'update': ('update', status(runtime_version='2.9.0', message_code='update_available')),
+            'legacy': ('update', status(state='legacy', runtime_version=None,
+                                       message_code='legacy_upgrade_available', enrollment_required=True)),
+            'remove': ('remove', status()),
+        }
+        for name, (action, local) in cases.items():
+            for result in ('success', 'failed', 'blocked', 'rolled_back'):
+                with self.subTest(action=name, result=result):
+                    SyntheticProcess.delay_ms = 0
+                    controller, window = self.client(local)
+                    progress = window.findChild(QObject, 'driverProgress')
+                    self.assertFalse(progress.property('visible'))
+                    SyntheticProcess.responses[action] = status(result=result, message_code='ready')
+                    SyntheticProcess.delay_ms = None  # Complete only after inspecting the active UI.
+                    controller.perform(action)
+                    self.app.processEvents()
+                    self.assertTrue(progress.property('visible'))
+                    self.assertTrue(progress.property('indeterminate'))
+                    self.assertTrue(self.item(window, controller.notice).property('visible'))
+                    self.assertTrue(self.item(window, 'Do not close Goodix Manager or interrupt the operation.').property('visible'))
+                    for label in ('Verify status', 'Remove', 'Upgrade to 3.0.0' if name == 'legacy'
+                                  else 'Apply Update' if name == 'update' else 'Install'):
+                        self.assertFalse(self.item(window, label).property('enabled'))
+                    self.assertNotIn('%', controller.notice)
+                    if result == 'success':
+                        self.capture(window, 'progress-' + name)
+                    self.assertFalse(window.close(), 'Lifecycle must reject closing the window')
+                    busy_dialog = next(obj for obj in window.findChildren(QObject)
+                                       if obj.property('title') == 'Operation in progress')
+                    self.assertTrue(busy_dialog.property('visible'))
+                    QMetaObject.invokeMethod(busy_dialog, 'close')
+                    controller.process.complete()
+                    self.wait_for(lambda: not controller.busy)
+                    self.assertFalse(progress.property('visible'))
+                    self.assertFalse(self.item(window, 'Do not close Goodix Manager or interrupt the operation.').property('visible'))
+                    self.assertTrue(self.item(window, controller.notice).property('visible'))
+                    self.assertTrue(self.item(window, 'Verify status').property('enabled'))
+                    self.assertEqual(controller.last_result, result)
+                    controller.copy_diagnostics()
+                    self.assertIn('Operation result: ' + result, self.app.clipboard().text())
+                    self.assertIn('"sensor_present": false', self.app.clipboard().text())
+                    self.assertTrue(window.close(), 'Completed operation must allow closing')
+
+    def test_status_and_failed_process_never_leave_driver_progress_active(self):
+        controller, window = self.client(status(state='absent', runtime_version=None))
+        progress = window.findChild(QObject, 'driverProgress')
+        SyntheticProcess.delay_ms = None
+        controller.refresh()
+        self.app.processEvents()
+        self.assertTrue(controller.busy)
+        self.assertFalse(progress.property('visible'), 'Status must not display installation progress')
+        controller.process.complete()
+        self.wait_for(lambda: not controller.busy)
+        SyntheticProcess.responses['install'] = status()
+        controller.perform('install')
+        self.assertTrue(progress.property('visible'))
+        controller.process.errorOccurred.emit(QProcess.ProcessError.FailedToStart)
+        self.app.processEvents()
+        self.assertFalse(controller.busy)
+        self.assertFalse(progress.property('visible'))
+        self.assertTrue(self.item(window, controller.notice).property('visible'))
+        self.assertEqual(controller.last_result, 'helper_unavailable')
 
 
 if __name__ == '__main__':
