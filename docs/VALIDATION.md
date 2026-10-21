@@ -23,7 +23,7 @@ undergone this reader's full biometric qualification.
 | Sensor binding | CRC-checked A6 OTP source; opaque 16-byte identity and full OTP SHA-256 envelope; malformed/mismatch rejection | Enrollment, reboot and limited Windows/Linux switching operated on one reader | Cross-device uniqueness, stability across more units and failure histories |
 | Templates and users | Backend identity separation; stock fprintd per-user galleries; historical files preserved by recovery | One local user/finger was enrolled and verified after reboot | Multiple real users/fingers, corrupted gallery live paths, partial-input behavior |
 | USB/TLS and pairing | Existing APP12509/APP12508 transport contracts and offline error/cleanup tests | First-use enrollment from empty host pairing state, reboot and bounded Windows/Linux ping-pong passed as reported by operator | Review live audit for E0/readback/TLS invariants; fault/recovery/timeout and APP12508 ChicagoHS |
-| Installer | Canonical source build and payload validation; simulated install/update/reinstall/rollback, including SIGFM receipt migration | FIRST_INSTALL, UPDATE of ChicagoHS, reinstall, source identity and SELinux Enforcing verified in clean Fedora VM | Real SIGFM 2.x → ChicagoHS 3.0.0 update with preexisting templates/pairing material, failed update and rollback |
+| Installer | Canonical source build and payload validation; simulated install/update/reinstall/rollback, including SIGFM receipt migration | FIRST_INSTALL, UPDATE, reinstall, source identity and SELinux Enforcing verified in clean Fedora VM | Real 2.x → 3.0.0 update with preexisting templates/pairing material, failed update and rollback |
 | Removal | Simulated normal and emergency removal, damaged/missing receipts, state/template preservation | Normal remove and recovery from TTY succeeded; subsequent password login and vendor fprintd restored | Real damaged-install recovery; byte-for-byte before/after comparison of preexisting templates/host state |
 | Desktop integration | PAM selector and stock fprintd ABI/dependency checks | KScreenLocker, sudo, PolicyKit, Plasma Login, reboot login, three failed fingerprint attempts then password fallback PASS | Broader policy/system versions and repeated cold-start latency/reliability |
 
@@ -91,10 +91,9 @@ allow at most three physical attempts and stop at the first match. A timeout,
 corrupted template, binding mismatch or ambiguous state is a STOP, not an
 instruction to provision or reset the sensor. The pairing journal/readback/E0
 contract must be audited separately from the observed success of a fingerprint
-action. ChicagoHS is the canonical engine intended for `main`; it is not an
-alternative branch to SIGFM. The normal installer is designed to upgrade a
-recognized SIGFM installation transactionally, retaining pairing state and
-historical templates but requiring new ChicagoHS enrollment. This direct
+action. The normal installer is designed to upgrade a recognized earlier
+installation transactionally, retaining pairing state and historical
+templates but requiring new fingerprint enrollment. This direct
 migration still requires a populated real-installation validation before
 3.0.0. An optional return to SIGFM uses the two ordinary recovery commands
 and a separate pinned historical checkout such as `v2.2.1`, **not `main`**,
