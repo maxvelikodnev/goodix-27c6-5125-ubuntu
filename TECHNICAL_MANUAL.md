@@ -701,8 +701,12 @@ waits for manual-sample completion without draining the independent IRQ0200
 notification, whose consumer can also conditionally refresh background data.
 The Linux zero branch performs no such background refresh. OEM host control
 flow establishes neither a firmware flush nor a guarantee about late release
-bytes across contacts. Rockytkg supplies SIGFM/preprocessing code, not evidence
-for the Goodix IRQ/FDT/re-arm protocol.
+bytes across contacts. Rockytkg's open-source 5125 research provided a
+foundational implementation and description of A0/B0 command flow, FDT and
+image capture, along with the earlier SIGFM integration. That upstream work
+is not, by itself, differential evidence of this particular OEM late-release,
+IRQ ordering or re-arm corner case; these stricter claims rely on the
+separately reviewed evidence and local bounds described here.
 
 ## 7. Finger detection, capture, release, and cancellation
 
