@@ -2,9 +2,7 @@
 # Documentation index
 
 This page is the complete thematic index for the Goodix `27c6:5125` Fedora KDE
-project. It describes the canonical ChicagoHS implementation intended for
-`main` with the planned 3.0.0 release; SIGFM is retained in historical
-versioned source, not as a parallel current engine.
+project.
 
 ## Quick access
 
@@ -71,9 +69,9 @@ technical specification.
 4. **[From finger detection to image](docs/learning/04_from_finger_to_image.md)** —
    Finger detection, capture, TLS-protected image transport, decoding, and release.
 5. **[From image to fingerprint template](docs/learning/05_from_image_to_template.md)** —
-   ChicagoHS calibration, native feature extraction, and sensor-bound template samples.
+   Image calibration, feature extraction, and sensor-bound fingerprint templates.
 6. **[Enrollment](docs/learning/06_enrollment.md)** — Multiple contacts,
-   ChicagoHS twelve-stage policy, quality/position retries, and host-side
+   Twelve-stage enrollment, quality/position retries, and host-side
    template creation.
 7. **[Verification and matching](docs/learning/07_verification_and_matching.md)** —
    MATCH, NO MATCH, retry, cancellation, and comparison behavior.
@@ -111,7 +109,7 @@ authoritative public technical reference for the current implementation.
 
 - [Finger detection, capture, release, and cancellation](TECHNICAL_MANUAL.md#7-finger-detection-capture-release-and-cancellation)
 - [Image decoding and preprocessing](TECHNICAL_MANUAL.md#8-image-decoding-and-preprocessing)
-- [ChicagoHS extraction, serialization, and matching](TECHNICAL_MANUAL.md#9-chicagohs-extraction-serialization-and-matching)
+- [Biometric extraction, serialization, and matching](TECHNICAL_MANUAL.md#9-biometric-features-templates-and-matching)
 - [Enrollment, verification, and identification](TECHNICAL_MANUAL.md#10-enrollment-verification-and-identification)
 - [Templates, storage, and multi-user behavior](TECHNICAL_MANUAL.md#11-templates-storage-and-multi-user-behavior)
 
@@ -173,7 +171,7 @@ not need them for installation or daily use.
   origins, per-file licensing, combined-library terms, source provenance, and
   excluded private material.
 - **[Upstream references](docs/REFERENCES.md)** — libfprint, fprintd, Linux-PAM,
-  Plasma Login, ChicagoHS upstream, historical Rockytkg references, TLS RFCs, and related sources.
+  Plasma Login, native biometric sources, foundational Goodix research, TLS RFCs and related references.
 - **[Acknowledgements](ACKNOWLEDGEMENTS.md)** — Upstream projects, contributors,
   references, and development-tool acknowledgement.
 - **[Repository license](LICENSE)** — Repository-level licensing notice.
