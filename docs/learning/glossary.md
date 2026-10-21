@@ -32,7 +32,7 @@ sensor readings and images can be interpreted relative to the empty sensor.
 ## Biometric template
 
 A saved, machine-readable representation of biometric features. In this
-project's ChicagoHS driver, a template contains packed native Type 24
+project's fingerprint driver, a template contains packed native Type 24
 subtemplates and the device-bound RAW FpPrint envelope; it is not a normal
 fingerprint photograph.
 
@@ -86,7 +86,7 @@ the guide does not claim an exact physical meaning for each value.
 Numbers describing the pattern around a feature point. They are useful for
 understanding the historical SIGFM method, which compared descriptors without
 requiring fingerprint images to be pixel-for-pixel identical. The current
-ChicagoHS backend uses its own native feature records and matching policy.
+current biometric engine uses its own native feature records and matching policy.
 
 ## Driver
 
@@ -112,9 +112,8 @@ designed to preserve it.
 ## Feature / keypoint
 
 A locally distinctive part of a processed fingerprint image used by the
-matcher. The current ChicagoHS backend extracts its own native feature
-records, which are assembled into Type 24 subtemplates rather than SIGFM
-keypoint-and-descriptor samples.
+matcher. The current driver extracts native feature records and assembles them
+into Type 24 subtemplates, not merely traditional feature points.
 
 ## Finger detection (FDT)
 
@@ -202,9 +201,8 @@ are active without exposing its implementation details.
 ## Minutiae
 
 Traditional fingerprint features such as ridge endings and bifurcations.
-The ChicagoHS engine uses its own recovered feature and subtemplate formats;
-do not assume they are simply an exported classic minutiae list. Historical
-SIGFM used keypoints and descriptors in its separate template format.
+The current biometric engine uses native feature and subtemplate formats;
+do not assume they are simply an exported classic minutiae list.
 
 ## NO MATCH
 
@@ -237,11 +235,10 @@ PAM fingerprint path.
 
 ## Preprocessing
 
-Preparing decoded image data for feature extraction. The current ChicagoHS
-path generates native calibration from a same-session no-finger FDT_B0 image
-and feeds the 80×64 12-bit finger raster through the original ChicagoHS
-preprocessor. Its image rendering for display is not the biometric matcher
-input. This is different from the historical SIGFM raster pipeline.
+Preparing decoded image data for feature extraction. The driver generates
+calibration from a same-session no-finger FDT_B0 image and processes the
+80×64 12-bit finger raster with the original native preprocessor. Its
+rendering for display is not the biometric matcher input.
 
 ## Probe
 
@@ -296,11 +293,10 @@ do not imply measured FAR/FRR.
 
 ## SIGFM
 
-The historical feature extraction and matching path of earlier Goodix
-releases, including `v2.2.1`. It turns a preprocessed image into keypoints
-and descriptors and computes comparison scores. It is **not** the matcher
-used by the current canonical ChicagoHS implementation and is available
-through versioned historical source, not a maintained parallel `main` engine.
+The feature extraction and matching method used by earlier Goodix releases,
+including `v2.2.1`. It turns a preprocessed image into keypoints and
+descriptors and computes comparison scores. It uses a different template
+format from the current driver.
 
 ## Threshold
 
