@@ -71,6 +71,35 @@ huge-page `dontaudit` module. Restored SELinux audit visibility does not
 prove absence of all AVCs. No measured improvement in cold-login behavior is
 claimed.
 
+## Known limitations: KDE Discover and local RPMs
+
+On Fedora 44 KDE with Discover 6.7.5, opening a **local RPM**
+displayed a generic `applications-other` icon and "Unknown author" rather
+than the embedded Goodix icon and `Guido Sorarù` developer information.
+The installed KDE application menu and Goodix Manager use the correct icon;
+the package's desktop/AppStream metadata are present.
+
+This is a known difference between Discover's local-package
+`LocalFilePKResource`/`PackageKitResource` and the usual
+`AppPackageKitResource` path for AppStream metadata. See the upstream
+[local-file resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/LocalFilePKResource.cpp),
+[package resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/PackageKitResource.h)
+and [AppStream resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/AppPackageKitResource.cpp).
+Changing publisher fields inside the RPM does not fix this specific
+local-file view; signature verification is an independent trust check.
+
+On the tested KDE system, the menu **Uninstall** action for the locally
+installed RPM opened an AppStream link that Discover could not resolve.
+To remove the Manager RPM alone, use `sudo dnf remove goodix-manager`.
+That command does **not** remove an activated driver. Use **Remove** inside
+Goodix Manager, or `goodix-uninstall`, for normal driver removal; the
+operator reports ordinary Manager removal **PASS**. Neither observation
+qualifies damaged-state removal or rollback.
+
+The Manager uses the KDE system light/dark palette rather than a separate
+theme selector. Automated Qt palette tests passed; actual behavior depends
+on the platform delivering system palette changes.
+
 ## Offline evidence and reproducible checks
 
 From a complete source tree, the public tests use no hardware:
@@ -118,10 +147,8 @@ paths. Record RPM results separately from CLI observations. The operator has
 reported ordinary Manager removal PASS; no claim is made here about every
 failure/rollback or removal of damaged software through the GUI. Preserve
 password access. Without actual pre-populated pairing state and templates,
-a clean VM cannot establish their byte-for-byte preservation. KDE Discover's
-local-RPM page also showed a generic icon and unknown author despite the
-correct installed KDE icon; the KDE menu's Uninstall action could not resolve
-the local AppStream package. These are UI observations, not driver failures.
+a clean VM cannot establish their byte-for-byte preservation. These UI presentation issues are recorded under the known limitations
+below.
 
 Additional live qualification requires supervised authorization and should
 cover sensor binding stability and cross-device separation, multiple users and

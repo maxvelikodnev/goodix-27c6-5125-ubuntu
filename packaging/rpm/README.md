@@ -50,32 +50,8 @@ version unknown, and a same-version source difference without proven equivalence
 stops local updates. Ordinary verified removal and the classic `install.sh`
 path remain available. These local gates do not hide newer public releases.
 
-## Discover metadata and system appearance
-
-Discover 6.7.5 opens a local RPM through `LocalFilePKResource`, whose package
-resource supplies the generic `applications-other` icon and an empty author.
-That view does not read the embedded AppStream developer or SVG. It can therefore
-show a generic icon and “Unknown author” before installation even when the
-package's desktop entry, icon and `Guido Sorarù` developer metadata are correct.
-The separate AppStream resource reads the developer name; the KDE application
-menu and Manager use the installed icon. See the upstream
-[local-file resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/LocalFilePKResource.cpp),
-[package resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/PackageKitResource.h)
-and [AppStream resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/AppPackageKitResource.cpp).
-Changing RPM publisher fields or duplicating AppStream fields does not change
-that local-file path. Signature verification remains a separate trust check.
-On the tested KDE installation, the application's menu **Uninstall** entry
-also opened an unresolved Discover AppStream URL for the locally installed
-RPM. Use `sudo dnf remove goodix-manager` for the Manager package; it does
-not remove an active driver, which retains its own ordinary **Remove** /
-`goodix-uninstall` lifecycle. The operator reports successful ordinary
-driver removal through Goodix Manager (PASS), not a complete damaged-state
-or rollback qualification.
-
-The Manager follows the system light or dark palette without an application
-theme selector. Palette changes take effect while the window is open when the
-Qt/KDE platform integration delivers them; the system palette is also applied
-at startup.
+The Manager follows the system KDE light/dark palette without a separate
+application theme selector.
 
 ## Updates and privacy
 
