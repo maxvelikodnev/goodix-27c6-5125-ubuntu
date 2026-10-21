@@ -8,7 +8,7 @@ import sys
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from main import Controller
+from main import Controller, load_interface
 from model import Status
 from PySide6.QtCore import QObject, QMetaObject, QTimer, qInstallMessageHandler
 from PySide6.QtGui import QColor, QPalette
@@ -75,7 +75,7 @@ def main():
     engine = QQmlApplicationEngine()
     engine.addImportPath('/usr/lib64/qt6/qml')
     engine.rootContext().setContextProperty('backend', backend)
-    engine.load(str(Path(__file__).with_name('Main.qml')))
+    load_interface(engine)
     if not engine.rootObjects():
         return 1
     window = engine.rootObjects()[0]

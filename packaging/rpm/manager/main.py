@@ -239,6 +239,13 @@ class Controller(QObject):
         QGuiApplication.clipboard().setText(diagnostics)
 
 
+def load_interface(engine):
+    # RPM builds normalize mtimes. Read current bytes so an older on-disk QML
+    # cache cannot survive a package update; the base URL preserves relative assets.
+    path = Path(__file__).with_name('Main.qml')
+    engine.loadData(path.read_bytes(), QUrl.fromLocalFile(str(path)))
+
+
 def main():
     if os.geteuid() == 0:
         print('Goodix Manager must run as a regular desktop user.', file=sys.stderr)
@@ -253,7 +260,7 @@ def main():
     engine.addImportPath('/usr/lib64/qt6/qml')
     controller = Controller()
     engine.rootContext().setContextProperty('backend', controller)
-    engine.load(str(Path(__file__).with_name('Main.qml')))
+    load_interface(engine)
     if not engine.rootObjects():
         return 1
     return app.exec()

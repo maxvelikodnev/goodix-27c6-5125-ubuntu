@@ -177,7 +177,7 @@ class NetworkUiTests(unittest.TestCase):
         engine = QQmlApplicationEngine()
         engine.addImportPath('/usr/lib64/qt6/qml')
         engine.rootContext().setContextProperty('backend', controller)
-        engine.load(str(Path(__file__).with_name('Main.qml')))
+        manager.load_interface(engine)
         self.assertTrue(engine.rootObjects())
         window = engine.rootObjects()[0]
         self.clients.append((controller, engine, window))
