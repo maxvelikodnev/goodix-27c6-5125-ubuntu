@@ -3,7 +3,7 @@
 
 ## Upstream projects
 
-This ChicagoHS branch builds on libfprint, fprintd, Linux-PAM, KDE Plasma,
+The Goodix 27c6:5125 driver builds on libfprint, fprintd, Linux-PAM, KDE Plasma,
 libgusb, OpenSSL and independent open-source fingerprint research. We thank
 their contributors and Fedora maintainers for the software and interfaces
 that make integration with the stock authentication stack possible.
@@ -20,8 +20,9 @@ its source-level documentation, provenance records, and differential
 verification gave this port a practical and technically grounded
 starting point.
 
-The current Goodix USB `27c6:5125` ChicagoHS branch directly incorporates
-the upstream **computational backend**, pinned to commit
+The Goodix USB `27c6:5125` driver uses ChicagoHS as its canonical biometric
+engine and directly incorporates the upstream **computational backend**,
+pinned to commit
 [`010a665f`](https://github.com/berkekbgz/libfprint-goodix-spi/tree/010a665f54089a1632b1ab7be588b316ace934e2).
 This includes native no-finger calibration generation, preprocessing,
 feature extraction, the original twelve-stage enrollment/position policy,
@@ -79,8 +80,11 @@ biometric research into inspectable, reusable open-source knowledge.
 provided an important historical SIGFM implementation reference and
 reused device-configuration research, as detailed in
 [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
-The SIGFM driver remains available on this repository's `main` branch
-as the documented recovery baseline. These separately maintained
+SIGFM was the project's earlier biometric engine. Its implementation
+remains traceable through historical Git revisions and releases,
+including [v2.2.1](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1);
+it is **not** retained on `main` as a second supported matcher when ChicagoHS
+becomes the canonical engine. These independently maintained upstream
 projects may differ in hardware scope and behavior.
 
 ## Community contributions
