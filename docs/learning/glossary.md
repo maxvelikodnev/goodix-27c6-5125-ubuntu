@@ -285,8 +285,9 @@ configuration is not the same as rewriting persistent factory state.
 
 ## ChicagoHS
 
-The current native biometric engine for this branch. It uses the same-session
-no-finger image to generate calibration, preprocesses captured frames,
+The canonical native biometric engine of the Goodix driver, replacing
+SIGFM for the planned 3.0.0 release. It uses the same-session no-finger
+image to generate calibration, preprocesses captured frames
 extracts original ChicagoHS features, and builds Type 24 templates. The
 original native enrollment policy advances through twelve accepted stages,
 while preserving its own position-based retry/defer behavior. Its matcher
@@ -295,10 +296,11 @@ do not imply measured FAR/FRR.
 
 ## SIGFM
 
-The historical feature extraction and matching path retained on the `main`
-branch. It turns a preprocessed image into keypoints and descriptors and
-computes comparison scores. It is **not** the matcher used by the current
-`porting_ChicagoHS` branch.
+The historical feature extraction and matching path of earlier Goodix
+releases, including `v2.2.1`. It turns a preprocessed image into keypoints
+and descriptors and computes comparison scores. It is **not** the matcher
+used by the current canonical ChicagoHS implementation and is available
+through versioned historical source, not a maintained parallel `main` engine.
 
 ## Threshold
 
