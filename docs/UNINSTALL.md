@@ -56,14 +56,16 @@ assume that cleanup completed.
 | `/etc/pam.d/plasmalogin` | Removes the project's login entry first and exposes current Fedora PAM |
 | `/usr/local/lib64/goodix-plasma-login/` | Removes the selector and installation metadata |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
-| `/usr/local/lib64/goodix-27c6-5125/` | Removes private libfprint/OpenCV, links, notices and installation metadata |
-| Project-owned SELinux huge-page `dontaudit` module | Removes the project module and restores Fedora's normal audit visibility |
+| `/usr/local/lib64/goodix-27c6-5125/` | Removes project libfprint, matcher dependencies, links, notices and installation metadata |
+| Legacy SELinux huge-page `dontaudit` module, if present | Removes only the verified priority-400 project CIL rule and restores Fedora audit visibility; The current driver does not install it |
 | `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
 Removal stops and quiesces fprintd before removing runtime files. It does not
 start authentication, directly access USB, restart the display manager,
 overwrite Fedora-owned files or replay saved Fedora configuration. On incomplete
-cleanup, remaining recovery tooling is retained where possible.
+cleanup, remaining recovery tooling is retained where possible. A policy name,
+priority, state or content collision is left untouched and reported; the module
+name alone does not establish project ownership.
 
 Emergency removal uses fixed project-owned paths and tolerates missing receipts
 or partial software. It does not depend on Fedora vendor layout or version.
@@ -88,3 +90,31 @@ module, even without its receipt; unrelated SELinux rules are untouched.
 Report the result, exact error, failure point and whether password login and the
 desktop work. Do not send protected files, templates or fingerprint images.
 [Validation scope](VALIDATION.md) records the current evidence and limitations.
+
+## Optional downgrade to a historical SIGFM release
+
+The current driver is the canonical implementation on `main`. The older
+SIGFM engine is **not** a parallel active branch or an automatic fallback. A deliberate downgrade, when needed for diagnosis or recovery, must
+select a **pinned historical release**, such as the existing
+[`v2.2.1` tag](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
+
+Remove the installed driver with `goodix-uninstall`, or use
+`goodix-force-remove` for damaged software. Follow the restart instruction and confirm password login.
+Then use a **separate clean checkout** of the historical version:
+
+```bash
+git clone --branch v2.2.1 --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$HOME/goodix-5125-sigfm-v2.2.1"
+cd "$HOME/goodix-5125-sigfm-v2.2.1"
+./install.sh
+```
+
+Choose a new destination if that directory exists. No library is copied
+manually. The current remover recognizes receipts from the installed driver and
+supported legacy Milan/SIGFM versions; remove the newer runtime **before** installing historical SIGFM because
+the older installer/remover is not guaranteed to understand a newer runtime.
+Historical templates remain on disk and are usable only when compatible with
+the selected old driver and reader. Enroll again with SIGFM only if no valid
+SIGFM enrollment remains. Keep password authentication available and do not
+assume this optional downgrade has been qualified as a real-device 3.0.0
+recovery until it is tested. Private captures and calibration are outside
+software removal. There is no purge command or automatic biometric deletion.

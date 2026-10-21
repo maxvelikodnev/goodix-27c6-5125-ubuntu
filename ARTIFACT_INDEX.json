@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "authoritative": false,
+  "purpose": "Router minimale del contesto pertinente alla fase attiva, non stato operativo.",
+  "canonical_routing": {
+    "governance": "AGENTS.md",
+    "bootstrap": "START.md",
+    "roadmap": "ROADMAP.md",
+    "corroborations": "CORROBORATIONS.md",
+    "state_cache": "PROJECT_STATE.json",
+    "artifact_index": "ARTIFACT_INDEX.json",
+    "technical_reference": "TECHNICAL_MANUAL.md",
+    "provenance": "docs/LICENSING_AND_PROVENANCE.md",
+    "private_workspace": "development/"
+  },
+  "phase_routes": {
+    "CH0": [
+      "CORROBORATIONS.md",
+      "development/private-root/analysis/CH0_chicago/CH0_OFFLINE_REPORT_2026-10-20.md"
+    ],
+    "CH1": [
+      "production/chicago-native/source-manifest.json",
+      "libfprint-driver/goodix_chicago.c"
+    ],
+    "CH2": [
+      "libfprint-driver/goodix_fpimage_device.c"
+    ],
+    "CH3": [
+      "production/build-public.py",
+      "deployment/install.py",
+      "deployment/recovery/remove.py",
+      "docs/INSTALLATION.md",
+      "docs/UNINSTALL.md"
+    ],
+    "CH4": [
+      "docs/VALIDATION.md",
+      "docs/LICENSING_AND_PROVENANCE.md",
+      "development/private-root/analysis/CHICAGO_RC_2026-10-21/"
+    ]
+  },
+  "routing_rule": "Leggere i file canonici e lo stato; caricare poi solo gli artefatti pertinenti. C1 e C2 rimandano a fonti esterne: non duplicare dossier senza necessità."
+}

@@ -8,7 +8,7 @@ When a program needs to authenticate you, four different questions appear:
 1. **Who wants authentication?** A login screen, lock screen, `sudo`, or an
    authorization dialog.
 2. **Which methods are allowed?** Password, fingerprint, or another method.
-3. **How do we ask for a fingerprint?** Through the system fingerprint service.
+3. **How does an application request a fingerprint?** Through the system fingerprint service.
 4. **How does this particular reader work?** Through `libfprint` and its Goodix
    driver.
 
@@ -106,7 +106,7 @@ it when finished.
 The installer does not turn on fingerprint authentication everywhere. Consumers
 use it only where the current Fedora policy enables it.
 
-## 🔎 In our Goodix project
+## 🔎 In my Goodix project
 
 The project keeps Fedora's service command and D-Bus interface. A narrow service
 drop-in makes stock `fprintd` load the Goodix-enabled library. The architecture

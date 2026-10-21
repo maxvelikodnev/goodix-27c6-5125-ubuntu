@@ -2,7 +2,7 @@
 # Goodix libfprint driver sources
 
 This directory contains the target-specific source used by the
-`goodix_27c6_5125` libfprint driver:
+`goodix_27c6_5125_chicago` libfprint driver:
 
 - asynchronous USB routing and transfer ownership;
 - TLS 1.2 PSK server and secure-session state;
@@ -17,10 +17,10 @@ The source is selected by
 production file set and digests are in `production/source-files.tsv` and
 `production/source-files.sha256`.
 
-Licensing is per file. Most local driver files are `LGPL-2.1-or-later`.
-`rockytkg-imgproc/goodix_imgproc.[ch]` retains `GPL-2.0-or-later`; its presence
-makes the distributed Goodix-enabled combined binary GPL-compatible rather
-than an LGPL-only work. See `docs/LICENSING_AND_PROVENANCE.md`.
+Licensing is per file. The Chicago computational engine in
+`production/chicago-native` preserves LGPL-2.1-or-later upstream headers and
+notices. Some transport/configuration components retain GPL-2.0-or-later
+terms. See `docs/LICENSING_AND_PROVENANCE.md`.
 
 No file in this directory contains firmware, a PSK, factory data, a real
 fingerprint sample, a template, or a private capture.
@@ -58,3 +58,27 @@ This exercises actual libfprint actions with synthetic transport and image
 processing seams, including asynchronous decisions and ownership/drain. It does
 not require private fixtures or establish real biometric accuracy. Build output
 stays in the temporary directory; no host runtime is installed.
+
+Chicago adapter, original native synthetic tests, serialization and binding
+regressions run from the repository root with:
+
+```sh
+PATH=/usr/bin:/bin python3 production/test_chicago_native.py
+```
+
+The adapter uses 12 enrollment stages, native Type24 matching and no template
+learning. Opaque sensorID uses the exact upstream A6 prefix convention; the
+USB envelope additionally checks the complete validated OTP record digest.
+Dynamic background/calibration is not a template identity boundary. These
+synthetic tests neither access the reader nor establish live accuracy.
+
+For the stock fprintd per-user storage/deletion contract, provide an unmodified
+fprintd 1.94.5 source checkout (test input only, never an installation dependency):
+
+```sh
+GOODIX_CHICAGO_STORAGE_SOURCE=/path/to/fprintd-1.94.5 \
+  PATH=/usr/bin:/bin python3 production/test_chicago_native.py
+```
+
+This checks that deleting one user's Chicago print preserves another user's
+print and the historical SIGFM namespace, using only a temporary synthetic tree.

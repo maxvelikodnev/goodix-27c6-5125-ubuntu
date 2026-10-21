@@ -3,6 +3,7 @@
 """Build a local Fedora payload from this source tree, without installing it."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -17,12 +18,20 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 LIBFPRINT_SOURCE = Path('reference/libfprint-fedora44-1.94.100/source')
 LOGIN_SOURCE = Path('deployment/plasma-login-opt-in')
-BUILD_PACKAGES = ('gcc', 'gcc-c++', 'meson', 'ninja-build', 'pkgconf-pkg-config',
-                  'glib2-devel', 'libgusb-devel', 'openssl-devel', 'opencv-devel',
-                  'pam-devel', 'binutils')
-OPENCV_PARTS = ('core', 'features2d', 'flann', 'imgproc')
-LICENSES = ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0')
+BUILD_PACKAGES = ('gcc', 'meson', 'ninja-build', 'pkgconf-pkg-config',
+                  'glib2-devel', 'libgusb-devel', 'libusb1-devel', 'openssl-devel',
+                  'json-glib-devel', 'pam-devel', 'binutils')
+LICENSES = ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0', 'MIT')
+EXECUTABLES = {'check-material'}
 BASE_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL': 'C'}
+spec = importlib.util.spec_from_file_location('goodix_native_builder', ROOT / 'production/build-chicago-native.py')
+native = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(native)
+
+
+def validate_chicago_sources():
+    """Read-only preflight, before package installation or any privilege request."""
+    return native.validate_sources(ROOT)
 
 
 def require(condition, message):
@@ -55,14 +64,17 @@ def prerequisites():
             and platform.machine() == 'x86_64', 'Fedora 44 x86_64 is required')
     missing = missing_packages()
     require(not missing, 'missing build packages: ' + ' '.join(missing))
-    for name in ('meson', 'ninja', 'cc', 'c++', 'pkg-config', 'rpm', 'readelf', 'nm', 'ldd'):
+    for name in ('meson', 'ninja', 'cc', 'ar', 'glib-mkenums', 'pkg-config', 'rpm', 'readelf', 'nm', 'ldd'):
         require(shutil.which(name, path=BASE_ENV['PATH']) is not None, f'missing build command: {name}')
 
 
 def source_inventory():
     """Content provenance works equally in a source archive or a fresh clone."""
-    roots = [LIBFPRINT_SOURCE, Path('libfprint-driver'), Path('Rockytkg/libfprint/libfprint/sigfm')]
+    roots = [LIBFPRINT_SOURCE, Path('libfprint-driver')]
+    if (ROOT / native.NATIVE_SOURCE).is_dir():
+        roots.append(native.NATIVE_SOURCE)
     files = [ROOT / 'production/build-public.py',
+             ROOT / 'production/build-chicago-native.py',
              *(ROOT / 'deployment' / name for name in
                ('check-material.c', 'materials.py', 'test_material_native.c', 'test_materials.py')),
              ROOT / 'production/host-test-only-symbols.txt',
@@ -91,36 +103,6 @@ def soname(path):
     return names[0]
 
 
-def opencv_inputs():
-    version = run('pkg-config', '--modversion', 'opencv4')
-    includedir = Path(run('pkg-config', '--variable=includedir', 'opencv4'))
-    libdir = Path(run('pkg-config', '--variable=libdir', 'opencv4'))
-    require(version.startswith('4.') and includedir.is_absolute() and libdir.is_absolute(),
-            'OpenCV 4 development metadata is required')
-    libraries = {}
-    for component in OPENCV_PARTS:
-        path = (libdir / f'libopencv_{component}.so').resolve(strict=True)
-        require(path.is_file(), f'OpenCV library missing: {component}')
-        name = soname(path)
-        require(re.fullmatch(r'libopencv_' + component + r'\.so\.[0-9]+', name),
-                f'unexpected OpenCV SONAME: {name}')
-        libraries[name] = path
-    return version, includedir, libdir, libraries
-
-
-def opencv_notices(libraries):
-    owners = sorted({run('rpm', '-qf', '--qf', '%{NAME}', path) for path in libraries.values()})
-    license_files = set()
-    for owner in owners:
-        for line in run('rpm', '-ql', owner).splitlines():
-            path = Path(line)
-            if path.is_relative_to('/usr/share/licenses') and path.is_file():
-                license_files.add(path)
-    require(license_files, 'OpenCV package license notices are unavailable')
-    return '\n'.join(f'===== {path.relative_to("/usr/share/licenses")} =====\n' +
-                     path.read_text() for path in sorted(license_files)) + '\n'
-
-
 def _safe_relative(name):
     return isinstance(name, str) and name != '' and not Path(name).is_absolute() and \
         all(part not in ('', '.', '..') for part in name.split('/'))
@@ -139,15 +121,12 @@ def validate_payload(directory):
             and isinstance(manifest['files'], dict) and isinstance(manifest['links'], dict),
             'invalid payload manifest')
     files, links = manifest['files'], manifest['links']
-    fixed = {'runtime/libfprint-2.so.2.0.0', 'runtime/OpenCV-LICENSES.txt',
+    fixed = {'runtime/libfprint-2.so.2.0.0', 'runtime/ChicagoHS-NOTICES.txt',
              'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
              'runtime/build-provenance.json', 'login/pam_goodix_login_gate.so',
              'login/plasmalogin.pam', 'check-material',
              *(f'runtime/licenses/{name}.txt' for name in LICENSES)}
-    dynamic = set(files) - fixed
-    require(fixed <= set(files) and len(dynamic) == len(OPENCV_PARTS) and
-            all(sum(bool(re.fullmatch(r'runtime/libopencv_' + part + r'\.so\.[0-9]+', name))
-                    for name in dynamic) == 1 for part in OPENCV_PARTS), 'unexpected payload file inventory')
+    require(set(files) == fixed, 'unexpected ChicagoHS payload file inventory')
     require(links == {'runtime/libfprint-2.so.2': 'libfprint-2.so.2.0.0',
                       'runtime/libfprint-2.so': 'libfprint-2.so.2'}, 'unexpected payload links')
     actual = set()
@@ -170,8 +149,10 @@ def validate_payload(directory):
     for name, target in links.items():
         path = directory / name
         require(path.is_symlink() and os.readlink(path) == target, 'payload link drift: ' + name)
-    require(stat.S_IMODE((directory / 'check-material').stat().st_mode) == 0o755,
-            'material checker must be executable with mode 0755')
+    for name in files:
+        require(stat.S_IMODE((directory / name).stat().st_mode) ==
+                (0o755 if name in EXECUTABLES else 0o644),
+                'unexpected payload permissions: ' + name)
     return manifest
 
 
@@ -198,14 +179,13 @@ def pam_synthetic_tests(work):
 
 def build_payload(output):
     output = Path(output)
+    validate_chicago_sources()
     prerequisites()
     require(output.is_absolute() and not output.exists() and not output.is_symlink(),
             'build output must be a new absolute directory')
     require(not output.resolve().is_relative_to(ROOT), 'build output must be outside the source tree')
     inventory = source_inventory()
     source_id = sha256(inventory.encode())
-    version, includedir, libdir, libraries = opencv_inputs()
-    notices = opencv_notices(libraries)
     output.mkdir(mode=0o700)
     runtime, login = output / 'runtime', output / 'login'
     runtime.mkdir()
@@ -214,16 +194,8 @@ def build_payload(output):
     # is independent of the source clone and output directory names.
     with tempfile.TemporaryDirectory(prefix='goodix-source-build-', dir='/tmp') as temporary:
         work = Path(temporary)
-        pkgconfig = work / 'pkgconfig'
-        pkgconfig.mkdir()
-        # Fedora's full OpenCV .pc links unrelated modules. Keep the exact four
-        # components used by feature matching; all dependencies remain Fedora's.
-        (pkgconfig / 'opencv4.pc').write_text(
-            f'Name: OpenCV\nDescription: Goodix feature matching subset\nVersion: {version}\n'
-            f'Libs: -L{shlex.quote(str(libdir))} ' +
-            ' '.join('-lopencv_' + part for part in OPENCV_PARTS) + '\n'
-            f'Cflags: -I{shlex.quote(str(includedir))}\n')
-        env = dict(BASE_ENV, PKG_CONFIG_PATH=str(pkgconfig))
+        archive, native_include, native_provenance = native.build_native(ROOT, work, run)
+        env = dict(BASE_ENV, CC='cc')
         build = work / 'build'
         cflags = ['-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE',
                   f'-ffile-prefix-map={ROOT}=/usr/src/goodix',
@@ -232,16 +204,22 @@ def build_payload(output):
             '--buildtype=release', '--wrap-mode=nodownload', '-Ddrivers=goodix_27c6_5125',
             '-Dintrospection=false', '-Ddoc=false', '-Dinstalled-tests=false',
             '-Dudev_rules=disabled', '-Dudev_hwdb=disabled', '-Dgoodix_production_minimal=true',
-            '-Dc_args=' + json.dumps(cflags), '-Dcpp_args=' + json.dumps(cflags), env=env)
+            '-Dgoodix_chicago=true', '-Dgoodix_chicago_native_archive=' + str(archive),
+            '-Dgoodix_chicago_native_include=' + str(native_include),
+            '-Dc_args=' + json.dumps(cflags), env=env)
         run('meson', 'compile', '-C', build, 'fprint-2', env=env)
         library = build / 'libfprint/libfprint-2.so.2.0.0'
         require(soname(library) == 'libfprint-2.so.2', 'unexpected libfprint ABI')
         symbols = set(re.findall(r'\b(goodix_\w+)$', run('nm', library), flags=re.M))
         forbidden = set((ROOT / 'production/host-test-only-symbols.txt').read_text().splitlines())
         require(not symbols & forbidden, 'test-only entrypoints present in production library')
+        all_symbols = run('nm', library).lower()
+        require('sigfm' not in all_symbols and 'opencv' not in all_symbols and 'milan' not in all_symbols,
+                'Milan/SIGFM/OpenCV symbols present in ChicagoHS library')
+        dynamic = run('readelf', '-d', library).lower()
+        require(not any(name in dynamic for name in ('opencv', 'libstdc++', 'libc++')),
+                'SIGFM/OpenCV/C++ runtime dependency present in ChicagoHS library')
         shutil.copyfile(library, runtime / library.name)
-        for name, path in libraries.items():
-            shutil.copyfile(path, runtime / name)
         (runtime / 'libfprint-2.so.2').symlink_to(library.name)
         (runtime / 'libfprint-2.so').symlink_to('libfprint-2.so.2')
         run('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-fPIC', '-shared',
@@ -268,13 +246,16 @@ def build_payload(output):
     linked = run('ldd', '/usr/libexec/fprintd', env=dict(BASE_ENV, LD_LIBRARY_PATH=str(runtime)))
     require(str(runtime / 'libfprint-2.so.2') in linked and 'not found' not in linked,
             'stock fprintd dependency resolution failed')
-    (runtime / 'OpenCV-LICENSES.txt').write_text(notices)
+    require(not any(name in linked.lower() for name in ('opencv', 'libstdc++', 'libc++')),
+            'OpenCV/C++ dependency present in stock fprintd resolution')
+    shutil.copyfile(ROOT / native.NATIVE_SOURCE / 'NOTICES.txt', runtime / 'ChicagoHS-NOTICES.txt')
     shutil.copyfile(ROOT / 'docs/LICENSING_AND_PROVENANCE.md', runtime / 'LICENSING_AND_PROVENANCE.md')
     (runtime / 'licenses').mkdir()
     for name in LICENSES:
         shutil.copyfile(ROOT / 'LICENSES' / (name + '.txt'), runtime / 'licenses' / (name + '.txt'))
     (runtime / 'source-files.sha256').write_text(inventory)
-    provenance = {'source_id': source_id, 'opencv_version': version,
+    provenance = {'source_id': source_id, 'matcher': 'chicago-type24',
+                  'native': native_provenance,
                   'packages': run('rpm', '-q', *BUILD_PACKAGES, 'fprintd').splitlines()}
     (runtime / 'build-provenance.json').write_text(json.dumps(provenance, sort_keys=True) + '\n')
     require(source_inventory() == inventory, 'source content changed during the build')
@@ -284,7 +265,7 @@ def build_payload(output):
         if path.is_symlink():
             manifest['links'][name] = os.readlink(path)
         elif path.is_file():
-            path.chmod(0o755 if name == 'check-material' else 0o644)
+            path.chmod(0o755 if name in EXECUTABLES else 0o644)
             manifest['files'][name] = sha256(path.read_bytes())
     (output / 'payload.json').write_text(json.dumps(manifest, sort_keys=True, indent=2) + '\n')
     return validate_payload(output)

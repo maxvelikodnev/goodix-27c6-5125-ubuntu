@@ -12,6 +12,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tempfile
 
 CONFIG = Path('/etc/pam.d/plasmalogin')
 SUPPORT = Path('/usr/local/lib64/goodix-plasma-login')
@@ -105,12 +106,20 @@ def runtime_inventory(receipt):
     require(isinstance(files, dict) and isinstance(links, dict), 'invalid runtime inventory')
     require(links == LINKS, 'unexpected library links')
     require('libfprint-2.so.2.0.0' in files, 'missing fingerprint library')
-    for part in ('core', 'features2d', 'flann', 'imgproc'):
-        require(sum(bool(re.fullmatch(r'libopencv_' + part + r'\.so\.[0-9.]+', name))
-                    for name in files) == 1, 'invalid OpenCV library inventory')
     for name in files:
         require(isinstance(name, str) and re.fullmatch(r'(?:licenses/)?[A-Za-z0-9_.+-]+', name)
                 and name not in ('.', '..', 'installation.json'), 'unsafe runtime file name')
+    # Keep SIGFM and Milan receipts readable for migration and recovery.
+    # ChicagoHS retains the same software paths and ownership checks.
+    matcher = receipt.get('matcher', 'sigfm')
+    require(matcher in ('sigfm', 'milan-type17', 'chicago-type24'), 'unsupported runtime matcher')
+    if matcher in ('milan-type17', 'chicago-type24'):
+        require(not any(name.startswith('libopencv_') or name == 'OpenCV-LICENSES.txt'
+                        for name in files), 'unexpected OpenCV files in native C runtime')
+    else:
+        for part in ('core', 'features2d', 'flann', 'imgproc'):
+            require(sum(bool(re.fullmatch(r'libopencv_' + part + r'\.so\.[0-9.]+', name))
+                        for name in files) == 1, 'invalid OpenCV library inventory')
     return set(files), links
 
 
@@ -166,8 +175,8 @@ def normal_preflight():
     return owned_rule
 
 
-def command(*args):
-    result = subprocess.run(args, env=ENV, text=True, capture_output=True, timeout=30)
+def command(*args, cwd=None):
+    result = subprocess.run(args, env=ENV, text=True, capture_output=True, timeout=30, cwd=cwd)
     # An already removed Fedora service has no loaded project code to stop.
     # This is an absent-target result, never a vendor-file/version precondition.
     if args == ('systemctl', 'stop', 'fprintd.service') and result.returncode != 0:
@@ -215,18 +224,26 @@ def remove_label():
 
 
 def selinux_module_present():
+    """Return verified legacy CIL bytes, or None; identity alone is not ownership."""
     lines = []
     for line in command('semodule', '-lfull').splitlines():
         fields = line.split()
         if len(fields) >= 2 and fields[1] == SELINUX_MODULE_NAME:
             lines.append(line)
     if not lines:
-        return False
+        return None
     expected = (len(lines) == 1 and
-                lines[0].split()[:2] == [SELINUX_MODULE_PRIORITY, SELINUX_MODULE_NAME])
+                lines[0].split() == [SELINUX_MODULE_PRIORITY, SELINUX_MODULE_NAME, 'cil'])
     require(expected, 'project SELinux module has an unexpected priority/state; '
             'left untouched: ' + ' | '.join(lines))
-    return True
+    with tempfile.TemporaryDirectory(prefix='goodix-policy-check-') as directory:
+        command('semodule', '-X', SELINUX_MODULE_PRIORITY, '--cil', '--extract',
+                SELINUX_MODULE_NAME, cwd=directory)
+        policy = Path(directory) / (SELINUX_MODULE_NAME + '.cil')
+        data = read(policy)
+    require(data.strip() == SELINUX_MODULE_RULE.encode('ascii'),
+            'project SELinux module content differs; ownership ambiguous; left untouched')
+    return data
 
 
 def remove_selinux_module():

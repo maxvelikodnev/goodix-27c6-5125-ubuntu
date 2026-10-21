@@ -137,10 +137,6 @@ driver_sources = {
     'goodix_27c6_5125' : files(
         '../../../../libfprint-driver/goodix_u16_to_fpimage.c',
         '../../../../libfprint-driver/goodix_fpimage_pipeline.c',
-        '../../../../libfprint-driver/goodix_sigfm_preprocess.c',
-        '../../../../libfprint-driver/rockytkg-imgproc/goodix_imgproc.c',
-        '../../../../libfprint-driver/goodix_sigfm_metrics.cpp',
-        '../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp',
         '../../../../libfprint-driver/goodix_enrollment_model.c',
         '../../../../libfprint-driver/goodix_enrollment_diversity.c',
         '../../../../libfprint-driver/goodix_enrollment_pipeline.c',
@@ -195,21 +191,26 @@ drivers_sources = []
 drivers_cflags = []
 drivers_cppflags = []
 libfprint_goodix_cflags = []
-goodix_sigfm_deps = []
+goodix_native_deps = []
 if 'goodix_27c6_5125' in drivers
-    drivers_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
-    drivers_cppflags += '-DGOODIX_LIBFPRINT_SIGFM'
-    # GCC/libstdc++ can emit a spurious array-bounds diagnostic from inlined
-    # std::vector copy/move code in the SIGFM C++ translation units. Keep the
-    # warning enabled, but do not promote this compiler/library diagnostic to
-    # an error for the Goodix C++ driver sources.
-    drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])
-    libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
-    goodix_sigfm_deps += dependency('opencv4', required: true)
-    goodix_sigfm_deps += declare_dependency(include_directories: [
-        include_directories('../../../../libfprint-driver'),
-        include_directories('../../../../Rockytkg/libfprint/libfprint/sigfm'),
-    ])
+    if get_option('goodix_chicago')
+        archive = get_option('goodix_chicago_native_archive')
+        native_include = get_option('goodix_chicago_native_include')
+        if archive == '' or native_include == '' or not fs.is_file(archive)
+            error('ChicagoHS requires the pinned native archive and source headers; no SIGFM fallback')
+        endif
+        driver_sources += {'goodix_27c6_5125': driver_sources['goodix_27c6_5125'] + files(
+            '../../../../libfprint-driver/goodix_chicago.c')}
+        drivers_cflags += '-DGOODIX_LIBFPRINT_CHICAGO'
+        libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_CHICAGO'
+        goodix_native_deps += declare_dependency(
+            include_directories: [include_directories('../../../../libfprint-driver'), include_directories(native_include),
+                include_directories(native_include / '../common')],
+            link_args: [archive],
+            dependencies: [cc.find_library('m')])
+    else
+        error('This branch supports only the ChicagoHS matcher')
+    endif
 endif
 foreach driver: drivers
     drivers_sources += driver_sources[driver]
@@ -275,7 +276,7 @@ deps = [
     gusb_dep,
     mathlib_dep,
 ] + optional_deps
-deps += goodix_sigfm_deps
+deps += goodix_native_deps
 
 # These are empty and only exist so that the include directories are created
 # in the build tree. This silences a build time warning.

@@ -22,6 +22,23 @@ includes="-I$test_dir/support/post_tls -I$test_dir/support -I$git_root/libfprint
 strict_flags="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-DGOODIX_LIBFPRINT_SIGFM -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 
+chicago_link=""
+algorithm_objects="$build_dir/r2.o $build_dir/preprocess.o $build_dir/metrics.o -lstdc++"
+if [ "${GOODIX_CHICAGO_TEST:-0}" = 1 ]; then
+  test_source="${GOODIX_CHICAGO_TEST_SOURCE:-$test_dir/test_goodix_chicago.c}"
+  strict_flags="$strict_flags -DGOODIX_LIBFPRINT_CHICAGO"
+  local_flags=$(printf '%s' "$local_flags" | sed 's/GOODIX_LIBFPRINT_SIGFM/GOODIX_LIBFPRINT_CHICAGO/g')
+  includes="$includes -I$git_root/production/chicago-native/chicago"
+  chicago_link="$GOODIX_CHICAGO_NATIVE_ARCHIVE"
+  algorithm_objects="$build_dir/goodix_chicago.o"
+fi
+
+if [ -n "${GOODIX_CHICAGO_STORAGE_SOURCE:-}" ]; then
+  strict_flags="$strict_flags -DGOODIX_CHICAGO_STORAGE_TEST"
+  includes="$includes -I$GOODIX_CHICAGO_STORAGE_SOURCE/src"
+  chicago_link="$build_dir/file_storage.o $chicago_link"
+fi
+
 if [ "${GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST:-0}" = 1 ]; then
   strict_flags="$strict_flags -DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
 fi
@@ -43,7 +60,7 @@ configuration_mentions=$(find "$git_root/libfprint-driver" \
   grep -H 'goodix_device_context_configure_enrollment_graph' {} + | \
   wc -l)
 if [ "$configuration_mentions" -ne 3 ] ||
-   ! grep -A60 '^production_activation_start_secure_graph' \
+   ! grep -A80 '^production_activation_start_secure_graph' \
       "$git_root/libfprint-driver/goodix_fpimage_device.c" | \
       grep -F 'goodix_device_context_configure_enrollment_graph (' >/dev/null; then
   echo "production enrollment graph caller set is not the reviewed singleton" >&2
@@ -82,6 +99,12 @@ python3 "$test_dir/support/generate_libfprint_enums.py" \
   --output-source "$build_dir/fp-enums.c" \
   "$local_fp_dir/fp-device.h" \
   "$local_fp_dir/fp-print.h"
+
+
+
+if [ -n "${GOODIX_CHICAGO_STORAGE_SOURCE:-}" ]; then
+  gcc $local_flags $glib_cflags $includes -c "$GOODIX_CHICAGO_STORAGE_SOURCE/src/file_storage.c" -o "$build_dir/file_storage.o"
+fi
 
 # ---- libfprint core subset needed for real FpImageDevice actions ----
 compile_libfprint() {
@@ -202,15 +225,19 @@ fi
 echo "goodix_fpimage_device forbidden-symbol audit: PASS"
 
 # ---- Link ----
-gcc $local_flags $glib_cflags $includes -c "$git_root/libfprint-driver/rockytkg-imgproc/goodix_imgproc.c" -o "$build_dir/r2.o"
-gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_sigfm_preprocess.c" -o "$build_dir/preprocess.o"
-g++ -std=c++17 -O2 -g $includes -c "$git_root/libfprint-driver/goodix_sigfm_metrics.cpp" -o "$build_dir/metrics.o"
-gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
+if [ "${GOODIX_CHICAGO_TEST:-0}" = 1 ]; then
+  gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_chicago.c" -o "$build_dir/goodix_chicago.o"
+else
+  gcc $local_flags $glib_cflags $includes -c "$git_root/libfprint-driver/rockytkg-imgproc/goodix_imgproc.c" -o "$build_dir/r2.o"
+  gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_sigfm_preprocess.c" -o "$build_dir/preprocess.o"
+  g++ -std=c++17 -O2 -g $includes -c "$git_root/libfprint-driver/goodix_sigfm_metrics.cpp" -o "$build_dir/metrics.o"
+fi
+gcc -Wl,--gc-sections $algorithm_objects \
   "$build_dir/fp-device.o" \
   "$build_dir/fpi-device.o" \
   "$build_dir/fp-image-device.o" \
   "$build_dir/fpi-image-device.o" \
-  "$build_dir/fpi-image.o" "$build_dir/r2.o" "$build_dir/preprocess.o" \
+  "$build_dir/fpi-image.o" \
   "$build_dir/fp-image.o" \
   "$build_dir/fp-print.o" \
   "$build_dir/fpi-print.o" \
@@ -254,7 +281,7 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   "$build_dir/test_goodix_fpimage_device.o" \
   "$build_dir/gusb_stub.o" \
   "$build_dir/fpimage_link_stubs.o" \
-  $glib_libs -lm -o "$build_dir/test_goodix_fpimage_device"
+  $chicago_link $glib_libs -lm -o "$build_dir/test_goodix_fpimage_device"
 
 set +e
 timeout --signal=TERM "$test_timeout" "$build_dir/test_goodix_fpimage_device" "$@"
@@ -266,6 +293,11 @@ case $normal_rc in
   *) echo "Normal test run: FAIL/crash (exit $normal_rc)" >&2 ;;
 esac
 set -e
+
+if [ "${GOODIX_CHICAGO_TEST:-0}" = 1 ]; then
+  echo "Chicago host fixture uses the pinned unsanitized native archive; no sanitizer PASS claimed"
+  exit "$normal_rc"
+fi
 
 echo "Running address/undefined-behavior sanitized build..."
 san_common="-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"

@@ -110,7 +110,7 @@ and the [technical manual](../../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-rec
 
 Reaching an 80×64 image was a major engineering milestone, but it answers only:
 
-> Did we receive and decode a plausible fingerprint image?
+> Did the driver receive and decode a plausible fingerprint image?
 
 Recognition asks a later and different question:
 

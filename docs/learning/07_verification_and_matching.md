@@ -3,7 +3,7 @@
 
 ## The question changes
 
-Enrollment asks, "can we build a reference?"
+Enrollment asks, "can the system build a reference?"
 
 Verification asks, "does this new touch match the reference already saved for
 this user?"
@@ -12,31 +12,34 @@ this user?"
 flowchart TD
     A["New finger touch"] --> B["Detect and capture one image"]
     B --> C["Decode and preprocess"]
-    C --> D["Extract one SIGFM probe sample"]
-    D --> E["Load enrolled host template"]
-    E --> F["Compare probe with stored samples"]
+    C --> D["Extract one ChicagoHS native probe"]
+    D --> E["Validate current sensor and Type 24 host template"]
+    E --> F["Run original ChicagoHS matching policy"]
     F --> G{"Comparison outcome"}
-    G -->|At least one score reaches threshold| H["MATCH"]
-    G -->|All valid comparisons stay below threshold| I["NO MATCH"]
+    G -->|Valid native score greater than zero| H["MATCH"]
+    G -->|Valid native score not positive| I["NO MATCH"]
     G -->|Capture, data, or processing failed| J["ERROR / RETRY STATUS"]
 ```
 
 ## MATCH
 
-A MATCH means at least one enrolled sample produced a score at or above the
-configured threshold.
+A MATCH means ChicagoHS has completed a valid native template comparison
+and returned a positive final match score. Its pinned selector threshold is
+207 and the final decision uses `score > 0`. Those values have not been
+tuned to improve the project's observed results.
 
-The matcher stops after the first matching sample. The driver then treats that
-capture result as terminal for the current verification attempt and performs
-cleanup.
+A successful verify stops the current authentication attempt after the match.
+The driver then treats the result as terminal, drains the action and performs
+cleanup. No hidden fourth physical attempt is started.
 
-MATCH does not mean that the raw images were identical. It means their feature
-representations were similar enough under the current matcher.
+MATCH does not mean that the raw images were identical. It means the native
+ChicagoHS feature representation and saved Type 24 subtemplates satisfied
+the original matching policy on that probe.
 
 ## NO MATCH
 
-NO MATCH means the system obtained a valid probe, made valid comparisons, and
-none reached the threshold.
+NO MATCH means the system obtained a valid ChicagoHS probe, evaluated the
+compatible saved template and returned a nonpositive final match score.
 
 This is different from a broken USB transfer, malformed image, cancelled
 operation, or feature-extraction failure.
@@ -111,12 +114,15 @@ Two closely related operations exist:
   report which one matched, if any.
 
 `fprintd` can use identification when the user chooses "any" enrolled finger.
-Both still use the same capture, feature extraction, and SIGFM comparison
-ideas.
+Both use the same native ChicagoHS capture/preprocessing and Type 24 matching
+engine. One probe is extracted once per action and compared with the
+compatible gallery. A different backend's saved templates are not converted
+or silently accepted.
 
 ## ✅ What to remember
 
-- Verification creates one new probe and compares it with stored samples.
+- Verification creates one new native ChicagoHS probe and compares it with
+  the saved, device-bound Type 24 template.
 - MATCH, NO MATCH, and ERROR are different outcomes.
 - A clean NO MATCH may be followed by another explicit attempt after cleanup.
 - The tested PAM and Plasma Login series allow at most three attempts and stop

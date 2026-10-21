@@ -17,10 +17,12 @@ and factory data.
 Within the supported Fedora 44 KDE scope, the project integrates enrollment,
 verification, screen unlocking, ordinary sudo, PolicyKit, Plasma fingerprint
 login and password fallback through Fedora's existing authentication stack.
-Fedora qualification concerns one APP12509 reader. APP12508 has contributor-reported
-pairing, enrollment, VERIFY and IDENTIFY evidence on a Huawei MateBook D with
-Ubuntu GNOME; this does not extend the supported Fedora platform to Ubuntu/GNOME
-or qualify the full Fedora authentication path on APP12508. See
+An initial live functional check of the current driver passed on one APP12509
+reader in a Fedora KDE VM, including enrollment, verification, authentication,
+reboot, password fallback and bounded Windows coexistence. APP12508 has
+contributor-reported evidence from the earlier driver on Ubuntu GNOME, not full
+Fedora qualification for the current biometric engine. These observations do
+not establish general recognition accuracy or cross-device compatibility. See
 [validation and limitations](docs/VALIDATION.md).
 
 ## Installation
@@ -34,14 +36,27 @@ or qualify the full Fedora authentication path on APP12508. See
 integration and removal commands. It requests normal sudo authentication when
 needed.
 
-You need an administrative access. Git must be
-available to run the bootstrap block.
+You need administrative access. Git must be available to run the bootstrap block.
 
 After a successful installation, the repository clone may be removed.
 
+### Upgrading from an earlier release
+
+Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
+fingerprint format. The standard installer is designed to replace a recognized 2.x runtime
+without a preliminary manual uninstall, while preserving host pairing state,
+existing fingerprint files and password access. **Previously enrolled fingers
+must be enrolled again** because the old templates cannot be used by the new
+engine. The real-device upgrade from a populated 2.x installation remains a
+release qualification gate; see [installation](docs/INSTALLATION.md) and
+[validation](docs/VALIDATION.md). An optional return to an older version uses
+a pinned historical release rather than the current `main` branch.
+
 ## Using fingerprint authentication
 
-The first fingerprint action initializes the reader by itself.
+The first fingerprint action initializes the reader by itself. New enrollments
+follow the current native twelve-stage policy; repositioning prompts may require
+additional physical touches.
 
 Manage enrolled fingers through KDE's fingerprint settings. At Plasma Login,
 a nonempty password uses ordinary password login immediately. Submitting an

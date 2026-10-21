@@ -67,6 +67,12 @@ typedef struct _GUsbDevice GUsbDevice;
  * contact; completion is driven solely by the 21st accepted sample. */
 #define GOODIX_SIGFM_ENROLL_PHYSICAL_CONTACTS_UNBOUNDED G_MAXUINT
 
+#ifdef GOODIX_LIBFPRINT_CHICAGO
+#define GOODIX_BIOMETRIC_ENROLL_STAGES 12u
+#else
+#define GOODIX_BIOMETRIC_ENROLL_STAGES GOODIX_SIGFM_ENROLL_REQUIRED_STAGES
+#endif
+
 typedef enum
 {
   GOODIX_PRE_SESSION_RX_SYNC_NOT_STARTED = 0,
@@ -194,6 +200,8 @@ GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 gboolean goodix_fpimage_device_test_action_requires_live_preflight (
   FpiDeviceAction action);
+gboolean goodix_fpimage_device_test_action_may_start_without_material (
+  FpiDeviceAction action, GoodixRuntimeCoordinatorDecision decision);
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 void goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
@@ -380,6 +388,14 @@ void goodix_device_context_emit_terminal_error       (GoodixDeviceContext *ctx,
 #endif
 void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext *ctx,
                                                             guint64 generation);
+
+
+
+#if defined(GOODIX_LIBFPRINT_CHICAGO) && defined(GOODIX_ENABLE_TEST_SEAMS)
+gboolean goodix_device_context_test_chicago_prepare (GoodixDeviceContext *ctx, const guint8 otp[64], const guint16 background[5120], GError **error);
+gboolean goodix_device_context_test_chicago_pairing_activation (GoodixDeviceContext *ctx, GError **error);
+gboolean goodix_device_context_test_chicago_native_source_guard (GoodixDeviceContext *ctx, GError **error);
+#endif
 
 G_END_DECLS
 

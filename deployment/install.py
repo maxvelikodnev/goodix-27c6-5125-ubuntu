@@ -185,23 +185,27 @@ def install_tools(source_id):
     command('restorecon', '-F', str(r.RECOVERY), str(r.RECOVERY / 'receipt.json'), str(r.NORMAL), str(r.FORCE))
 
 
-def install_selinux_module():
-    if r.selinux_module_present():
+def install_selinux_module(policy_bytes):
+    """Restore a verified legacy module only during rollback."""
+    current = r.selinux_module_present()
+    if current is not None:
+        require(current == policy_bytes, 'legacy SELinux module changed before rollback')
         return
     with tempfile.TemporaryDirectory(prefix='goodix-selinux-') as directory:
         policy = Path(directory) / (r.SELINUX_MODULE_NAME + '.cil')
         descriptor = os.open(policy, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, 'w', encoding='ascii') as stream:
-            stream.write(r.SELINUX_MODULE_RULE + '\n')
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(policy_bytes)
             stream.flush()
             os.fsync(stream.fileno())
         command('semodule', '-X', r.SELINUX_MODULE_PRIORITY, '-i', str(policy))
-    require(r.selinux_module_present(), 'project SELinux module installation could not be verified')
+    require(r.selinux_module_present() == policy_bytes,
+            'project SELinux module restoration could not be verified')
 
 
 def restore_selinux_module(was_present):
     if was_present:
-        install_selinux_module()
+        install_selinux_module(was_present)
     else:
         r.remove_selinux_module()
 
@@ -215,7 +219,8 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         relative = name.removeprefix('runtime/')
         path = r.RUNTIME / relative
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
-        write_file(path, (payload / name).read_bytes())
+        write_file(path, (payload / name).read_bytes(),
+                   0o644)
         hashes[relative] = digest
     links = {}
     for name, target in manifest['links'].items():
@@ -227,6 +232,7 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         'rule': r.RULE, 'owned': not rule_preexisting,
         'preexisting': rule_preexisting, 'phase': 'ready'}
     write_json(r.RUNTIME / 'installation.json', {'schema': 2, 'source_id': manifest['source_id'],
+        'matcher': 'chicago-type24',
         'files': hashes, 'links': links, 'material_selinux': material_selinux,
         'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
         'state_root': str(r.STATE)})
@@ -438,12 +444,13 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
             print('GOODIX_INSTALL_MODE=' + mode, flush=True)
             saved = snapshot_software(staging)
             rule_before = material_rule()
+            selinux_module_before = r.selinux_module_present()
             try:
                 if saved:
                     with redirect_stdout(io.StringIO()):
                         require(r.remove(force=False) == 0, 'existing installation could not be removed')
                 install_tools(manifest['source_id'])
-                install_selinux_module()
+                r.remove_selinux_module()
                 if bundle is not None and not reuse:
                     materials.install_materials(bundle, r.MATERIAL, native_check=native_check)
                 create_state_root()
@@ -463,7 +470,8 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 print('GOODIX_ROLLBACK=PASS PRIOR_PROJECT_SOFTWARE_RESTORED=true', file=sys.stderr)
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')
-    print('Use KDE fingerprint settings to enroll or your existing template. The service was not started by installation.')
+    print('ChicagoHS requires new enrollment for every finger/user; SIGFM and Milan templates are incompatible.')
+    print('Live biometric qualification remains pending. The service was not started by installation.')
     print('Removal: goodix-uninstall. Emergency recovery: goodix-force-remove.')
 
 
@@ -497,6 +505,8 @@ def main():
         return 0
     require(os.geteuid() != 0, 'run ./install.sh as your ordinary user; it requests sudo itself')
     require(args.owner_uid is None and args.default_materials is None, 'invalid invocation')
+    # An incomplete or modified native source set must stop before sudo/packages.
+    builder.validate_chicago_sources()
     supported_system()
     if args.check:
         prerequisites()

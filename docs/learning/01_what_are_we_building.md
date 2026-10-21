@@ -71,8 +71,8 @@ new touch → new features → compare → MATCH / NO MATCH
 
 ### Enrollment
 
-Enrollment asks: **can we collect enough useful views to make a reusable
-template?**
+Enrollment asks: **can the system collect enough useful views to make a
+reusable template?**
 
 ```text
 touch 1 ─┐
@@ -87,8 +87,10 @@ the separate job of building the reference that later logins will use.
 ## What the project adds
 
 Fedora already provides `fprintd`, PAM, KDE integration, and most of
-`libfprint`. This project adds the Goodix-specific device path and SIGFM
-biometric support needed for this reader. It also adds a small, removable
+`libfprint`. The Goodix driver adds the target-specific device path and
+the native ChicagoHS biometric backend needed for this reader. The backend
+prepares a calibration from the no-finger image, extracts fingerprint features,
+and matches native Type 24 templates. The project also adds a small, removable
 selector for fingerprint login at Plasma Login on the tested Fedora setup.
 
 The intended boundary is:

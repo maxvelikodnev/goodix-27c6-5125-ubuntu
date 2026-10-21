@@ -6,8 +6,10 @@
 Fedora 44 KDE on x86_64, a local user account, Goodix USB `27c6:5125` running
 `GF_ST411SEC_APP_12509` or `GF_ST411SEC_APP_12508`, Fedora's stock fprintd, PAM
 and Plasma Login, and SELinux Enforcing. Fedora qualification concerns one
-APP12509 reader; APP12508 recognition is backed by contributor hardware evidence
-on Ubuntu GNOME, not a complete Fedora authentication/lifecycle qualification.
+APP12509 reader, where the current biometric implementation has also passed
+initial supervised VM/live checks. APP12508 recognition has contributor hardware
+evidence from the earlier driver on Ubuntu GNOME, not a complete qualification
+of the current biometric implementation on Fedora.
 Other hardware, unlisted firmware, distributions and network accounts are
 unsupported. See [validation](VALIDATION.md) for the qualification boundary.
 
@@ -39,9 +41,13 @@ if [ -d "$REPO/.git" ] && [ ! -L "$REPO" ]; then
         https://github.com/sorguido/goodix-27c6-5125.git|git@github.com:sorguido/goodix-27c6-5125.git) ;;
         *) echo "STOP: $REPO is not the Goodix Git repository."; exit 1 ;;
     esac
+    if [ "$(git -C "$REPO" branch --show-current)" != "main" ]; then
+        echo "STOP: use a main checkout for canonical installation; no branch switch was made."
+        exit 1
+    fi
     git -C "$REPO" pull --ff-only
 elif [ ! -e "$REPO" ] && [ ! -L "$REPO" ]; then
-    git clone https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
+    git clone --branch main --single-branch https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
 else
     echo "STOP: $REPO exists but is not the Goodix Git repository."
     exit 1
@@ -126,10 +132,12 @@ The standard procedure above needs no override.
 
 After successful installation, use KDE's normal fingerprint settings to manage
 your enrolled fingers. The first fingerprint action takes slightly longer while
-the reader is initialized; later actions do not repeat that step. If your finger
-is already enrolled, keep that enrollment;
-installation preserves existing templates. Otherwise enroll one finger following
-the normal prompts, without opening simultaneous fingerprint applications.
+the reader is initialized; later actions do not repeat that step. If already
+enrolled with the current driver, the existing compatible template remains
+available. **Fingerprints enrolled with the earlier 2.x/SIGFM engine must be
+enrolled again** after the major upgrade: the old format is preserved but cannot
+be read by the new matcher. Otherwise enroll one finger following the normal
+prompts, without opening simultaneous fingerprint applications.
 
 ### Recommended enrollment practice
 
@@ -147,8 +155,10 @@ During enrollment:
 - keep the finger reasonably flat on the sensor and avoid deliberately
   repeating the same contact area.
 
-The goal is not to reproduce the same touch 21 times, but to build good coverage
-of the finger across the 21 accepted samples.
+The goal is not to repeat one identical touch. The native biometric engine
+advances through twelve accepted enrollment stages, but physical contacts and
+retained subtemplates may exceed that number because of quality or position
+prompts. Good coverage remains more important than repeating one position.
 
 Windows Hello follows a similar principle and explicitly encourages capturing
 the finger from different angles. KDE's standard enrollment dialog may provide
@@ -186,6 +196,16 @@ Never attach host pairing state, templates, fingerprint images or raw USB captur
 ## What updates and reinstalls preserve
 
 The same bootstrap block checks dependencies and rebuilds from current source.
+When moving from version 2.x to 3.0.0, the installer is designed to recognize
+the previous project software and replace it transactionally; a preliminary
+manual uninstall is not normally necessary. The direct upgrade with populated
+historical templates and real pairing state is still awaiting final VM
+qualification. A failed ownership, receipt or state check must stop instead
+of trying to guess how to migrate. After successful upgrade, new fingerprint
+enrollment is required; this is a format incompatibility, not loss of the
+preserved old template files. A deliberate downgrade uses a pinned historical
+version (see [removal and recovery](UNINSTALL.md)), not the current main branch.
+
 Existing project software is replaced while fprintd is quiescent. Host pairing
 state and existing templates are preserved; a reader's pairing identity is never
 changed by an update, and reinstallation after removal does not re-pair it.
@@ -202,5 +222,6 @@ pairing when it initializes the device; Linux classifies that change read-only,
 preserves the Windows record byte-for-byte and restores its own stored key with
 one qualified write on the next fingerprint action. No reinstall, re-enrollment
 or manual key handling is needed, and no key is shared between the two operating
-systems. Coexistence is qualified for one reader and one Windows 11 virtual
-machine; see [validation](VALIDATION.md) for that boundary.
+systems. Initial Windows/Linux switching with the current driver was observed
+to succeed on one reader. The exact pairing-write/readback/TLS audit remains
+separate from that functional result; see [validation](VALIDATION.md).

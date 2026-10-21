@@ -15,20 +15,21 @@ That reusable representation is called a **template**.
 
 ## The project-specific image pipeline
 
-The production path for this project uses **SIGFM**. This is the name of the
-feature extraction and matching method integrated into the Goodix-enabled
-`libfprint` build.
+The driver uses a native biometric engine called **ChicagoHS**. The image is
+calibrated, processed and converted into features that form a stored Type 24
+template. Those operations happen in the Goodix-enabled `libfprint` runtime,
+not inside Fedora's login screen.
 
 The path is:
 
 ```mermaid
 flowchart LR
-    A["80 x 64 raw sensor raster"] --> B["Compare with no-finger baseline"]
-    B --> C["Target-specific preprocessing"]
-    C --> D["8-bit fingerprint image"]
-    D --> E["SIGFM feature extraction"]
-    E --> F["Keypoints and descriptors"]
-    F --> G["Template sample"]
+    A["Current 80 x 64 finger raster"] --> D["Native image preprocessing"]
+    B["Same-session no-finger FDT_B0 raster"] --> C["Generate calibration"]
+    C --> D
+    D --> E["Extract fingerprint features"]
+    E --> F["Native feature records and subtemplates"]
+    F --> G["Type 24 template inside sensor-bound FpPrint"]
 ```
 
 ### 1. Raw raster
@@ -38,37 +39,46 @@ sensor.
 
 ### 2. Preprocessing
 
-The current pipeline uses the session's no-finger image as a baseline. It
-combines that baseline with the finger image and produces an 8-bit grayscale
-raster suitable for SIGFM.
+The current driver uses the same-session no-finger `FDT_B0` image as the
+input to calibration generation. The native biometric engine
+generates gain/offset state and processes the 80×64 unsigned 12-bit finger
+raster with its own native preprocessing. A separate 8-bit rendering, if
+supplied to libfprint, is for display and not for biometric matching.
 
 This is closer to preparing a scanned page before optical character recognition
 than to recognizing the person directly. It improves the input; it does not
-make the final identity decision.
+make the final identity decision. The relationship between the 5125 USB
+`FDT_B0` and the upstream SPI T0/ImageBase is supported by initial functional
+results, but not proven physically identical across devices.
 
 ### 3. Feature extraction
 
-SIGFM finds **keypoints** and builds numerical **descriptors** around them.
-A keypoint is a locally interesting place in the fingerprint image. A
-descriptor summarizes what the nearby pattern looks like so that it can be
-compared later.
+The matcher extracts **native feature records** from each processed
+finger image. These records are used to construct subtemplates with the native
+Type 24 enrollment and matching policy. The feature format and its scoring
+must not be reduced to an ordinary pixel-by-pixel image comparison.
 
 Many fingerprint explanations use the word **minutiae** for ridge endings and
 bifurcations. That is a useful general concept, but it would be misleading to
-say that this production path stores only a classic minutiae list. Its actual
-stored samples are SIGFM keypoints and descriptors.
+say this driver's saved Type 24 data is only a classic minutiae list. Its
+actual stored representation uses the engine's native subtemplate format.
 
 ### 4. Template sample
 
-The extracted representation becomes one sample inside a `libfprint`
-fingerprint template. Enrollment can place several accepted samples into the
-same template so later touches have more than one useful reference.
+The extracted representation becomes a native subtemplate. The original
+twelve-stage enrollment policy can retain several subtemplates, including
+some contacts that do not advance the visible enrollment stage because of
+position guidance. When complete, the packed native template is wrapped
+inside a sensor-bound `FpPrint` so later touches have useful references.
 
 ## What is saved—and what is not
 
-The template is not meant to be a normal photograph. `libfprint` serializes the
-SIGFM feature representation together with metadata needed to understand it.
-The raw debugging image is not the normal stored identity record.
+The template is not meant to be a normal photograph. `libfprint` serializes
+the native Type 24 representation within a RAW FpPrint envelope,
+including its backend identity and OTP-bound device information. The raw
+fingerprint raster is not the normal stored identity record. Templates made
+by older biometric engines are preserved but cannot be
+matched or converted by the current implementation.
 
 This does not make templates harmless. A biometric template is sensitive
 personal data and must not be published, attached to bug reports, or committed
@@ -76,23 +86,25 @@ to source control.
 
 ## Matching is a score, then a decision
 
-During verification, SIGFM extracts one new probe sample. It compares that
-probe with the enrolled samples one at a time and produces a similarity score.
+During verification, the driver preprocesses the new probe once and uses
+its original matching algorithm to evaluate the stored Type 24 template.
+The native selector threshold is 207; the final match decision is
+`score > 0`, without application-specific threshold adjustments.
 
 ```text
-probe sample
+new extracted probe
     │
-    ├─ compare with enrolled sample 1
-    ├─ compare with enrolled sample 2
-    └─ compare with enrolled sample 3 ...
+    ├─ validate current reader and stored Type 24 template
+    ├─ evaluate stored native subtemplates
+    └─ apply the original native match policy
 
-any score reaches the configured threshold → MATCH
-no score reaches it                         → NO MATCH
-matcher cannot process valid data           → ERROR
+valid native match score > 0  → MATCH
+valid native match score <= 0 → NO MATCH
+invalid data or failed engine → ERROR (never a fabricated NO MATCH)
 ```
 
-A threshold is a boundary chosen by the implementation. It is not a statement
-that two fingerprints are mathematically identical.
+Those implementation thresholds are not statements that the fingerprints
+are mathematically identical, nor are they measured FAR/FRR guarantees.
 
 ## Features are not identity by themselves
 
@@ -104,19 +116,22 @@ the user account and finger label.
 The sensor does not receive a list of local Linux users and does not choose one.
 
 > 🔎 **Want to see this in the repository?**
-> Baseline-aware image preprocessing is connected in
-> [`goodix_fpimage_pipeline.c`](../../libfprint-driver/goodix_fpimage_pipeline.c).
-> The SIGFM extraction, score, and safe serialization boundary is in
-> [`goodix_sigfm_metrics.cpp`](../../libfprint-driver/goodix_sigfm_metrics.cpp).
+> The USB background and capture lifecycle are connected in
+> [`goodix_fpimage_device.c`](../../libfprint-driver/goodix_fpimage_device.c).
+> The native biometric adapter, probe, enrollment, matching and
+> sensor-bound serialization are in
+> [`goodix_chicago.c`](../../libfprint-driver/goodix_chicago.c)
+> and the pinned [native source files](../../production/chicago-native/).
 
 ## ✅ What to remember
 
 - Pixel-for-pixel comparison would be too fragile.
 - Preprocessing prepares the image; it does not identify the user.
-- The current production representation is SIGFM keypoints and descriptors,
-  not merely a traditional minutiae list.
-- A template can contain several accepted feature samples.
-- Matching compares a new probe with stored samples and applies a threshold.
+- The stored representation is native Type 24 subtemplates,
+  rather than an ordinary grayscale image or classic minutiae list.
+- Enrollment can retain more subtemplates than the twelve stages it advances.
+- The native matcher applies its original scoring and decision
+  without relaxing quality or matching conditions.
 - Templates are sensitive biometric data even though they are not ordinary
   fingerprint photographs.
 

@@ -170,6 +170,8 @@ fp_image_device_change_state (FpImageDevice *self, FpiImageDeviceState state)
     }
 }
 
+static void fp_image_device_maybe_complete_action (FpImageDevice *self, GError *error);
+
 static void
 fp_image_device_enroll_maybe_await_finger_on (FpImageDevice *self)
 {
@@ -181,6 +183,13 @@ fp_image_device_enroll_maybe_await_finger_on (FpImageDevice *self)
       priv->enroll_completion_held)
     return;
 
+  if (priv->algorithm == FPI_PRINT_RAW &&
+      priv->enroll_stage == fp_device_get_nr_enroll_stages (FP_DEVICE (self)))
+    {
+      fp_image_device_maybe_complete_action (self, NULL);
+      fpi_image_device_deactivate (self, FALSE);
+      return;
+    }
   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
 }
 
@@ -610,6 +619,118 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
 
   /* XXX: This is wrong if we add support for raw capture mode. */
   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+}
+
+/* Native RAW biometric completion uses the established FpImageDevice lifecycle.
+ * Processing has already completed in the driver's capture boundary; no second
+ * USB state machine, worker or installed service is involved. */
+void
+fpi_image_device_raw_image_captured (FpImageDevice *self, FpImage *image,
+                                     FpPrint *print, gint enroll_stage, GError *error)
+{
+  FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
+  FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (self);
+  FpDevice *device = FP_DEVICE (self);
+  FpiDeviceAction action = fpi_device_get_current_action (device);
+  g_autoptr(FpImage) owned_image = image;
+  g_autoptr(FpPrint) owned_print = print;
+
+  g_return_if_fail (priv->algorithm == FPI_PRINT_RAW);
+  g_return_if_fail (priv->state == FPI_IMAGE_DEVICE_STATE_CAPTURE);
+  g_return_if_fail (!priv->minutiae_scan_active);
+  if (!error)
+    g_cancellable_set_error_if_cancelled (fpi_device_get_cancellable (device), &error);
+  fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+  if (error && error->domain != FP_DEVICE_RETRY)
+    {
+      fp_image_device_maybe_complete_action (self, error);
+      fpi_image_device_deactivate (self, TRUE);
+      return;
+    }
+  if (action == FPI_DEVICE_ACTION_CAPTURE)
+    {
+      priv->capture_image = g_steal_pointer (&owned_image);
+      fp_image_device_maybe_complete_action (self, error);
+    }
+  else if (action == FPI_DEVICE_ACTION_ENROLL)
+    {
+      FpPrint *enrolled;
+      fpi_device_get_enroll_data (device, &enrolled);
+      if (error || enroll_stage != priv->enroll_stage + 1 ||
+          enroll_stage > fp_device_get_nr_enroll_stages (device) ||
+          (enroll_stage == fp_device_get_nr_enroll_stages (device) && !print))
+        {
+          g_clear_error (&error);
+          fp_image_device_maybe_complete_action (self, fpi_device_error_new (FP_DEVICE_ERROR_DATA_INVALID));
+          fpi_image_device_deactivate (self, TRUE);
+          return;
+        }
+      if (print)
+        {
+          g_autoptr(GVariant) data = NULL;
+          g_object_get (print, "fpi-data", &data, NULL);
+          if (fpi_print_get_type (print) != FPI_PRINT_RAW || !data)
+            {
+              fp_image_device_maybe_complete_action (self, fpi_device_error_new (FP_DEVICE_ERROR_DATA_INVALID));
+              fpi_image_device_deactivate (self, TRUE);
+              return;
+            }
+          g_object_set (enrolled, "fpi-data", data, NULL);
+          fpi_print_set_device_stored (enrolled, FALSE);
+        }
+      priv->enroll_stage = enroll_stage;
+      fpi_device_enroll_progress (device, enroll_stage, NULL, NULL);
+      if (enroll_stage == fp_device_get_nr_enroll_stages (device))
+        {
+          if (!priv->enroll_completion_held && !priv->finger_present)
+            {
+              fp_image_device_maybe_complete_action (self, NULL);
+              fpi_image_device_deactivate (self, FALSE);
+            }
+        }
+      else fp_image_device_enroll_maybe_await_finger_on (self);
+    }
+  else if (action == FPI_DEVICE_ACTION_VERIFY || action == FPI_DEVICE_ACTION_IDENTIFY)
+    {
+      FpPrint *matched = NULL;
+      FpiMatchResult result = FPI_MATCH_ERROR;
+      if (!error && (!print || !cls->raw_match))
+        error = fpi_device_error_new (FP_DEVICE_ERROR_DATA_INVALID);
+      if (action == FPI_DEVICE_ACTION_VERIFY)
+        {
+          FpPrint *enrolled;
+          fpi_device_get_verify_data (device, &enrolled);
+          if (!error) result = cls->raw_match (self, enrolled, print, &error);
+          if (!error) g_cancellable_set_error_if_cancelled (fpi_device_get_cancellable (device), &error);
+          if (cls->verify_result) cls->verify_result (self, error == NULL, result == FPI_MATCH_SUCCESS);
+          if (!error || error->domain == FP_DEVICE_RETRY)
+            fpi_device_verify_report (device, result, NULL, g_steal_pointer (&error));
+        }
+      else
+        {
+          GPtrArray *gallery;
+          fpi_device_get_identify_data (device, &gallery);
+          for (guint i = 0; !error && i < gallery->len; i++)
+            {
+              FpPrint *enrolled = g_ptr_array_index (gallery, i);
+              result = cls->raw_match (self, enrolled, print, &error);
+              if (result == FPI_MATCH_SUCCESS) { matched = enrolled; break; }
+            }
+          if (!error) g_cancellable_set_error_if_cancelled (fpi_device_get_cancellable (device), &error);
+          if (cls->identify_result) cls->identify_result (self, error == NULL, matched != NULL);
+          if (!error || error->domain == FP_DEVICE_RETRY)
+            fpi_device_identify_report (device, matched, NULL, g_steal_pointer (&error));
+        }
+      gboolean cancelled = g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+      fp_image_device_maybe_complete_action (self, error);
+      if (cancelled) fpi_image_device_deactivate (self, TRUE);
+    }
+  else
+    {
+      g_clear_error (&error);
+      fp_image_device_maybe_complete_action (self, fpi_device_error_new (FP_DEVICE_ERROR_PROTO));
+      fpi_image_device_deactivate (self, TRUE);
+    }
 }
 
 /**

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "authoritative": false,
+  "project": "Goodix 27c6:5125 — ChicagoHS",
+  "candidate": "ChicagoHS",
+  "phase": "CH4",
+  "phase_status": "CHICAGOHS_SOFTWARE_RC_READY_FOR_VM",
+  "software_rc_ready_for_vm": "PASS",
+  "completed_gates": [
+    "CH0_SOURCE_BASELINE",
+    "CH1_NATIVE_BACKEND_AND_BINDING",
+    "CH2_LIBFPRINT_ACTIONS",
+    "CH3_CANONICAL_BUILD_RECOVERY",
+    "CH4_INDEPENDENT_REVIEW"
+  ],
+  "live_qualification": "NOT_RUN",
+  "vm_installation": "NOT_RUN",
+  "host_modified": false,
+  "implementation_baseline": "ddc09472229bd88d8b4a072039e6f2d5a07579d5",
+  "rc_source_id": "bdc3729d6467636d06045190f08e3eb3852dcc84181e080f9182984c3f0cc5a4",
+  "verification": {
+    "native_tests": 64,
+    "optional_OEM_oracles_skipped": 42,
+    "adapter_and_stock_storage": 6,
+    "packaging_fixtures": 121,
+    "transport_pairing_normal_tests": 202,
+    "corpus_admissions": "35/35",
+    "enrollment": "12 stages / 20 contacts",
+    "separate_process_matching": "3 genuine MATCH / 3 impostor NO_MATCH / 2 partial NO_MATCH",
+    "libfprint_actions": "enroll + 8 verify + 8 identify; simulated transport and identity",
+    "sanitizers": "NOT_RUN_MISSING_HOST_LIBRARIES",
+    "installer_check": "PASS_READ_ONLY",
+    "independent_review": "ACCEPT_AND_CONTINUE",
+    "selinux_cleanup": {
+      "install": 32,
+      "recovery": 54,
+      "public_builder": 21,
+      "install_selection": 8,
+      "bootstrap": 6,
+      "self_contained_build": "PASS",
+      "runtime_avc_absence": "NOT_RUN"
+    }
+  },
+  "relevant_artifacts": [
+    "production/build-public.py",
+    "production/build-chicago-native.py",
+    "production/chicago-native/source-manifest.json",
+    "libfprint-driver/goodix_chicago.c",
+    "libfprint-driver/tests/test_goodix_chicago.c",
+    "deployment/install.py",
+    "deployment/recovery/remove.py",
+    "docs/VALIDATION.md",
+    "development/private-root/analysis/CHICAGO_RC_2026-10-21/REPORT.md",
+    "development/private-root/analysis/CHICAGO_RC_2026-10-21/REVIEW.md"
+  ],
+  "qualification_limits": [
+    "No real USB, host installation, VM installation, Windows recovery or desktop authentication executed",
+    "FDT_B0 physical equivalence, cross-device identity uniqueness, FAR/FRR and liveness remain unqualified",
+    "Opaque native heap is freed; complete zeroization is not guaranteed"
+  ],
+  "next_action": "Supervised isolated Fedora KDE VM software installation without USB; live qualification requires separate user authorization",
+  "obsolete_selinux_module_removed": "PASS"
+}

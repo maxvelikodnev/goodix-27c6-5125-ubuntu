@@ -22,11 +22,10 @@ does.
 You do not need to read source code. Optional source links are included for
 curious readers, but the story stands on its own.
 
-The project-specific parts describe the supported Goodix USB `27c6:5125` target,
-recognized firmware `GF_ST411SEC_APP_12509` and `GF_ST411SEC_APP_12508`, and
-Fedora 44 KDE setup. Fedora qualification concerns APP12509; APP12508 has
-separate contributor hardware evidence described in
-[Validation](../VALIDATION.md#app12508-contributor-evidence).
+The project-specific parts describe the Goodix USB `27c6:5125` reader,
+recognized firmware `GF_ST411SEC_APP_12509` and `GF_ST411SEC_APP_12508`,
+and Fedora 44 KDE. Hardware qualification is limited to the devices and
+usage patterns described in [Validation and limitations](../VALIDATION.md).
 Other Linux systems may arrange the upper layers differently.
 
 ## The four zoom levels
@@ -53,7 +52,7 @@ You can stop after any chapter and still keep a useful mental picture.
 2. [From Fedora to the sensor](02_from_fedora_to_the_sensor.md) — the Linux layers and why they are separate.
 3. [Preparing a tiny computer](03_preparing_the_sensor.md) — identity, first-use pairing, runtime setup, and the secure channel.
 4. [From finger detection to image](04_from_finger_to_image.md) — the doorbell, the camera, and the image bytes.
-5. [From image to fingerprint template](05_from_image_to_template.md) — preprocessing, features, and SIGFM.
+5. [From image to fingerprint template](05_from_image_to_template.md) — image calibration, feature extraction, and templates.
 6. [Enrollment](06_enrollment.md) — how several touches become a reusable template.
 7. [Verification and matching](07_verification_and_matching.md) — MATCH, NO MATCH, retry, and cancellation.
 8. [Login, lock screen, sudo, and PolicyKit](08_desktop_authentication.md) — one fingerprint stack, different experiences.

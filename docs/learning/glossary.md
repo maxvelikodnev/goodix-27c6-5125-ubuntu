@@ -32,8 +32,9 @@ sensor readings and images can be interpreted relative to the empty sensor.
 ## Biometric template
 
 A saved, machine-readable representation of biometric features. In this
-project, a template contains SIGFM feature samples and metadata; it is not just
-a normal fingerprint photograph.
+project's fingerprint driver, a template contains packed native Type 24
+subtemplates and the device-bound RAW FpPrint envelope; it is not a normal
+fingerprint photograph.
 
 ## Binary file
 
@@ -82,9 +83,10 @@ the guide does not claim an exact physical meaning for each value.
 
 ## Descriptor
 
-Numbers describing the pattern around a feature point. SIGFM compares these
-descriptors rather than requiring two fingerprint images to be pixel-for-pixel
-identical.
+Numbers describing the pattern around a feature point. They are useful for
+understanding the historical SIGFM method, which compared descriptors without
+requiring fingerprint images to be pixel-for-pixel identical. The current
+current biometric engine uses its own native feature records and matching policy.
 
 ## Driver
 
@@ -110,7 +112,8 @@ designed to preserve it.
 ## Feature / keypoint
 
 A locally distinctive part of a processed fingerprint image used by the
-matcher. The current SIGFM path stores keypoints and descriptors.
+matcher. The current driver extracts native feature records and assembles them
+into Type 24 subtemplates, not merely traditional feature points.
 
 ## Finger detection (FDT)
 
@@ -197,10 +200,9 @@ are active without exposing its implementation details.
 
 ## Minutiae
 
-Traditional fingerprint features such as ridge endings and bifurcations. They
-are common in fingerprint systems, but this project's production SIGFM format
-uses its own keypoint-and-descriptor representation rather than only a classic
-minutiae list.
+Traditional fingerprint features such as ridge endings and bifurcations.
+The current biometric engine uses native feature and subtemplate formats;
+do not assume they are simply an exported classic minutiae list.
 
 ## NO MATCH
 
@@ -233,8 +235,10 @@ PAM fingerprint path.
 
 ## Preprocessing
 
-Preparing decoded image data for feature extraction. The Goodix SIGFM path uses
-the no-finger baseline and current finger frame to produce an 8-bit raster.
+Preparing decoded image data for feature extraction. The driver generates
+calibration from a same-session no-finger FDT_B0 image and processes the
+80×64 12-bit finger raster with the original native preprocessor. Its
+rendering for display is not the biometric matcher input.
 
 ## Probe
 
@@ -276,11 +280,23 @@ MATCH decision was produced, or because enrollment needs different coverage.
 The software and temporary state used while the system is operating. Runtime
 configuration is not the same as rewriting persistent factory state.
 
+## ChicagoHS
+
+The canonical native biometric engine of the Goodix driver, replacing
+SIGFM for the planned 3.0.0 release. It uses the same-session no-finger
+image to generate calibration, preprocesses captured frames
+extracts original ChicagoHS features, and builds Type 24 templates. The
+original native enrollment policy advances through twelve accepted stages,
+while preserving its own position-based retry/defer behavior. Its matcher
+uses the native selector threshold 207 and score > 0 decision; these values
+do not imply measured FAR/FRR.
+
 ## SIGFM
 
-The feature extraction and matching path used by this project's production
-`libfprint`. It turns a preprocessed image into keypoints and descriptors and
-computes comparison scores.
+The feature extraction and matching method used by earlier Goodix releases,
+including `v2.2.1`. It turns a preprocessed image into keypoints and
+descriptors and computes comparison scores. It uses a different template
+format from the current driver.
 
 ## Threshold
 

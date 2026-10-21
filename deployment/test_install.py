@@ -57,11 +57,13 @@ class Installer(unittest.TestCase):
         self.active = True
         self.rule = False
         self.selinux_modules = []
+        self.selinux_policy = m.r.SELINUX_MODULE_RULE.encode() + b'\n'
         self.fail_login = False
         self.ctx.enter_context(patch.object(m, 'command', side_effect=self.command))
         self.ctx.enter_context(patch.object(m.r, 'command', side_effect=self.command))
         self.ctx.enter_context(patch.object(m, 'supported_system'))
         self.ctx.enter_context(patch.object(m, 'prerequisites'))
+        self.ctx.enter_context(patch.object(m.builder, 'validate_chicago_sources', return_value={}))
         self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
         self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
         self.ctx.enter_context(patch.object(m, 'label_materials', side_effect=self.labels))
@@ -117,7 +119,7 @@ class Installer(unittest.TestCase):
         if m.r.MATERIAL.exists():
             self.assertTrue(self.rule)
 
-    def command(self, *args):
+    def command(self, *args, cwd=None):
         args = tuple(str(a) for a in args)
         self.events.append(args)
         self.assertFalse(any('/dev/bus/usb' in a or '/sys/bus/usb' in a for a in args))
@@ -146,13 +148,18 @@ class Installer(unittest.TestCase):
         if args[:3] == ('semanage', 'fcontext', '-d'):
             self.rule = False
             return ''
+        if args == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY,
+                    '--cil', '--extract', m.r.SELINUX_MODULE_NAME):
+            self.assertIsNotNone(cwd)
+            (Path(cwd) / (m.r.SELINUX_MODULE_NAME + '.cil')).write_bytes(self.selinux_policy)
+            return ''
         if args == ('semodule', '-lfull'):
             return '\n'.join(self.selinux_modules)
         if args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i'):
             self.assertEqual(len(args), 5)
             self.assertTrue(m.r.NORMAL.exists() and m.r.FORCE.exists() and m.r.RECOVERY.exists())
             self.assertEqual(Path(args[4]).name, m.r.SELINUX_MODULE_NAME + '.cil')
-            self.assertEqual(Path(args[4]).read_text(), m.r.SELINUX_MODULE_RULE + '\n')
+            self.assertEqual(Path(args[4]).read_bytes(), self.selinux_policy)
             self.selinux_modules.append(
                 f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil')
             return ''
@@ -168,12 +175,11 @@ class Installer(unittest.TestCase):
 
     def make_payload(self, directory):
         directory.mkdir()
-        names = {'runtime/libfprint-2.so.2.0.0', 'runtime/OpenCV-LICENSES.txt',
+        names = {'runtime/libfprint-2.so.2.0.0', 'runtime/ChicagoHS-NOTICES.txt',
                  'runtime/LICENSING_AND_PROVENANCE.md', 'runtime/source-files.sha256',
                  'runtime/build-provenance.json', 'login/' + m.r.MODULE,
                  'login/plasmalogin.pam', 'check-material',
-                 *(f'runtime/licenses/{n}.txt' for n in m.builder.LICENSES),
-                 *(f'runtime/libopencv_{n}.so.413' for n in m.builder.OPENCV_PARTS)}
+                 *(f'runtime/licenses/{n}.txt' for n in m.builder.LICENSES)}
         manifest = {'schema': 1, 'source_id': 'a' * 64, 'files': {}, 'links': {}}
         for name in names:
             target = directory / name
@@ -195,6 +201,13 @@ class Installer(unittest.TestCase):
     def test_first_install_mode_and_no_protected_output(self):
         self.apply()
         self.assertIn('GOODIX_INSTALL_MODE=FIRST_INSTALL', self.stdout.getvalue())
+        receipt = json.loads((m.r.RUNTIME / 'installation.json').read_bytes())
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
+        self.assertEqual(receipt['matcher'], 'chicago-type24')
+        self.assertFalse(any('opencv' in name.lower() for name in receipt['files']))
+        self.assertIn('new enrollment for every finger/user', self.stdout.getvalue())
         for value in self.bundle.files.values():
             self.assertNotIn(value.decode(), self.stdout.getvalue() + self.stderr.getvalue())
 
@@ -266,8 +279,7 @@ class Installer(unittest.TestCase):
         self.assertFalse(self.active)
         self.assertFalse(m.r.MASK.is_symlink())
         self.assertTrue(m.r.CONFIG.exists())
-        self.assertEqual(self.selinux_modules,
-                         [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'])
+        self.assertEqual(self.selinux_modules, [])
         self.assert_preserved()
         self.assertEqual(m.r.remove(), 0)
         self.assert_preserved()
@@ -290,6 +302,52 @@ class Installer(unittest.TestCase):
         m.r.normal_preflight()
         self.assert_preserved()
 
+    def test_update_from_sigfm_receipt_uses_same_canonical_removal(self):
+        self.apply()
+        path = m.r.RUNTIME / 'installation.json'
+        receipt = json.loads(path.read_bytes())
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        receipt.pop('matcher')  # Existing main schema-2 receipts have no matcher.
+        for part in ('core', 'features2d', 'flann', 'imgproc'):
+            name = f'libopencv_{part}.so.413'
+            data = b'SYNTHETIC SIGFM LIBRARY ' + part.encode()
+            (m.r.RUNTIME / name).write_bytes(data)
+            receipt['files'][name] = m.r.digest(data)
+        path.write_text(json.dumps(receipt))
+        m.r.normal_preflight()
+        self.apply()
+        receipt = json.loads(path.read_bytes())
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
+        self.assertEqual(receipt['matcher'], 'chicago-type24')
+        self.assertFalse(any(name.startswith('libopencv_') for name in receipt['files']))
+        m.r.normal_preflight()
+        self.assert_preserved()
+
+    def test_update_from_milan_removes_diagnostic_and_preserves_data(self):
+        self.apply()
+        path = m.r.RUNTIME / 'installation.json'
+        receipt = json.loads(path.read_bytes())
+        receipt['matcher'] = 'milan-type17'
+        for name in ('Milan-NOTICES.txt', 'goodix-milan-diagnostic',
+                     'prepare-milan-diagnostic.py'):
+            data = b'SYNTHETIC LEGACY MILAN ' + name.encode()
+            (m.r.RUNTIME / name).write_bytes(data)
+            receipt['files'][name] = m.r.digest(data)
+        path.write_text(json.dumps(receipt))
+        m.r.normal_preflight()
+        self.apply()
+        receipt = json.loads(path.read_bytes())
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
+        self.assertEqual(receipt['matcher'], 'chicago-type24')
+        self.assertFalse(any('milan' in name.lower() for name in receipt['files']))
+        self.assertFalse(any('milan' in p.name.lower() for p in m.r.RUNTIME.iterdir()))
+        m.r.normal_preflight()
+        self.assert_preserved()
+
     def test_partial_install_rolls_back_software_preserves_complete_materials(self):
         with patch.object(m, 'install_login', side_effect=RuntimeError('synthetic login failure')):
             with self.assertRaisesRegex(RuntimeError, 'synthetic login failure'):
@@ -302,6 +360,8 @@ class Installer(unittest.TestCase):
 
     def test_failed_update_restores_prior_project_installation(self):
         self.apply()
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        self.selinux_policy = b'\n' + self.selinux_policy + b'\n'
         shutil.rmtree(self.source)
         before = (m.r.RUNTIME / 'installation.json').read_bytes()
         with patch.object(m, 'install_login', side_effect=RuntimeError('synthetic failed update')):
@@ -314,13 +374,55 @@ class Installer(unittest.TestCase):
                          [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'])
         self.assert_preserved()
 
-    def test_existing_expected_selinux_module_is_not_overwritten(self):
+    def test_recognized_legacy_residual_module_is_removed(self):
         expected = f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'
         self.selinux_modules = [expected]
         self.apply()
-        self.assertEqual(self.selinux_modules, [expected])
+        self.assertEqual(self.selinux_modules, [])
         self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
                              for args in self.events))
+
+    def test_policy_collision_stops_update_before_mutation(self):
+        self.apply()
+        before = (m.r.RUNTIME / 'installation.json').read_bytes()
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        self.selinux_policy = b'(allow fprintd_t sysctl_vm_t (file (read)))\n'
+        self.events.clear()
+        with self.assertRaisesRegex(RuntimeError, 'ownership ambiguous'):
+            self.apply()
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assertTrue(m.r.CONFIG.exists())
+        self.assertFalse(any(args[:2] == ('systemctl', 'stop') or '-r' in args
+                             for args in self.events))
+        self.assert_preserved()
+
+    def test_foreign_policy_appearing_during_rollback_is_not_overwritten(self):
+        self.apply()
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        def failed_login(*args):
+            self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+            self.selinux_policy = b'(allow fprintd_t sysctl_vm_t (file (read)))\n'
+            self.events.clear()
+            raise RuntimeError('synthetic failure with concurrent policy change')
+        with patch.object(m, 'install_login', side_effect=failed_login):
+            with self.assertRaisesRegex(RuntimeError, 'rollback incomplete.*ownership ambiguous'):
+                self.apply()
+        self.assertTrue(self.selinux_modules)
+        self.assertFalse(any('-i' in args or '-r' in args for args in self.events))
+        self.assertTrue(m.r.NORMAL.exists() and m.r.FORCE.exists())
+        self.assert_preserved()
+
+    def test_failed_chicago_update_does_not_create_legacy_module(self):
+        self.apply()
+        before = (m.r.RUNTIME / 'installation.json').read_bytes()
+        with patch.object(m, 'install_login', side_effect=RuntimeError('synthetic failed update')):
+            with self.assertRaisesRegex(RuntimeError, 'synthetic failed update'):
+                self.apply()
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
+        self.assert_preserved()
 
     def test_unexpected_selinux_module_priority_stops_before_mutation(self):
         unexpected = f'300 {m.r.SELINUX_MODULE_NAME} cil'
@@ -502,6 +604,18 @@ class Installer(unittest.TestCase):
                 patch.object(m.builder, 'build_payload', side_effect=build), \
                 patch.object(m.subprocess, 'run', side_effect=execute):
             self.assertEqual(m.main(), 0)
+
+    def test_missing_native_sources_stop_before_sudo_or_dependencies(self):
+        with patch.object(m.os, 'geteuid', return_value=1000), \
+                patch.object(sys, 'argv', ['install.py', '--install-dependencies']), \
+                patch.object(m.builder, 'validate_chicago_sources',
+                             side_effect=RuntimeError('incomplete ChicagoHS native source set')), \
+                patch.object(m.subprocess, 'run') as run, \
+                patch.object(m.builder, 'build_payload') as build, \
+                self.assertRaisesRegex(RuntimeError, 'incomplete ChicagoHS native source set'):
+            m.main()
+        run.assert_not_called()
+        build.assert_not_called()
 
     def test_failed_material_preflight_never_installs_packages_or_builds(self):
         for explicit in ([], ['--materials', str(self.source)]):

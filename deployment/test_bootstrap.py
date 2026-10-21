@@ -11,6 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = 'https://github.com/sorguido/goodix-27c6-5125.git'
+BRANCH = 'porting_ChicagoHS'
 
 
 class Bootstrap(unittest.TestCase):
@@ -23,10 +24,12 @@ class Bootstrap(unittest.TestCase):
         self.bin = self.home / 'bin'
         self.bin.mkdir()
         blocks = re.findall(r'```bash\n(.*?)\n```', (ROOT / 'docs/INSTALLATION.md').read_text(), re.S)
+        blocks = [block for block in blocks if './install.sh' in block.splitlines()]
         self.assertEqual(len(blocks), 1, 'one canonical installation/update/reinstall block')
         self.block = blocks[0]
         self.env = dict(os.environ, HOME=str(self.home), PATH=str(self.bin) + ':/usr/bin:/bin',
-                        BOOTSTRAP_LOG=str(self.log), BOOTSTRAP_URL=URL, BOOTSTRAP_FAIL='')
+                        BOOTSTRAP_LOG=str(self.log), BOOTSTRAP_URL=URL,
+                        BOOTSTRAP_BRANCH=BRANCH, BOOTSTRAP_FAIL='')
         self.fixture = self.home / 'install-fixture'
         self.fixture.write_text('#!/bin/sh\nprintf "installed\\n" > "$HOME/installed"\n')
         self.fixture.chmod(0o755)
@@ -37,13 +40,16 @@ args = sys.argv[1:]
 with open(os.environ['BOOTSTRAP_LOG'], 'a') as log:
     log.write(json.dumps(args) + '\\n')
 if args[0] == 'clone':
-    assert args[1] == os.environ['BOOTSTRAP_URL']
+    assert args[1:4] == ['--branch', 'porting_ChicagoHS', '--single-branch']
+    assert args[4] == os.environ['BOOTSTRAP_URL']
     if os.environ['BOOTSTRAP_FAIL'] == 'clone': sys.exit(9)
-    repo = pathlib.Path(args[2])
+    repo = pathlib.Path(args[5])
     (repo / '.git').mkdir(parents=True)
     shutil.copy2(pathlib.Path(os.environ['HOME']) / 'install-fixture', repo / 'install.sh')
 elif args[0] == '-C' and args[2:] == ['remote', 'get-url', 'origin']:
     print(os.environ['BOOTSTRAP_URL'])
+elif args[0] == '-C' and args[2:] == ['branch', '--show-current']:
+    print(os.environ['BOOTSTRAP_BRANCH'])
 elif args[0] == '-C' and args[2:] == ['pull', '--ff-only']:
     if os.environ['BOOTSTRAP_FAIL'] == 'pull': sys.exit(9)
 else:
@@ -66,7 +72,7 @@ else:
     def test_absent_path_clones_then_installs(self):
         result = self.run_block()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.commands(), [['clone', URL, str(self.repo)]])
+        self.assertEqual(self.commands(), [['clone', '--branch', BRANCH, '--single-branch', URL, str(self.repo)]])
         self.assertTrue((self.home / 'installed').exists())
 
     def test_existing_clone_pulls_then_installs(self):
@@ -74,6 +80,7 @@ else:
         result = self.run_block()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.commands(), [['-C', str(self.repo), 'remote', 'get-url', 'origin'],
+                                          ['-C', str(self.repo), 'branch', '--show-current'],
                                           ['-C', str(self.repo), 'pull', '--ff-only']])
         self.assertTrue((self.home / 'installed').exists())
 
@@ -99,6 +106,16 @@ else:
         self.assertIn('STOP:', result.stdout)
         self.assertFalse((self.home / 'installed').exists())
         self.assertEqual(len(self.commands()), 1)
+
+    def test_existing_other_branch_is_preserved_without_pull_or_install(self):
+        self.existing_clone()
+        self.env['BOOTSTRAP_BRANCH'] = 'main'
+        result = self.run_block()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('current branch is preserved', result.stdout)
+        self.assertFalse((self.home / 'installed').exists())
+        self.assertFalse(any('pull' in args or 'checkout' in args or 'switch' in args
+                             for args in self.commands()))
 
     def test_git_failure_never_runs_installer(self):
         for action in ('clone', 'pull'):
