@@ -2,10 +2,11 @@
 # ChicagoHS: installation and updates
 
 This branch targets **Fedora 44 KDE x86_64**, Goodix USB `27c6:5125`, and
-APP12509/APP12508 firmware. ChicagoHS live biometric and desktop qualification
-has not been performed. Start with an isolated Fedora KDE VM without USB
-passthrough to qualify software installation and recovery. The SIGFM driver on
-`main` remains the recovery baseline.
+APP12509/APP12508 firmware. An initial supervised live functional check
+has passed on one reader in a Fedora KDE VM; see the precise evidence and
+remaining limitations in [Validation](VALIDATION.md). Start software-only
+installation and recovery checks without USB passthrough. The historical
+SIGFM driver on `main` remains the recovery baseline.
 
 ## Install, update or reinstall
 
@@ -70,11 +71,14 @@ privileged changes. `--check` validates prerequisites; it does not certify a liv
 reader or existing protected state. A missing package can therefore cause the
 check to stop before a regular installation installs dependencies.
 
-In the VM, leave USB passthrough disabled, run the canonical installation block,
-then reinstall with `./install.sh`. Check password login remains available and
-exercise both documented removal paths separately. Require `GOODIX_INSTALL=PASS`
-and `GOODIX_REMOVAL=PASS`; on any failure preserve the error and use the recovery
-procedure. A successful software-only VM test does not qualify authentication.
+For software-only VM validation, leave USB passthrough disabled, run the
+canonical installation block, then repeat `./install.sh` for UPDATE. Check
+password login remains available and exercise both documented removal paths
+separately, including `goodix-force-remove` from TTY when appropriate.
+Require `GOODIX_INSTALL=PASS` and `GOODIX_REMOVAL=PASS`; on failure preserve the
+error and follow recovery. The initial clean-VM sequence has been observed PASS,
+but such software checks alone never qualify authentication or protection of
+previously populated biometric data.
 
 ## Enrollment and authentication
 
@@ -84,7 +88,7 @@ identities and are not accepted or converted. Stock fprintd isolates users'
 galleries. Manage fingerprints through KDE's normal fingerprint settings;
 explicit user-requested deletion uses the stock database.
 
-Use normal APPOGGIA/SOLLEVA prompts and lift between contacts. Do not run another
+Use KDE's normal place/lift prompts and lift between contacts. Do not run another
 fingerprint client simultaneously. Calibration is derived from the no-finger
 background; there is no private diagnostic enrollment path or Windows file
 prerequisite. Hardware binding and calibration must pass the driver's checks;
@@ -93,7 +97,9 @@ unsafe or unqualified binding fails closed.
 At Plasma Login, a nonempty password uses password authentication. Submitting an
 empty password explicitly selects fingerprint authentication, with at most three
 attempts and a stop on the first match. Keep password access available; fingerprint
-authentication does not unlock a password-encrypted KWallet. Live reader testing,
-including enrollment, verify, identify, screen unlock, sudo, PolicyKit and Windows
-coexistence, requires separate supervised qualification. See
-[validation](VALIDATION.md) and [removal/recovery](UNINSTALL.md).
+authentication does not unlock a password-encrypted KWallet. The first supervised live session has exercised enrollment, selected-finger
+verification, a different-finger negative result, KScreenLocker, sudo, PolicyKit,
+Plasma Login, reboot login, limited Windows coexistence and password fallback.
+Further live qualification, including multiuser and failure-path coverage,
+remains necessary. See [validation](VALIDATION.md) and
+[removal/recovery](UNINSTALL.md).
