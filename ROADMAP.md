@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ROADMAP.md — ChicagoHS per Goodix 27c6:5125
+# ROADMAP.md — Goodix 27c6:5125
 
 ## Obiettivo
 
