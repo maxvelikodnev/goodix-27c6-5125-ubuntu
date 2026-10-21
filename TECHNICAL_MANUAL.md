@@ -7,10 +7,12 @@ USB reader to Fedora authentication consumers, including the secure session,
 image and biometric pipeline, system integration, installation, recovery, and
 qualification boundary.
 
-This branch uses ChicagoHS. Transport and integration evidence inherited from
-the SIGFM baseline does not qualify ChicagoHS live authentication. ChicagoHS
-requires separate real-reader and Fedora desktop qualification; the software
-contracts below are not claims of biometric accuracy or physical uniqueness.
+This branch uses ChicagoHS. Transport and integration code inherited from the
+SIGFM baseline was complemented by an initial operator-supervised live check
+of ChicagoHS enrollment, matching and Fedora KDE authentication on one reader.
+The limited observations do not establish biometric accuracy statistics,
+multi-device reliability or physical uniqueness. The software contracts below
+are independent of any such performance claim.
 
 The implementation is intentionally narrow. A successful result on the
 qualified target must not be generalized to a different Goodix reader,
@@ -54,7 +56,7 @@ does not replace Fedora's authentication stack.
 | --- | --- |
 | USB identity | Goodix `27c6:5125` |
 | Recognized reader applications | `GF_ST411SEC_APP_12509` and `GF_ST411SEC_APP_12508` |
-| SIGFM baseline Fedora-qualified application | `GF_ST411SEC_APP_12509`; ChicagoHS live qualification remains separate |
+| Initial ChicagoHS live functional scope | One USB `27c6:5125` reader in Fedora KDE VM; APP12508 ChicagoHS live behavior not qualified |
 | Host | Fedora 44 KDE, x86_64 |
 | Accounts | Local accounts |
 | Mandatory access control | SELinux Enforcing |
@@ -67,7 +69,8 @@ configuration is incompatible.
 
 Recognition of APP12508 does not establish the full Fedora qualification for
 that revision. Its contributor hardware evidence and limits are described in
-the baseline reference on `main`; neither application has ChicagoHS live qualification.
+the baseline reference on `main`; the initial ChicagoHS live check covers only
+the tested reader, not APP12508 or the full recognized device population.
 
 ### 1.2 Support boundary
 
@@ -1466,7 +1469,7 @@ threat boundary.
 | --- | --- |
 | Two recognized applications; one Fedora-qualified APP12509 reader | APP12508 has contributor hardware evidence, not the full Fedora qualification. No compatibility claim for other Goodix devices, unlisted firmware, distributions, desktops, architectures, or multiple readers |
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
-| No FAR/FRR study | ChicagoHS selector 207 and score > 0 are not biometric security calibration |
+| No FAR/FRR study | Initial genuine and different-finger results were favorable, but the sample is too small to measure FAR/FRR. ChicagoHS selector 207 and score > 0 are not biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
 | One host-pairing write | The first qualifying fingerprint action may perform exactly one logical `E0`, and a Windows pairing replacement causes one qualified restore write. Same-OS reopens write nothing. Recovery from an interrupted post-`E0`/pre-ACTIVE transaction is offline-qualified only |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
@@ -1479,11 +1482,12 @@ threat boundary.
 | Concurrency beyond stock serialization | Competing low-level clients or bypass of fprintd's claim model is not qualified |
 | Late IRQ0200 after zero-mask recovery | One release before the valid new IRQ2 is consumed passively; same-byte stale/current release in a later compatible slot is not distinguishable (section 7.4) |
 | Fault/stale-traffic boundary | Process crashes, injected faults, and exhaustive late-byte or cross-generation behavior are outside the qualified scope |
-| SELinux audit suppression is type-based | The known denied read tuple can be hidden even when caused by a future process path |
-| Factory/Windows boundary | The SIGFM baseline qualified a bounded ping-pong on one APP12509 reader and one VM; ChicagoHS coexistence remains unqualified; there is no exhaustive factory-state readback and no guarantee across other firmware revisions, Windows configurations, power-loss scenarios, or future OS updates |
+| No legacy SELinux audit suppression | ChicagoHS installs no `goodix_5125_hugepage` `dontaudit` policy; a verified legacy module is removed. The remaining SELinux behavior still requires real-world fault/audit review |
+| Factory/Windows boundary | The operator reported a successful bounded Windows/Linux ping-pong with ChicagoHS on one reader, following an earlier SIGFM baseline. The exact E0/readback/TLS trace has not been independently audited for this sequence; there is no exhaustive factory-state readback or guarantee across other devices, firmware revisions, power-loss scenarios, or OS updates |
 
-See [Validation scope and known limitations](docs/VALIDATION.md) for the release
-support basis. The protocol limits in this manual apply independently of a
+See [Validation scope and known limitations](docs/VALIDATION.md) for the bounded
+operator-supervised VM and physical-reader results and the remaining release
+support limits. The protocol limits in this manual apply independently of a
 successful installation or authentication attempt.
 
 ## 20. Troubleshooting and diagnostic principles
