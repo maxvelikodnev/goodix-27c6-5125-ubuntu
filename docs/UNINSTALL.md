@@ -57,7 +57,7 @@ assume that cleanup completed.
 | `/usr/local/lib64/goodix-plasma-login/` | Removes the selector and installation metadata |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
 | `/usr/local/lib64/goodix-27c6-5125/` | Removes project libfprint, matcher dependencies, links, notices and installation metadata |
-| Legacy SELinux huge-page `dontaudit` module, if present | Removes only the verified priority-400 project CIL rule and restores Fedora audit visibility; ChicagoHS does not install it |
+| Legacy SELinux huge-page `dontaudit` module, if present | Removes only the verified priority-400 project CIL rule and restores Fedora audit visibility; The current driver does not install it |
 | `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
 Removal stops and quiesces fprintd before removing runtime files. It does not
@@ -98,8 +98,8 @@ SIGFM engine is **not** a parallel active branch or an automatic fallback. A del
 select a **pinned historical release**, such as the existing
 [`v2.2.1` tag](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
 
-Remove ChicagoHS with `goodix-uninstall`, or use `goodix-force-remove` for
-damaged software. Follow the restart instruction and confirm password login.
+Remove the installed driver with `goodix-uninstall`, or use
+`goodix-force-remove` for damaged software. Follow the restart instruction and confirm password login.
 Then use a **separate clean checkout** of the historical version:
 
 ```bash
