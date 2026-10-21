@@ -39,7 +39,10 @@ the runtime. Existing runtime and standalone recovery commands remain available.
 %check
 /usr/bin/python3 -I -B packaging/rpm/test_packaging.py
 /usr/bin/python3 -I -B packaging/rpm/test_helper.py
+/usr/bin/python3 -I -B packaging/rpm/test_compat_transactions.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_model.py
+/usr/bin/python3 -I -B packaging/rpm/manager/test_network_ui.py
+/usr/bin/python3 -I -B packaging/rpm/test_verify_release.py Metadata PayloadMetadata
 /usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py --initial-palette dark
 desktop-file-validate %{buildroot}%{_datadir}/applications/io.github.sorguido.GoodixManager.desktop

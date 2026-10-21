@@ -15,7 +15,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 
 # The launcher uses isolated mode; load only the adjacent installed, root-owned module.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model import LATEST_API, MESSAGES, REPOSITORY, Release, Status, version_tuple
+from model import LATEST_API, MESSAGES, REPOSITORY, LocalPackage, NoCompatibleRelease, Release, Status, version_tuple
 
 HELPER = '/usr/libexec/goodix-manager-helper'
 MAX_REPLY = 512 * 1024
@@ -32,6 +32,7 @@ class Controller(QObject):
         self.notice = 'Verifying installed software…'
         self.remote_message = 'Checking public releases…'
         self.release = None
+        self.local_package = None
         self.network = QNetworkAccessManager(self)
         self.reply = None
         self.network_timeout = QTimer(self)
@@ -58,22 +59,35 @@ class Controller(QObject):
     @Property('QVariantMap', notify=changed)
     def view(self):
         state = self.status
-        remote = self.release is not None and bool(state.payload_version) and self.release.newer_than(state)
+        remote_state, remote_message = self.public_status()
+        remote = remote_state == 'available'
         sensor = ('Connected' if state.sensor_present else 'Not connected') if state.sensor_present is not None else 'Not checked'
         return {
             'busy': self.busy, 'operation': self.operation,
             'title': state.title, 'state': state.state, 'notice': self.notice,
-            'runtime': state.runtime_version or ('Not installed' if state.state == 'absent' else 'Not verified'),
+            'runtime': state.runtime_version or ('Not installed' if state.state == 'absent' else
+                        'Earlier driver · version unknown' if state.state == 'legacy' else
+                        'Unknown version' if state.message_code == 'version_unknown' else 'Not verified'),
             'payload': state.payload_version or 'Not verified',
             'package': state.package_version or self.package_version,
             'sensor': sensor, 'action': state.action,
+            'upgradeLegacy': state.state == 'legacy' and state.action == 'update',
             'canRemove': state.state in {'installed', 'legacy'} or state.message_code in {'version_unknown', 'source_mismatch'},
-            'remoteMessage': self.remote_message,
+            'remoteMessage': remote_message, 'remoteState': remote_state,
             'remoteAvailable': remote, 'remoteChecking': self.remote_state == 'checking',
-            'remoteVersion': self.release.version if remote else '',
+            'remoteVersion': self.release.package_version if remote else '',
             'rebootRequired': state.reboot_required,
             'enrollmentRequired': state.enrollment_required or state.state == 'legacy',
         }
+
+    def public_status(self):
+        if self.remote_state != 'available':
+            return self.remote_state, self.remote_message
+        if self.local_package is None:
+            return 'unavailable', 'Check unavailable · local Manager package could not be verified'
+        if self.release.newer_than(self.local_package):
+            return 'available', 'New public package: ' + self.release.package_version
+        return 'current', 'Manager package is current · latest compatible public package: ' + self.release.package_version
 
     @Slot()
     def refresh(self):
@@ -117,6 +131,7 @@ class Controller(QObject):
 
     def finish_invalid(self, code):
         self.status = Status(message_code=code)
+        self.local_package = None
         self.notice = MESSAGES[code]
         self.busy = False
         self.last_result = code
@@ -135,6 +150,10 @@ class Controller(QObject):
             if code != 0 and result == 'success':
                 raise ValueError('contradictory exit status')
             self.status = status
+            try:
+                self.local_package = LocalPackage.from_status(status)
+            except ValueError:
+                self.local_package = None
             self.last_result = result
             self.notice = MESSAGES[status.message_code]
             if result == 'rolled_back':
@@ -187,6 +206,10 @@ class Controller(QObject):
             self.release = Release.parse(json.loads(self.remote_body))
             self.remote_state = 'available'
             self.remote_message = 'Latest public release: ' + self.release.version
+        except NoCompatibleRelease:
+            self.release = None
+            self.remote_state = 'no-compatible'
+            self.remote_message = 'No compatible public release · local actions remain available'
         except (ValueError, TypeError, KeyError):
             self.release = None
             self.remote_state = 'unavailable'
@@ -203,12 +226,12 @@ class Controller(QObject):
 
     @Slot(bool)
     def open_release(self, download):
-        if self.release and self.status.payload_version and self.release.newer_than(self.status):
+        if self.release and self.local_package and self.public_status()[0] == 'available':
             QDesktopServices.openUrl(QUrl(self.release.asset_url if download else self.release.page_url))
 
     @Slot()
     def copy_diagnostics(self):
-        diagnostics = self.status.diagnostic() + '\nOperation result: ' + self.last_result + '\nRelease check: ' + self.remote_state
+        diagnostics = self.status.diagnostic() + '\nOperation result: ' + self.last_result + '\nRelease check: ' + self.public_status()[0]
         QGuiApplication.clipboard().setText(diagnostics)
 
 

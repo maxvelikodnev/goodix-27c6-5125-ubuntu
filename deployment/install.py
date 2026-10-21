@@ -442,7 +442,7 @@ def apply(payload, material_directory, owner_uid, *, explicit=False, expected_so
             if expected_source_id is not UNCHECKED_SOURCE:
                 current_source = None
                 if r.present(r.RUNTIME):
-                    current_source = json.loads(r.read(r.RUNTIME / 'installation.json')).get('source_id')
+                    current_source = r.receipt_identity(json.loads(r.read(r.RUNTIME / 'installation.json')))
                 require(current_source == expected_source_id,
                         'runtime changed since Manager verification; refresh status')
             # The preliminary check is advisory: recheck under the lifecycle

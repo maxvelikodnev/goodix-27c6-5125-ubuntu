@@ -156,7 +156,7 @@ Kirigami.ApplicationWindow {
                         Layout.fillWidth: true
                         spacing: 10
                         Controls.Button { implicitHeight: 38;
-                            text: info.action === "update" ? "Apply Update" : "Install"
+                            text: info.upgradeLegacy ? "Upgrade to " + info.payload : info.action === "update" ? "Apply Update" : "Install"
                             icon.name: info.action === "update" ? "system-software-update" : "list-add"
                             highlighted: true
                             enabled: !info.busy && info.action !== ""
@@ -185,7 +185,7 @@ Kirigami.ApplicationWindow {
                     spacing: Kirigami.Units.largeSpacing
                     RowLayout {
                         Layout.fillWidth: true
-                        Kirigami.Heading { color: window.inkColor; text: info.remoteAvailable ? "New version available" : "Public releases"; level: 3; font.pointSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                        Kirigami.Heading { color: window.inkColor; text: info.remoteAvailable ? "New version available · " + info.remoteVersion : "Public releases"; level: 3; font.pointSize: 15; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                         Controls.BusyIndicator { running: info.remoteChecking; visible: info.remoteChecking; implicitWidth: 24; implicitHeight: 24 }
                     }
                     Controls.Label { text: info.remoteMessage; wrapMode: Text.WordWrap; Layout.fillWidth: true }
@@ -229,11 +229,12 @@ Kirigami.ApplicationWindow {
         anchors.centerIn: parent
         width: Math.min(window.width - 48, 480)
         modal: true
-        title: window.requestedAction === "remove" ? "Remove the fingerprint driver?" : window.requestedAction === "update" ? "Apply the local update?" : "Install the fingerprint driver?"
+        title: window.requestedAction === "remove" ? "Remove the fingerprint driver?" : window.requestedAction === "update" ? (info.upgradeLegacy ? "Upgrade to " + info.payload + "?" : "Apply the local update?") : "Install the fingerprint driver?"
         standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
         contentItem: Controls.Label {
             text: window.requestedAction === "remove"
                 ? "This removes the installed driver using its ordinary integrity-checked uninstaller. Goodix Manager, pairing state and stored fingerprints are preserved. Keep your password available and restart afterwards."
+                : info.upgradeLegacy ? "This upgrades the verified earlier driver directly to " + info.payload + ". The fingerprint format changes: enroll every finger again after the upgrade. Historical templates and pairing state are preserved. Keep your password available. No preliminary uninstall is required."
                 : "The verified local payload will be applied with administrator authorization. New enrollment is required when moving from an earlier 2.x driver; historical templates are preserved. Keep your password available. This does not perform fingerprint enrollment or pair the reader."
             wrapMode: Text.WordWrap
         }

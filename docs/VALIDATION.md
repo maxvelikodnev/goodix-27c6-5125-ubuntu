@@ -10,11 +10,20 @@ reader was passed through to a Fedora VM and also used with a Windows VM.
 Software installation and removal were separately exercised on an isolated
 Fedora VM without reader access.
 
-Those installation observations concern the source-based CLI. The signed RPM
-and Goodix Manager have offline build, payload, signature and UI checks, but
-Discover installation, interactive PolicyKit and the complete RPM lifecycle
-still require VM qualification. Fedora 45 is not qualified; the package targets
+Those installation observations concern the source-based CLI. The operator also
+reports successful RPM installation and the application icon in KDE. The signed
+RPM and Goodix Manager have offline build, payload, signature and UI checks;
+interactive PolicyKit migration and the complete RPM lifecycle still require
+their own VM qualification. Fedora 45 is not qualified; the package targets
 Fedora 44 x86_64. These boundaries also apply to the RPM installation guidance.
+
+Driver qualification, historical CLI recognition and Manager migration are
+separate claims. A recognized 2.x installation can use the direct transactional
+Manager upgrade; qualification on a real populated installation, including
+rollback and preservation, remains required before release. Synthetic checks of
+a future 3.0.1 API response and local package exercise update continuity without
+publishing that release. They do not claim public GitHub availability or replace
+the real 2.x migration check; an additional 3.0.1 VM exercise is a separate test.
 
 These results supplement offline build and biometric corpus checks. They
 do not establish FAR/FRR, liveness, multi-reader compatibility or exhaustive

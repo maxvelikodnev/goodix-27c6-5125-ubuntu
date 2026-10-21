@@ -46,9 +46,10 @@ Use a release with a compatible Fedora 44 x86_64 RPM asset. See
 ### Upgrading from an earlier release
 
 Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
-fingerprint format. Goodix Manager blocks direct migration from a 2.x runtime
-until that path is qualified. Ordinary removal preserves host pairing state,
-existing fingerprint files and password access. **Previously enrolled fingers
+fingerprint format. For an intact, recognized 2.x installation, Goodix Manager
+offers **Upgrade to 3.0.0** through the transactional installer, without a
+preliminary uninstall. Host pairing state and existing fingerprint files are
+preserved. **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new
 engine. The real-device upgrade from a populated 2.x installation remains a
 release qualification gate; see [installation](docs/INSTALLATION.md) and

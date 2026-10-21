@@ -12,8 +12,9 @@ STATES = {'absent', 'installed', 'legacy', 'blocked'}
 MESSAGES = {
     'ready': 'The local payload is ready.',
     'not_installed': 'The driver has not been activated.',
-    'legacy_unqualified': 'Earlier driver detected. Migration is not yet qualified; Update is disabled. Ordinary removal is available.',
-    'source_mismatch': 'Installed and local builds differ at the same version. Update is blocked; ordinary verified removal is available.',
+    'legacy_upgrade_available': 'A verified earlier driver can be upgraded directly. The fingerprint format changes: enroll every finger again. Historical templates are preserved.',
+    'legacy_unqualified': 'This earlier driver is not recognized for direct upgrade. Update is disabled. Ordinary verified removal is available.',
+    'source_mismatch': 'The installed source identity does not match a supported build. Update is blocked; ordinary verified removal is available.',
     'version_unknown': 'The installed version cannot be established. Update is disabled; ordinary verified removal is available.',
     'up_to_date': 'The installed driver matches the local payload.',
     'update_available': 'A newer verified local payload is ready to apply.',
@@ -64,6 +65,8 @@ class Status:
     def action(self):
         if self.state == 'absent':
             return 'install'
+        if self.state == 'legacy' and self.message_code == 'legacy_upgrade_available' and self.enrollment_required:
+            return 'update'
         if self.state == 'installed' and self.runtime_version is not None:
             if version_tuple(self.runtime_version) < version_tuple(self.payload_version):
                 return 'update'
@@ -85,7 +88,7 @@ class Status:
 
     @classmethod
     def parse(cls, data):
-        if not isinstance(data, dict) or data.get('schema') != 1 or data.get('state') not in STATES:
+        if not isinstance(data, dict) or data.get('schema') != 1 or type(data.get('schema')) is not int or data.get('state') not in STATES:
             raise ValueError('invalid status')
         payload = data.get('payload_version')
         unknown_package = data['state'] == 'blocked' and data.get('result') == 'blocked' and payload == ''
@@ -106,6 +109,8 @@ class Status:
         package = data.get('package_version', payload)
         if not (unknown_package and package == '') and (not isinstance(package, str) or not re.fullmatch(SEMVER + r'(?:-[1-9][0-9]*\.fc44)?', package)):
             raise ValueError('invalid package version')
+        if not unknown_package and package.split('-', 1)[0] != payload:
+            raise ValueError('inconsistent package and payload versions')
         code = data.get('message_code', 'ready')
         if code not in MESSAGES:
             code = 'blocked' if data['state'] == 'blocked' else 'ready'
@@ -123,6 +128,25 @@ class Status:
 
 
 @dataclass(frozen=True)
+class LocalPackage:
+    """Only construct from metadata returned by the installed, verifying helper."""
+    version: str
+    revision: int
+
+    @classmethod
+    def from_status(cls, status):
+        version_tuple(status.payload_version)
+        match = re.fullmatch(SEMVER + r'-([1-9][0-9]*)\.fc44', status.package_version)
+        if not match or status.package_version.split('-', 1)[0] != status.payload_version:
+            raise ValueError('verified package metadata unavailable')
+        return cls(status.payload_version, int(match.group(4)))
+
+
+class NoCompatibleRelease(ValueError):
+    """A valid response contains no stable, complete RPM for this target."""
+
+
+@dataclass(frozen=True)
 class Release:
     version: str
     packaging_release: int
@@ -131,8 +155,10 @@ class Release:
 
     @classmethod
     def parse(cls, data):
-        if not isinstance(data, dict) or data.get('draft') is not False or data.get('prerelease') is not False:
-            raise ValueError('not a stable public release')
+        if not isinstance(data, dict) or type(data.get('draft')) is not bool or type(data.get('prerelease')) is not bool:
+            raise ValueError('malformed release status')
+        if data['draft'] or data['prerelease']:
+            raise NoCompatibleRelease('not a stable public release')
         tag = data.get('tag_name')
         if not isinstance(tag, str):
             raise ValueError('missing tag')
@@ -153,21 +179,24 @@ class Release:
             if not match:
                 continue
             url = REPOSITORY + '/releases/download/' + tag + '/' + asset['name']
-            if (asset.get('browser_download_url') != url or asset.get('state') != 'uploaded'
-                    or type(asset.get('size')) is not int or asset['size'] <= 0):
+            if asset.get('browser_download_url') != url or type(asset.get('size')) is not int:
                 raise ValueError('invalid download')
+            if asset.get('state') != 'uploaded' or asset['size'] <= 0:
+                raise NoCompatibleRelease('compatible download is incomplete')
             found.append((int(match.group(1)), url))
-        if not found or len({item[0] for item in found}) != len(found):
-            raise ValueError('missing or ambiguous compatible RPM')
+        if not found:
+            raise NoCompatibleRelease('no compatible RPM')
+        if len({item[0] for item in found}) != len(found):
+            raise ValueError('ambiguous compatible RPM')
         revision, url = max(found)
         return cls(version, revision, page, url)
 
-    def newer_than(self, status):
-        candidate = version_tuple(self.version)
-        if status.runtime_version and candidate < version_tuple(status.runtime_version):
-            return False
-        local = version_tuple(status.payload_version)
-        if candidate != local:
-            return candidate > local
-        match = re.fullmatch(SEMVER + r'-([1-9][0-9]*)\.fc44', status.package_version)
-        return bool(match and self.packaging_release > int(match.group(4)))
+    @property
+    def package_version(self):
+        return f'{self.version}-{self.packaging_release}.fc44'
+
+    def newer_than(self, package):
+        # Public package discovery is independent of runtime identity and gates.
+        candidate = (version_tuple(self.version), self.packaging_release)
+        local = (version_tuple(package.version), package.revision)
+        return candidate > local

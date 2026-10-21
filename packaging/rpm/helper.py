@@ -27,11 +27,27 @@ PACKAGE = 'goodix-manager'
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
 OPERATIONS = {'status', 'install', 'update', 'remove'}
 VERSION = r'(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)'
-CODES = {'ready', 'not_installed', 'legacy_unqualified', 'version_unknown',
+CODES = {'ready', 'not_installed', 'legacy_unqualified', 'legacy_upgrade_available', 'version_unknown',
          'up_to_date', 'update_available', 'downgrade_blocked', 'integrity_failed',
          'authorization_required', 'invalid_request', 'busy', 'operation_failed',
          'rollback_complete', 'installed', 'removed', 'runtime_changed',
          'missing_dependencies', 'source_mismatch'}
+
+# Immutable public source inventories, reproduced from these Git tags/commits.
+# See fixtures/historical/README.md; no running branch or network lookup.
+HISTORICAL = {
+    '5495a408358ecde77c882bc6ada1dc4018077e44375524ed2a46730ab61272cd': ('2.0.0', 'sigfm'),
+    '3dd3fbaa7e5f5cc2599476110b4b3bc1506e3c24efcb76b2a724857544d8cc46': ('2.1.0', 'sigfm'),
+    '929983b0adf8b07e4b68e872a1de1b99193ee534a1960bf20d880af4a9a06760': ('2.1.1', 'sigfm'),
+    'e67de418620282d54de2ecbd56eb7c74ffd3deec27176cad629e0c55a67e9e18': ('2.2.1', 'sigfm'),
+    'bdc3729d6467636d06045190f08e3eb3852dcc84181e080f9182984c3f0cc5a4': ('3.0.0', 'chicago-type24'),
+}
+# Only this audited pair has identical driver/native/PAM sources. The RPM
+# inventory added VERSION and changed build metadata and licensing description.
+CHICAGO_300_EQUIVALENT = frozenset((
+    'bdc3729d6467636d06045190f08e3eb3852dcc84181e080f9182984c3f0cc5a4',
+    'f259f6f10a60e5facc5a8404f951bce3eb18da2aaefebc8c9a167e4540938d97',
+))
 
 
 class Blocked(RuntimeError):
@@ -155,23 +171,49 @@ def inspect_runtime(backend, metadata):
         r.normal_preflight()
         require(r.present(r.RUNTIME), 'integrity_failed')
         receipt = json.loads(r.read(r.RUNTIME / 'installation.json'))
-        if receipt.get('matcher', 'sigfm') != 'chicago-type24':
-            # Recognized software remains removable; migration needs qualification.
+        identity = r.receipt_identity(receipt)
+        matcher = receipt.get('matcher', 'sigfm')
+        known = HISTORICAL.get(identity)
+        if matcher != 'chicago-type24' and (not known or known[1] != 'sigfm' or matcher != 'sigfm'):
             return response(metadata, state='legacy', result='success',
-                            message_code='legacy_unqualified', enrollment_required=True), receipt.get('source_id')
+                            message_code='legacy_unqualified', enrollment_required=True), identity
         provenance = json.loads(r.read(r.RUNTIME / 'build-provenance.json'))
         require(provenance.get('source_id') == receipt.get('source_id'))
+        require('matcher' not in provenance or provenance['matcher'] == matcher)
+        if known:
+            require(known[1] == matcher)
+            require(r.digest(r.read(r.RUNTIME / 'source-files.sha256')) == identity)
         for record in (receipt, provenance):
             if 'version' in record:
                 version(record['version'])
         runtime_version = receipt.get('version', provenance.get('version'))
+        if known:
+            require(runtime_version is None or runtime_version == known[0])
+            runtime_version = known[0]
+        elif runtime_version is None and identity == metadata['source_id']:
+            # The verified local payload proves the exact source identity.
+            require(r.digest(r.read(r.RUNTIME / 'source-files.sha256')) == identity)
+            runtime_version = metadata['version']
         if runtime_version is None:
-            return response(metadata, state='blocked', message_code='version_unknown'), receipt.get('source_id')
+            return response(metadata, state='blocked', message_code='version_unknown'), identity
         require('version' not in provenance or provenance['version'] == runtime_version)
-        if (runtime_version == metadata['version']
-                and receipt.get('source_id') != metadata['source_id']):
+        if matcher == 'sigfm':
+            require(version(runtime_version) < version(metadata['version']), 'downgrade_blocked')
+            return response(metadata, state='legacy', runtime_version=runtime_version, result='success',
+                            message_code='legacy_upgrade_available', enrollment_required=True), identity
+        # 3.0.0 predates reliable Manager metadata. Do not let installing a
+        # newer RPM silently promote its previously unknown source identity.
+        # Later, versioned releases do not need a growing historical registry.
+        if (runtime_version == '3.0.0' and identity not in CHICAGO_300_EQUIVALENT
+                and identity != metadata['source_id']):
             return response(metadata, state='blocked', runtime_version=runtime_version,
-                            message_code='source_mismatch'), receipt.get('source_id')
+                            message_code='source_mismatch'), identity
+        if (runtime_version == metadata['version']
+                and identity != metadata['source_id']
+                and not (runtime_version == '3.0.0' and
+                         {identity, metadata['source_id']} <= CHICAGO_300_EQUIVALENT)):
+            return response(metadata, state='blocked', runtime_version=runtime_version,
+                            message_code='source_mismatch'), identity
         if version(runtime_version) > version(metadata['version']):
             code = 'downgrade_blocked'
         elif version(runtime_version) < version(metadata['version']):
@@ -179,7 +221,7 @@ def inspect_runtime(backend, metadata):
         else:
             code = 'up_to_date'
         return response(metadata, state='installed', runtime_version=runtime_version,
-                        result='success', message_code=code), receipt.get('source_id')
+                        result='success', message_code=code), identity
 
 
 def runtime_prerequisites(backend):
@@ -199,10 +241,11 @@ def execute(operation, backend, metadata):
     if operation == 'remove':
         require(current['state'] != 'absent', 'not_installed')
     else:
-        require(current['state'] != 'legacy', 'legacy_unqualified')
+        legacy_upgrade = current['state'] == 'legacy' and current['message_code'] == 'legacy_upgrade_available'
+        require(current['state'] != 'legacy' or legacy_upgrade, 'legacy_unqualified')
         require(current['state'] != 'blocked', current['message_code'])
         require((operation == 'install' and current['state'] == 'absent') or
-                (operation == 'update' and current['state'] == 'installed'), 'runtime_changed')
+                (operation == 'update' and (current['state'] == 'installed' or legacy_upgrade)), 'runtime_changed')
         if operation == 'update':
             require(version(current['runtime_version']) < version(metadata['version']),
                     'downgrade_blocked' if version(current['runtime_version']) > version(metadata['version'])
@@ -237,10 +280,13 @@ def execute(operation, backend, metadata):
             restored = False
         return response(metadata, result='rolled_back' if rolled_back and restored else 'failed',
                         message_code='rollback_complete' if rolled_back and restored else 'operation_failed')
-    after, _ = inspect_runtime(backend, metadata)
+    after, after_source = inspect_runtime(backend, metadata)
     require(after['state'] == ('absent' if operation == 'remove' else 'installed'), 'operation_failed')
+    if operation != 'remove':
+        require(after['runtime_version'] == metadata['version'] and
+                after_source == metadata['source_id'], 'runtime_changed')
     after.update(message_code='removed' if operation == 'remove' else 'installed',
-                 reboot_required=True, enrollment_required=operation == 'install',
+                 reboot_required=True, enrollment_required=operation == 'install' or current['state'] == 'legacy',
                  sensor_present=current['sensor_present'])
     return after
 

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from model import REPOSITORY, Release, Status, version_tuple
+from model import REPOSITORY, LocalPackage, NoCompatibleRelease, Release, Status, version_tuple
 
 
 def status(**changes):
@@ -13,6 +13,8 @@ def status(**changes):
             'payload_version': '3.1.0', 'package_version': '3.1.0-1.fc44',
             'sensor_present': False, 'message_code': 'ready'}
     data.update(changes)
+    if 'payload_version' in changes and 'package_version' not in changes:
+        data['package_version'] = changes['payload_version'] + '-1.fc44'
     return Status.parse(data)
 
 
@@ -39,6 +41,14 @@ class StateTests(unittest.TestCase):
         self.assertEqual(status(runtime_version='3.2.0').action, '')
         self.assertEqual(status(state='blocked').action, '')
         self.assertEqual(status(state='legacy', runtime_version='2.0.0').action, '')
+
+    def test_recognized_legacy_upgrade_requires_explicit_backend_code(self):
+        legacy = status(state='legacy', runtime_version=None,
+                        message_code='legacy_upgrade_available', enrollment_required=True)
+        self.assertEqual(legacy.action, 'update')
+        self.assertIsNone(legacy.runtime_version)
+        self.assertEqual(status(state='legacy', runtime_version=None,
+                                message_code='legacy_upgrade_available').action, '')
 
     def test_inconsistent_status_fails_closed(self):
         for change in [{'state': 'absent'}, {'state': 'installed', 'runtime_version': None},
@@ -75,11 +85,29 @@ class StateTests(unittest.TestCase):
 class ReleaseTests(unittest.TestCase):
     def test_compatible_download_and_numeric_ordering(self):
         parsed = Release.parse(release())
-        self.assertTrue(parsed.newer_than(status()))
-        self.assertFalse(parsed.newer_than(status(runtime_version='3.3.0')))
-        self.assertFalse(parsed.newer_than(status(payload_version='3.10.0')))
-        self.assertTrue(Release.parse(release('3.1.0', 2)).newer_than(status()))
-        self.assertFalse(Release.parse(release('3.1.0', 1)).newer_than(status()))
+        self.assertTrue(parsed.newer_than(LocalPackage.from_status(status())))
+        self.assertTrue(parsed.newer_than(LocalPackage.from_status(status(runtime_version='3.3.0'))))
+        self.assertFalse(parsed.newer_than(LocalPackage.from_status(status(payload_version='3.10.0'))))
+        self.assertTrue(Release.parse(release('3.1.0', 2)).newer_than(LocalPackage.from_status(status())))
+        self.assertFalse(Release.parse(release('3.1.0', 1)).newer_than(LocalPackage.from_status(status())))
+
+    def test_discovery_independent_of_runtime_identity(self):
+        candidate = Release.parse(release())
+        for change in ({'state': 'absent', 'runtime_version': None},
+                       {'state': 'legacy', 'runtime_version': None},
+                       {'state': 'blocked', 'runtime_version': None, 'message_code': 'version_unknown'},
+                       {'state': 'blocked', 'message_code': 'source_mismatch'}):
+            self.assertTrue(candidate.newer_than(LocalPackage.from_status(status(**change))))
+
+    def test_no_compatible_distinct_from_invalid_response(self):
+        for change in ({'draft': True}, {'prerelease': True}, {'assets': []}):
+            item = release()
+            item.update(change)
+            with self.assertRaises(NoCompatibleRelease):
+                Release.parse(item)
+        with self.assertRaises(ValueError) as error:
+            Release.parse({'draft': 'false'})
+        self.assertNotIsInstance(error.exception, NoCompatibleRelease)
 
     def test_only_stable_releases(self):
         for change in [{'draft': True}, {'prerelease': True}, {'draft': None},

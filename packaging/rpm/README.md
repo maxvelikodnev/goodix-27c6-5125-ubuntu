@@ -37,13 +37,18 @@ Use the normal CLI to remove the remaining driver, or reinstall the Manager.
 Emergency `goodix-force-remove` remains a TTY recovery command; it is not a GUI
 action. No RPM scriptlet attempts authentication changes or irreversible cleanup.
 
-Unknown or damaged software stops safely. Recognized 2.x legacy installations
-are shown and can be removed normally, but direct Manager migration is blocked
-pending populated-installation VM qualification. Old fingerprints require **new
-enrollment** with the 3.x engine; historical files are preserved. A prior 3.x CLI
-receipt without a verifiable driver version is shown as version unknown, rather
-than guessed. Use ordinary removal then install for such a transition, preserving
-all protected data. The classic `install.sh` path remains available.
+Unknown or damaged software stops safely. Recognized, intact 2.x installations
+offer **Upgrade to 3.0.0**, using the canonical transactional update without a
+preliminary uninstall. Old fingerprints require **new enrollment** with the 3.x
+engine; historical files are preserved. Real populated-installation migration
+and rollback remain a separate VM qualification gate.
+
+Earlier ChicagoHS CLI receipts without a version can be recognized from a
+verified source identity anchored to a pinned historical build. Receipts are
+not rewritten just to add version metadata. An unrecognized identity remains
+version unknown, and a same-version source difference without proven equivalence
+stops local updates. Ordinary verified removal and the classic `install.sh`
+path remain available. These local gates do not hide newer public releases.
 
 ## Discover metadata and system appearance
 
@@ -68,11 +73,14 @@ at startup.
 ## Updates and privacy
 
 At startup the GUI asynchronously checks the official GitHub stable Release API.
-It compares runtime, local payload and public versions numerically. Only a
+It compares the verified local Manager package and public versions numerically. Only a
 matching Fedora/architecture RPM asset produces a download action. The flow is
 **Download update → Discover → reopen Manager → Apply Update**; no remote code
 is executed by the helper. Prereleases, malformed replies, missing compatible
 RPMs, rate limits and offline failures do not disable local operations.
+The UI distinguishes an unavailable check, no compatible public release and a
+current package. Unknown, legacy or mismatched runtime versions do not suppress
+a public update notification; applying its payload still requires local checks.
 
 The read-only status helper checks installed package files and runtime receipts
 without opening USB or reading pairing/template contents. A narrow PolicyKit
@@ -165,12 +173,41 @@ do not silently regenerate the signing key in a build.
 
 ## Qualification before distribution
 
+Every public stable GitHub Release must contain its signed Fedora 44 x86_64 RPM
+and corresponding signed SRPM. Prepare the assets in a draft first, then save
+the release metadata JSON and run the offline publication check against the
+exact local files:
+
+```sh
+python3 -I -B packaging/rpm/verify_release.py --mode draft \
+  --metadata release-candidate.json \
+  --binary development/rpm/builds/VERSION-RELEASE.fc44/rpmbuild/RPMS/x86_64/goodix-manager-VERSION-RELEASE.fc44.x86_64.rpm \
+  --source development/rpm/builds/VERSION-RELEASE.fc44/rpmbuild/SRPMS/goodix-manager-VERSION-RELEASE.fc44.src.rpm
+```
+
+The gate requires a coherent stable version/tag, completed compatible assets,
+official download URLs, matching size/SHA-256, RPM identity and embedded payload
+metadata, and signatures from the approved personal certificate. `--mode public`
+checks a saved published-release response instead. Both modes check local
+evidence only: they neither publish nor prove GitHub availability. Do not publish
+a candidate that fails the gate.
+
+Future-release regression tests use a fictional 3.0.1 response and isolated
+test packages. Their private artifacts are **TEST ONLY / NEVER PUBLISH** and
+are separate from production releases; the test signer is not a trusted
+production identity. A public 3.0.1 release is not required to qualify update
+continuity before the first 3.0.0 publication. Real populated 2.x migration
+remains a separate VM gate.
+
 Run public fixture tests and inspect the RPM before a VM transaction:
 
 ```sh
 python3 packaging/rpm/test_packaging.py
 python3 packaging/rpm/test_helper.py
+python3 packaging/rpm/test_compat_transactions.py
 python3 packaging/rpm/manager/test_model.py
+python3 packaging/rpm/manager/test_network_ui.py
+python3 packaging/rpm/test_verify_release.py
 python3 packaging/rpm/manager/test_ui.py
 python3 packaging/rpm/manager/test_ui.py --initial-palette dark
 python3 production/test_build_public.py

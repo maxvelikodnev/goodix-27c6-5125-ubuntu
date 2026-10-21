@@ -1332,8 +1332,11 @@ Fedora to activate it.
 An RPM update replaces the Manager and its local payload while leaving the
 installed runtime unchanged. The Manager compares the verified runtime version
 with the local payload and offers Apply Update only for a newer driver. A
-packaging-only revision does not trigger a driver update; an unknown version or
-different source identity at the same version blocks it. The backend reports
+packaging-only revision does not trigger a driver update. A missing historical
+version field can be resolved from a verified source identity anchored to a
+pinned build, without rewriting its receipt. Unknown versions or different
+source identities at the same version without proven equivalence block local
+updates, while public release discovery remains independent. The backend reports
 `GOODIX_INSTALL_MODE` for the software transaction:
 
 | Project software | Host pairing state | Mode |
@@ -1361,8 +1364,8 @@ current driver identity: users must enroll their desired fingers again.
 The migration code is covered by offline simulated tests, but a real populated
 2.x → 3.0.0 upgrade and failed-update rollback require separate
 live qualification before release. A clean installation is not evidence of
-that migration. The Manager therefore blocks direct legacy migration until it
-is qualified; it retains ordinary verified removal for recognized legacy software.
+that migration. The Manager exposes a direct upgrade for recognized, intact
+legacy software through this same transaction and retains ordinary verified removal.
 
 Neither the Manager nor its payload needs a source clone. For optional source
 installation, the clone may be removed afterwards; runtime and standalone

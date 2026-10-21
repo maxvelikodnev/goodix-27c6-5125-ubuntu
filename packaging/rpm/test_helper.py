@@ -19,9 +19,9 @@ META = {'schema': 1, 'version': '3.0.0', 'release': 1, 'fedora': 44,
 
 
 class HelperTests(unittest.TestCase):
-    def backend(self, *, installed=True, matcher='chicago-type24', version='3.0.0'):
-        receipt = {'schema': 2, 'matcher': matcher, 'source_id': 'a' * 64}
-        provenance = {'source_id': 'a' * 64}
+    def backend(self, *, installed=True, matcher='chicago-type24', version='3.0.0', source_id='a' * 64):
+        receipt = {'schema': 2, 'matcher': matcher, 'source_id': source_id}
+        provenance = {'source_id': source_id}
         if version is not None:
             receipt['version'] = version
             provenance['version'] = version
@@ -31,7 +31,8 @@ class HelperTests(unittest.TestCase):
         r = SimpleNamespace(RUNTIME=runtime, MATERIAL=Path('/fake/protected'),
                             NORMAL=Path('/usr/local/bin/goodix-uninstall'),
                             present=Mock(return_value=installed), normal_preflight=Mock(),
-                            read=Mock(side_effect=read), main=Mock(return_value=0))
+                            read=Mock(side_effect=read), main=Mock(return_value=0),
+                            receipt_identity=lambda record: record['source_id'], digest=Mock(return_value=source_id))
         return SimpleNamespace(r=r, software_paths=lambda: [runtime],
                                RUNTIME_PACKAGES=('fprintd',), apply=Mock(),
                                builder=SimpleNamespace(validate_payload=Mock(return_value={'source_id': 'a' * 64})))
@@ -49,14 +50,47 @@ class HelperTests(unittest.TestCase):
         backend.r.normal_preflight.assert_not_called()
 
     def test_installed_version_not_inferred_from_payload(self):
-        value, _ = self.inspect(self.backend(version=None))
+        value, _ = self.inspect(self.backend(version=None, source_id='b' * 64))
         self.assertEqual((value['state'], value['message_code']), ('blocked', 'version_unknown'))
         self.assertIsNone(value['runtime_version'])
 
-    def test_legacy_known_but_unqualified(self):
-        value, _ = self.inspect(self.backend(matcher='sigfm', version='2.2.1'))
-        self.assertEqual((value['state'], value['message_code']), ('legacy', 'legacy_unqualified'))
-        self.assertTrue(value['enrollment_required'])
+    def test_released_sigfm_known_with_or_without_version(self):
+        for identity, (version, matcher) in h.HISTORICAL.items():
+            if matcher != 'sigfm':
+                continue
+            for declared in (None, version):
+                value, guard = self.inspect(self.backend(matcher=matcher, version=declared, source_id=identity))
+                self.assertEqual((value['state'], value['message_code']), ('legacy', 'legacy_upgrade_available'))
+                self.assertEqual(value['runtime_version'], version)
+                self.assertEqual(guard, identity)
+                self.assertTrue(value['enrollment_required'])
+
+    def test_unknown_sigfm_and_milan_are_not_promoted(self):
+        for matcher in ('sigfm', 'milan-type17'):
+            value, _ = self.inspect(self.backend(matcher=matcher, version=None))
+            self.assertEqual(value['message_code'], 'legacy_unqualified')
+
+    def test_exact_local_source_proves_missing_version(self):
+        value, _ = self.inspect(self.backend(version=None))
+        self.assertEqual((value['runtime_version'], value['message_code']), ('3.0.0', 'up_to_date'))
+
+    def test_known_chicago_identity_and_specific_equivalence(self):
+        identity = next(key for key, value in h.HISTORICAL.items() if value[1] == 'chicago-type24')
+        backend = self.backend(version=None, source_id=identity)
+        with patch.object(h, 'status_lock', return_value=nullcontext()):
+            for local_source in h.CHICAGO_300_EQUIVALENT:
+                value, _ = h.inspect_runtime(backend, dict(META, source_id=local_source))
+                self.assertEqual((value['runtime_version'], value['message_code']), ('3.0.0', 'up_to_date'))
+            value, _ = h.inspect_runtime(backend, META)
+            self.assertEqual(value['message_code'], 'source_mismatch')
+        backend.r.digest.return_value = 'f' * 64
+        with self.assertRaises(h.Blocked):
+            self.inspect(backend)
+
+    def test_known_identity_cannot_claim_another_version(self):
+        identity = next(iter(h.HISTORICAL))
+        with self.assertRaises(h.Blocked):
+            self.inspect(self.backend(matcher='sigfm', source_id=identity, version='2.9.0'))
 
     def test_version_order_is_numeric(self):
         for version, code in [('3.0.0', 'up_to_date'), ('2.10.0', 'update_available'),
@@ -105,6 +139,17 @@ class HelperTests(unittest.TestCase):
                 with self.subTest(value=bad, receipt=corrupt_receipt), self.assertRaises(h.Blocked):
                     self.inspect(backend)
 
+    def test_provenance_matcher_when_present_must_match_receipt(self):
+        for matcher in ('sigfm', 'milan-type17', None, ''):
+            backend = self.backend()
+            backend.r.read.side_effect = [
+                json.dumps({'schema': 2, 'matcher': 'chicago-type24',
+                            'source_id': 'a' * 64, 'version': '3.0.0'}).encode(),
+                json.dumps({'source_id': 'a' * 64, 'version': '3.0.0',
+                            'matcher': matcher}).encode()]
+            with self.subTest(matcher=matcher), self.assertRaises(h.Blocked):
+                self.inspect(backend)
+
     def test_status_reads_only_runtime_software(self):
         backend = self.backend()
         self.inspect(backend)
@@ -132,6 +177,18 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(value['result'], 'success')
         self.assertTrue(value['enrollment_required'])
         self.assertTrue(value['reboot_required'])
+
+    def test_noop_or_racing_update_cannot_report_success(self):
+        backend = self.backend()
+        before = h.response(META, state='installed', runtime_version='2.2.1', result='success')
+        for final_version, final_source in [('2.2.1', 'a' * 64), ('3.0.0', 'b' * 64)]:
+            after = h.response(META, state='installed', runtime_version=final_version, result='success')
+            with patch.object(h, 'inspect_runtime', side_effect=[(before, 'a' * 64), (after, final_source)]), \
+                    patch.object(h, 'sensor_present', return_value=False), \
+                    patch.object(h, 'runtime_prerequisites'), \
+                    patch.object(h, 'read_json', return_value={'version': '3.0.0'}):
+                with self.assertRaisesRegex(h.Blocked, 'runtime_changed'):
+                    h.execute('update', backend, META)
 
     def test_remove_dispatches_normal_entrypoint_and_restores_argv(self):
         backend = self.backend()

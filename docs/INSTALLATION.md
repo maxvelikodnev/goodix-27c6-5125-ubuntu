@@ -82,17 +82,34 @@ when the local payload is newer than the installed driver. Updating the RPM alon
 leaves the previous runtime in place. A packaging-only revision does not require
 reapplying an unchanged driver. Downgrades are not offered.
 
+For an intact, recognized 2.x/SIGFM installation, choose **Upgrade to 3.0.0**.
+Read the format-change warning and confirm the direct transactional upgrade;
+no preliminary uninstall is required. Restart when requested and enroll your
+fingers again. The historical files and host pairing state are preserved.
+The populated-installation VM qualification remains a release gate in
+[validation](VALIDATION.md).
+
 The Manager checks official public releases in the background and links to a
 compatible RPM when one is available. Download and verify it, install it with
 Discover, then return to the Manager. **Check unavailable** means the public
 release check could not complete; local operations remain available offline.
+**No compatible public release** is distinct from a failed check or a current
+package. A newer public RPM remains visible even if a local runtime integrity
+or version check blocks Apply Update. Downloading an RPM does not bypass that
+local check, and its signature must still be verified before installation.
 
 After normal or emergency driver removal, reopen the Manager and choose
 **Install** to reinstall from its local payload. If the Manager itself was
-removed, reinstall the signed RPM first. A legacy or unverified runtime can block
-Update: stop and review the explanation. Where ordinary removal is available,
-follow [removal and recovery](UNINSTALL.md) before installing again; do not force
-a migration past a failed integrity check.
+removed, reinstall the signed RPM first. A failed integrity or provenance check
+blocks Update: keep the diagnostics and review the explanation. Do not force
+a migration past a failed check; [removal and recovery](UNINSTALL.md) remains
+available when you need to remove the installation.
+
+Earlier ChicagoHS CLI installations may lack a version field. The Manager can
+recognize a verified source identity from a pinned historical build without
+rewriting its receipts or reinstalling the current driver. If no exact version
+can be established, it reports **Unknown version**; public release discovery
+continues, while local mutation remains subject to the provenance checks.
 
 The Manager stays unprivileged and requests authorization only through its fixed
 installed helper. Keep password access available throughout. Wait for the final
@@ -214,8 +231,9 @@ Never attach host pairing state, templates, fingerprint images or raw USB captur
 ## What updates and reinstalls preserve
 
 The Manager applies the verified local payload through the same transactional
-backend used by the source installer. Direct migration from a populated 2.x
-installation is still awaiting qualification and is blocked in the Manager.
+backend used by the source installer. Direct migration is offered for recognized,
+intact 2.x installations; its populated-installation VM qualification is separate
+from the offline software checks.
 **New fingerprint enrollment is required** with the 3.x engine because historical
 templates are incompatible; the old files are preserved. A failed ownership,
 receipt or state check must stop instead of guessing how to migrate. A deliberate

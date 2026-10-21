@@ -1,0 +1,23 @@
+{
+  "name": "TEST ONLY / NEVER PUBLISH — synthetic future release",
+  "tag_name": "v3.0.1",
+  "draft": false,
+  "prerelease": false,
+  "html_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/v3.0.1",
+  "assets": [
+    {
+      "name": "goodix-manager-3.0.1-1.fc44.x86_64.rpm",
+      "state": "uploaded",
+      "size": 1,
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "browser_download_url": "https://github.com/sorguido/goodix-27c6-5125/releases/download/v3.0.1/goodix-manager-3.0.1-1.fc44.x86_64.rpm"
+    },
+    {
+      "name": "goodix-manager-3.0.1-1.fc44.src.rpm",
+      "state": "uploaded",
+      "size": 1,
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "browser_download_url": "https://github.com/sorguido/goodix-27c6-5125/releases/download/v3.0.1/goodix-manager-3.0.1-1.fc44.src.rpm"
+    }
+  ]
+}
