@@ -47,6 +47,13 @@ class StateTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 status(**change)
 
+    def test_packaging_revision_does_not_offer_driver_update(self):
+        for revision in (5, 6):
+            current = status(runtime_version='3.0.0', payload_version='3.0.0',
+                             package_version=f'3.0.0-{revision}.fc44')
+            self.assertEqual(current.action, '')
+            self.assertEqual(current.title, 'Up to date')
+
     def test_unknown_legacy_version_is_not_invented(self):
         legacy = status(state='legacy', runtime_version=None, message_code='legacy_unqualified')
         self.assertEqual(legacy.action, '')

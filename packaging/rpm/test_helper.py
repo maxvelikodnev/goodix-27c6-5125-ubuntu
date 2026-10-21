@@ -72,6 +72,20 @@ class HelperTests(unittest.TestCase):
         self.assertEqual((value['state'], value['message_code']), ('blocked', 'source_mismatch'))
         self.assertEqual(value['runtime_version'], '3.0.0')
 
+    def test_packaging_only_upgrade_does_not_reapply_driver(self):
+        backend = self.backend(version='3.0.0')
+        with patch.object(h, 'status_lock', return_value=nullcontext()), \
+                patch.object(h, 'sensor_present', return_value=False):
+            for revision in (5, 6):
+                metadata = dict(META, release=revision)
+                value = h.execute('status', backend, metadata)
+                self.assertEqual(value['message_code'], 'up_to_date')
+                self.assertEqual(value['package_version'], f'3.0.0-{revision}.fc44')
+                with self.assertRaises(h.Blocked):
+                    h.execute('update', backend, metadata)
+        backend.apply.assert_not_called()
+        backend.r.main.assert_not_called()
+
     def test_receipt_and_provenance_identity_must_agree(self):
         backend = self.backend()
         backend.r.read.side_effect = [json.dumps({'schema': 2, 'matcher': 'chicago-type24',

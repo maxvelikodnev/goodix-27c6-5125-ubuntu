@@ -4,7 +4,7 @@
   "project": "Goodix 27c6:5125 — ChicagoHS",
   "candidate": "ChicagoHS",
   "phase": "RPM_DISTRIBUTION",
-  "phase_status": "SIGNED_OFFLINE_READY_AWAITING_OPERATOR_VM_TESTS",
+  "phase_status": "UI_CORRECTIONS_SIGNED_AWAITING_OPERATOR_VM_RETEST",
   "software_rc_ready_for_vm": "PASS",
   "completed_gates": [
     "CH0_SOURCE_BASELINE",
@@ -14,7 +14,7 @@
     "CH4_INDEPENDENT_REVIEW"
   ],
   "live_qualification": "PREEXISTING_OPERATOR_REPORTED_FUNCTIONAL_PASS_SEE_DOCS_VALIDATION",
-  "vm_installation": "PREEXISTING_CLI_OBSERVATIONS_ONLY_RPM_NOT_TESTED",
+  "vm_installation": "OPERATOR_REPORTED_RPM5_INSTALL_AND_MENU_ICON_PASS; RPM7_RETEST_NOT_TESTED",
   "host_modified": false,
   "implementation_baseline": "ddc09472229bd88d8b4a072039e6f2d5a07579d5",
   "rc_source_id": "bdc3729d6467636d06045190f08e3eb3852dcc84181e080f9182984c3f0cc5a4",
@@ -54,27 +54,33 @@
     "development/private-root/analysis/CHICAGO_RC_2026-10-21/REVIEW.md"
   ],
   "qualification_limits": [
-    "RPM/Manager: no real USB, active runtime installation, Discover or desktop authentication executed in this task; earlier CLI operator observations are documented separately.",
+    "Operator reports RPM5 installed correctly and custom icon in KDE menu/Manager; no agent VM/USB/active-runtime transaction; RPM7 Discover and real KDE theme propagation remain NOT_TESTED.",
     "FDT_B0 physical equivalence, cross-device identity uniqueness, FAR/FRR and liveness remain unqualified",
     "Opaque native heap is freed; complete zeroization is not guaranteed"
   ],
-  "next_action": "Operator tests signed RPM 3.0.0-5.fc44 in Fedora 44 KDE VM; report Discover, PolicyKit, offline lifecycle and password fallback outcomes before acceptance",
+  "next_action": "Operator opens signed RPM 3.0.0-7.fc44 in Fedora 44 KDE VM and checks system light/dark startup/live changes; Discover local-file icon/author remain upstream limitations",
   "obsolete_selinux_module_removed": "PASS",
   "rpm_distribution": {
     "branch": "rpm",
     "version": "3.0.0",
-    "release": 5,
+    "release": 7,
     "fedora": 44,
     "architecture": "x86_64",
     "signature": "VERIFIED",
     "fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
-    "source_archive_sha256": "a44b9a73a68a1f866ea865bfe9c54422d78bee4be47662c9164e19af0ca39a1a",
+    "source_archive_sha256": "28e78c3b4a8fa4d9e9da958420c6ef492466bcb28b157f3823f6361bac8eb4e8",
     "payload_source_id": "f259f6f10a60e5facc5a8404f951bce3eb18da2aaefebc8c9a167e4540938d97",
-    "public_unit_tests_passed": 160,
-    "qml_render": "PASS_LIGHT_DARK_COMPACT",
+    "public_unit_tests_passed": 38,
+    "qml_render": "PASS_SYSTEM_LIGHT_DARK_STARTUP_LIVE_DIALOG_DISABLED_COMPACT",
     "runtime_modified_on_host": false,
     "release_published": false,
-    "operator_vm_testing": "PENDING_USER_WILL_EXECUTE",
-    "report": "development/rpm/reports/REPORT.md"
+    "operator_vm_testing": "RPM5_INSTALL_REPORTED_PASS_RPM7_RETEST_PENDING",
+    "report": "development/rpm/reports/ui-01-03/REPORT.md",
+    "ui_corrections": {
+      "UI-01": "BLOCKED_DISCOVER_LOCAL_FILE_GENERIC_ICON",
+      "UI-02": "BLOCKED_DISCOVER_LOCAL_FILE_EMPTY_AUTHOR",
+      "UI-03": "PASS_QT_SYSTEM_PALETTE_TESTS; KDE_VM_NOT_TESTED",
+      "packaging_only_no_reapply": "PASS_ACTUAL_5_TO_7_METADATA_FIXTURE"
+    }
   }
 }

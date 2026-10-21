@@ -70,6 +70,11 @@ Open the verified RPM with **KDE Discover** and complete its installation. This
 installs **Goodix Manager** and a compiled local payload. It does not activate the
 driver, modify PAM or pairing state, or start a fingerprint action.
 
+Discover 6.7.5's local-RPM page may show a generic icon and “Unknown author” even for
+this correctly signed package; its local-file view does not use the embedded
+application metadata. See the [Discover metadata limitation](../packaging/rpm/README.md#discover-metadata-and-system-appearance).
+The KDE menu and Manager use the installed Goodix icon.
+
 Open **Goodix Manager** from the KDE application menu. With no driver installed,
 choose **Install** and approve the PolicyKit authorization. For an update, install
 the newer signed RPM with Discover, reopen the Manager and choose **Apply Update**

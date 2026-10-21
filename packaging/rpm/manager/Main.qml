@@ -13,18 +13,68 @@ Kirigami.ApplicationWindow {
     minimumHeight: 560
     property var info: backend.view
     property string requestedAction: ""
-    property int themeChoice: 0
-    SystemPalette { id: systemPalette }
-    property color surfaceColor: themeChoice === 2 ? "#18222e" : themeChoice === 1 ? "#f3f6fa" : systemPalette.window
-    property color cardColor: themeChoice === 2 ? "#233141" : themeChoice === 1 ? "#ffffff" : systemPalette.base
-    property color inkColor: themeChoice === 2 ? "#edf3fa" : themeChoice === 1 ? "#172c40" : systemPalette.text
-    property color lineColor: themeChoice === 2 ? "#405065" : themeChoice === 1 ? "#dbe3ec" : systemPalette.mid
-    palette.window: surfaceColor
-    palette.base: cardColor
-    palette.windowText: inkColor
-    palette.text: inkColor
-    palette.buttonText: inkColor
-    palette.button: cardColor
+    // Bind all system groups at startup and on paletteChanged; no application theme override.
+    SystemPalette { id: systemPalette; colorGroup: SystemPalette.Active }
+    SystemPalette { id: inactivePalette; colorGroup: SystemPalette.Inactive }
+    SystemPalette { id: disabledPalette; colorGroup: SystemPalette.Disabled }
+    palette.active {
+        window: systemPalette.window
+        windowText: systemPalette.windowText
+        base: systemPalette.base
+        alternateBase: systemPalette.alternateBase
+        text: systemPalette.text
+        button: systemPalette.button
+        buttonText: systemPalette.buttonText
+        light: systemPalette.light
+        midlight: systemPalette.midlight
+        dark: systemPalette.dark
+        mid: systemPalette.mid
+        shadow: systemPalette.shadow
+        highlight: systemPalette.highlight
+        highlightedText: systemPalette.highlightedText
+        placeholderText: systemPalette.placeholderText
+        accent: systemPalette.accent
+    }
+    palette.inactive {
+        window: inactivePalette.window
+        windowText: inactivePalette.windowText
+        base: inactivePalette.base
+        alternateBase: inactivePalette.alternateBase
+        text: inactivePalette.text
+        button: inactivePalette.button
+        buttonText: inactivePalette.buttonText
+        light: inactivePalette.light
+        midlight: inactivePalette.midlight
+        dark: inactivePalette.dark
+        mid: inactivePalette.mid
+        shadow: inactivePalette.shadow
+        highlight: inactivePalette.highlight
+        highlightedText: inactivePalette.highlightedText
+        placeholderText: inactivePalette.placeholderText
+        accent: inactivePalette.accent
+    }
+    palette.disabled {
+        window: disabledPalette.window
+        windowText: disabledPalette.windowText
+        base: disabledPalette.base
+        alternateBase: disabledPalette.alternateBase
+        text: disabledPalette.text
+        button: disabledPalette.button
+        buttonText: disabledPalette.buttonText
+        light: disabledPalette.light
+        midlight: disabledPalette.midlight
+        dark: disabledPalette.dark
+        mid: disabledPalette.mid
+        shadow: disabledPalette.shadow
+        highlight: disabledPalette.highlight
+        highlightedText: disabledPalette.highlightedText
+        placeholderText: disabledPalette.placeholderText
+        accent: disabledPalette.accent
+    }
+    readonly property color surfaceColor: systemPalette.window
+    readonly property color cardColor: systemPalette.base
+    readonly property color inkColor: systemPalette.text
+    readonly property color lineColor: systemPalette.mid
     onClosing: function(close) {
         if (info.busy) {
             close.accepted = false
@@ -55,13 +105,6 @@ Kirigami.ApplicationWindow {
                     Layout.fillWidth: true
                     Kirigami.Heading { color: window.inkColor; text: "Your fingerprint.\nYour device."; level: 1; font.pointSize: 22; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     Controls.Label { text: "Goodix 27c6:5125 · Fedora KDE"; opacity: 0.72; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                }
-                Controls.ComboBox {
-                    model: ["System theme", "Light", "Dark"]
-                    currentIndex: window.themeChoice
-                    Accessible.name: "Color theme"
-                    onActivated: window.themeChoice = currentIndex
-                    Layout.preferredWidth: 142
                 }
             }
             Kirigami.AbstractCard {

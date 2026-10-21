@@ -45,6 +45,26 @@ receipt without a verifiable driver version is shown as version unknown, rather
 than guessed. Use ordinary removal then install for such a transition, preserving
 all protected data. The classic `install.sh` path remains available.
 
+## Discover metadata and system appearance
+
+Discover 6.7.5 opens a local RPM through `LocalFilePKResource`, whose package
+resource supplies the generic `applications-other` icon and an empty author.
+That view does not read the embedded AppStream developer or SVG. It can therefore
+show a generic icon and “Unknown author” before installation even when the
+package's desktop entry, icon and `Guido Sorarù` developer metadata are correct.
+The separate AppStream resource reads the developer name; the KDE application
+menu and Manager use the installed icon. See the upstream
+[local-file resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/LocalFilePKResource.cpp),
+[package resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/PackageKitResource.h)
+and [AppStream resource](https://github.com/KDE/discover/blob/v6.7.5/libdiscover/backends/PackageKitBackend/AppPackageKitResource.cpp).
+Changing RPM publisher fields or duplicating AppStream fields does not change
+that local-file path. Signature verification remains a separate trust check.
+
+The Manager follows the system light or dark palette without an application
+theme selector. Palette changes take effect while the window is open when the
+Qt/KDE platform integration delivers them; the system palette is also applied
+at startup.
+
 ## Updates and privacy
 
 At startup the GUI asynchronously checks the official GitHub stable Release API.
@@ -151,6 +171,8 @@ Run public fixture tests and inspect the RPM before a VM transaction:
 python3 packaging/rpm/test_packaging.py
 python3 packaging/rpm/test_helper.py
 python3 packaging/rpm/manager/test_model.py
+python3 packaging/rpm/manager/test_ui.py
+python3 packaging/rpm/manager/test_ui.py --initial-palette dark
 python3 production/test_build_public.py
 python3 deployment/test_install.py
 python3 deployment/test_install_selection.py
