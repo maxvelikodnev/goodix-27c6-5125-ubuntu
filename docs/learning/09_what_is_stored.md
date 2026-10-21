@@ -18,7 +18,7 @@ root-only host directory.
 | --- | --- | --- | --- |
 | Factory and persistent reader state | Inside the sensor | Device identity, firmware, existing secure setup, calibration/factory state | Preserved; the supported path does not reprogram it and adds only one bounded host-pairing record |
 | Host pairing state | Host: `/var/lib/fprint/goodix-5125-state-v2/` | The locally generated Linux pairing key and its authenticated receipts | Created on first use; root-only; preserved during removal |
-| Enrolled fingerprint templates | Host: `/var/lib/fprint/` | Stores user/finger metadata and SIGFM feature samples for later matching | Managed by Fedora `fprintd`; preserved during project removal |
+| Enrolled fingerprint templates | Host: `/var/lib/fprint/` | Stores user/finger metadata and sensor-bound ChicagoHS Type 24 templates for later matching | Managed by Fedora `fprintd`; preserved during project removal |
 
 These categories are related, but they are not interchangeable.
 
@@ -56,15 +56,19 @@ calibration live. That host state is not an enrolled fingerprint template.
 
 ## Host-side biometric templates
 
-During enrollment, `libfprint` builds an `FpPrint` containing accepted SIGFM
-samples plus metadata such as the finger label and compatible device. It
-serializes that record, and `fprintd` saves it under `/var/lib/fprint/` for the
-user.
+During enrollment, ChicagoHS collects native fingerprint features into a
+Type 24 subtemplate gallery. The original twelve-stage policy can retain
+more subtemplates than the number of stages that advance. When complete,
+`libfprint` builds an `FpPrint` containing the packed ChicagoHS template,
+the driver identity, and the current reader's OTP-bound envelope, alongside
+metadata such as the finger label and user. `fprintd` saves the serialized
+record under `/var/lib/fprint/` for that user. Historical SIGFM and Milan
+templates remain separate and cannot be silently converted or reused.
 
 During verification:
 
 1. `fprintd` loads the appropriate saved template;
-2. `libfprint` validates and deserializes its SIGFM samples;
+2. `libfprint` validates and deserializes its ChicagoHS template and current reader binding;
 3. the new probe is compared with those samples in memory;
 4. the result is returned to `fprintd` and the authentication consumer.
 
@@ -103,7 +107,8 @@ attachments.
 - Factory/persistent state belongs to the reader and is preserved.
 - The Linux pairing key is generated once and lives in a root-only host
   directory.
-- Enrolled SIGFM templates live in Fedora's host-side `fprintd` storage.
+- Enrolled ChicagoHS templates live in Fedora's host-side `fprintd` storage;
+  historical SIGFM and Milan records remain separate and are preserved.
 - Raw images are processed in memory, not saved as the normal template format.
 - Removing the project preserves pairing state and templates by default.
 
