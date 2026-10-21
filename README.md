@@ -1,9 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix 27c6:5125 — ChicagoHS branch
+# Goodix 27c6:5125 — Fedora KDE fingerprint driver
 
-`porting_ChicagoHS` contains the ChicagoHS Type 24 driver for **Fedora 44 KDE
-x86_64**, Goodix USB `27c6:5125` and APP12509/APP12508 firmware. The canonical
-source build integrates with Fedora's stock libfprint/fprintd/PAM/KDE interfaces.
+The canonical Goodix USB `27c6:5125` driver uses the **ChicagoHS Type 24**
+biometric engine on **Fedora 44 KDE x86_64**, recognizing APP12509/APP12508
+firmware. The source build integrates with Fedora's stock
+libfprint/fprintd/PAM/KDE interfaces. ChicagoHS supersedes the earlier SIGFM
+engine in the planned major **3.0.0** release; it is not a parallel long-term
+driver edition.
 An initial operator-supervised Fedora KDE VM qualification with USB passthrough
 has completed enrollment, genuine/negative verification, desktop authentication,
 reboot and a bounded Windows/Linux coexistence check. Broader reliability,
@@ -13,8 +16,23 @@ see [validation evidence and limits](docs/VALIDATION.md).
 ChicagoHS replaces the matcher and requires new twelve-stage enrollment for each
 finger/user. Historical SIGFM and Milan templates are preserved but incompatible.
 There is no alternative matcher or private diagnostic path in the payload.
-`main` remains the SIGFM recovery baseline. See the precise
-[qualification boundary](docs/VALIDATION.md).
+The former SIGFM implementation remains available through
+[historical releases such as v2.2.1](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1),
+**not** through the canonical `main` branch after the ChicagoHS merge.
+See the precise [qualification boundary](docs/VALIDATION.md).
+
+## Upgrade from SIGFM 2.x to ChicagoHS 3.0.0
+
+ChicagoHS changes the enrolled-print format and the driver identity. Existing
+SIGFM templates are kept on disk, but **every user must enroll each desired
+finger again** after upgrading. Host pairing state and password authentication
+are preserved. The canonical installer is designed to remove a recognized
+older project runtime and install ChicagoHS transactionally; manual
+pre-uninstallation is not normally required. The direct migration from a
+real populated SIGFM installation must still pass its final live qualification
+before release. Do not assume a clean-VM install is that migration test.
+An optional downgrade to the historical SIGFM release requires removing
+ChicagoHS first; see [recovery](docs/UNINSTALL.md).
 
 ## Installation and recovery
 
@@ -36,9 +54,9 @@ Manage fingerprints through KDE's fingerprint settings. A nonempty password at
 Plasma Login selects password authentication; an empty submission selects the
 fingerprint path, with at most three attempts and stop on the first match.
 Keep password access available. Fingerprint login does not unlock a
-password-encrypted KWallet. The initial live authentication paths have passed on one reader, but keep
-password access available and do not infer general FAR/FRR, liveness or
-multi-device reliability from the limited trials.
+password-encrypted KWallet. Initial live authentication paths passed on one
+reader; do not infer general FAR/FRR, liveness or multi-device reliability
+from these limited trials.
 
 ## Documentation
 
