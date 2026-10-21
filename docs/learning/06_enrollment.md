@@ -72,8 +72,9 @@ some strongly shifted touches produced normal requests to reposition.
 These limited results do not prove that every possible finger will enroll
 reliably or establish statistical biometric accuracy.
 
-For historical context only, the prior **SIGFM** driver on `main` used
-a fixed-21 accepted-sample policy and measured three all-zero scoring probes
+For historical context only, the prior **SIGFM** driver from older tagged
+releases (such as `v2.2.1`) used a fixed-21 accepted-sample policy and
+measured three all-zero scoring probes
 among 100 in one qualification set (3.00%). That statistic does **not**
 describe ChicagoHS and must not be used to estimate its error rate.
 
