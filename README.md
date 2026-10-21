@@ -42,8 +42,8 @@ After a successful installation, the repository clone may be removed.
 
 ### Upgrading from an earlier release
 
-Version 3.0.0 introduces a different biometric engine and stored fingerprint
-format. The standard installer is designed to replace a recognized 2.x runtime
+Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
+fingerprint format. The standard installer is designed to replace a recognized 2.x runtime
 without a preliminary manual uninstall, while preserving host pairing state,
 existing fingerprint files and password access. **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new
