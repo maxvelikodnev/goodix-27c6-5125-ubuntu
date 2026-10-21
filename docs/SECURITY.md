@@ -61,7 +61,7 @@ Fedora owns fprintd, Plasma, PAM, sudo and PolicyKit. The project adds a private
 library directory, a narrow service environment drop-in and a minimal
 Plasma Login selector. It does not ship a replacement daemon/greeter or freeze
 Fedora's vendor authentication files.
-SELinux remains Enforcing. ChicagoHS installs no huge-page `dontaudit` module
+SELinux remains Enforcing. The driver installs no huge-page `dontaudit` module
 and no replacement `allow` policy. Updates and both removal commands remove the
 legacy `goodix_5125_hugepage` module only after verifying its single enabled
 priority-400 CIL entry and exact legacy rule content. Ambiguous or foreign policy
