@@ -7,12 +7,12 @@ USB reader to Fedora authentication consumers, including the secure session,
 image and biometric pipeline, system integration, installation, recovery, and
 qualification boundary.
 
-ChicagoHS is the canonical biometric engine of the Goodix 27c6:5125 driver
-for the planned 3.0.0 major release. It supersedes SIGFM within the project's
-standard `main` source line; it is not a separate long-term distribution.
-Transport and integration code inherited from the historical SIGFM releases
-was complemented by an initial operator-supervised live check of ChicagoHS
-enrollment, matching and Fedora KDE authentication on one reader.
+The Goodix USB `27c6:5125` driver provides native fingerprint acquisition,
+biometric recognition and integration with Fedora KDE. Its current biometric
+engine uses the Type 24 format and replaces the earlier SIGFM implementation.
+The original USB/TLS, pairing and desktop-integration contracts remain in
+scope. Initial live verification of enrollment, matching and Fedora KDE
+authentication was completed on one reader.
 The limited observations do not establish biometric accuracy statistics,
 multi-device reliability or physical uniqueness. The software contracts below
 are independent of any such performance claim.
@@ -33,7 +33,7 @@ manual when reviewing, maintaining, or diagnosing the design.
 6. [Device initialization and secure-session lifecycle](#6-device-initialization-and-secure-session-lifecycle)
 7. [Finger detection, capture, release, and cancellation](#7-finger-detection-capture-release-and-cancellation)
 8. [Image decoding and preprocessing](#8-image-decoding-and-preprocessing)
-9. [ChicagoHS extraction, serialization, and matching](#9-chicagohs-extraction-serialization-and-matching)
+9. [Biometric features, templates, and matching](#9-biometric-features-templates-and-matching)
 10. [Enrollment, verification, and identification](#10-enrollment-verification-and-identification)
 11. [Templates, storage, and multi-user behavior](#11-templates-storage-and-multi-user-behavior)
 12. [fprintd integration](#12-fprintd-integration)
@@ -59,7 +59,7 @@ does not replace Fedora's authentication stack.
 | --- | --- |
 | USB identity | Goodix `27c6:5125` |
 | Recognized reader applications | `GF_ST411SEC_APP_12509` and `GF_ST411SEC_APP_12508` |
-| Initial ChicagoHS live functional scope | One USB `27c6:5125` reader in Fedora KDE VM; APP12508 ChicagoHS live behavior not qualified |
+| Initial live functional scope | One USB `27c6:5125` reader in Fedora KDE VM; current biometric behavior on APP12508 not yet qualified |
 | Host | Fedora 44 KDE, x86_64 |
 | Accounts | Local accounts |
 | Mandatory access control | SELinux Enforcing |
@@ -72,7 +72,7 @@ configuration is incompatible.
 
 Recognition of APP12508 does not establish the full Fedora qualification for
 that revision. Its contributor hardware evidence and limits are described in
-historical versioned releases, such as `v2.2.1`; the initial ChicagoHS live
+historical versioned releases, such as `v2.2.1`; the initial live
 check covers only the tested reader, not APP12508 or the full recognized device
 population.
 
@@ -207,7 +207,7 @@ project-owned.
 ```mermaid
 flowchart LR
     Reader["Goodix USB 27c6:5125"]
-    Driver["Project libfprint runtime<br/>USB, TLS, image, ChicagoHS"]
+    Driver["Project libfprint runtime<br/>USB, TLS, image, matching"]
     Daemon["Fedora fprintd<br/>D-Bus ownership and storage"]
     PAM["Fedora PAM"]
     KDE["Plasma Login and KScreenLocker"]
@@ -225,7 +225,7 @@ flowchart LR
 | Layer | Responsibility | Explicit non-responsibility |
 | --- | --- | --- |
 | Reader | Sensing, Goodix command protocol, TLS client role | Linux user identity and host template storage |
-| Goodix driver | USB framing, secure session, capture, preprocessing, ChicagoHS extraction/matching, cancellation fences | D-Bus authorization, PAM policy, account lifecycle |
+| Goodix driver | USB framing, secure session, capture, preprocessing, biometric extraction/matching, cancellation fences | D-Bus authorization, PAM policy, account lifecycle |
 | `libfprint` | Device/action abstraction and print serialization | System user authorization |
 | Fedora `fprintd` | D-Bus API, exclusive client claim, action orchestration, per-user template files | Goodix pairing-state or USB-protocol management |
 | Fedora PAM and KDE | Authentication policy and user interaction | USB or biometric algorithm implementation |
@@ -233,7 +233,7 @@ flowchart LR
 
 The stock daemon remains `/usr/libexec/fprintd`. A systemd drop-in sets only a
 private `LD_LIBRARY_PATH` so that this daemon resolves the project-built
-`libfprint` with its statically linked ChicagoHS computational backend. The project does not ship a
+`libfprint` with its statically linked native biometric backend. The project does not ship a
 forked `fprintd`, greeter, sudo, PolicyKit service, or global PAM policy.
 
 This separation matters during failure: a driver action may fail without
@@ -255,7 +255,7 @@ owns the resources that must agree about an action:
 | Secure-session machine | Ordered pre-TLS bootstrap and response validation |
 | TLS engine | In-memory TLS 1.2 PSK server state and recordization |
 | Post-TLS lifecycle | Baseline, FDT preparation, finger detection, image, release, and STOP |
-| Biometric pipeline | Decode, preprocess, ChicagoHS extract or match |
+| Biometric pipeline | Decode, preprocess, extract features or match templates |
 | Action fences | Generation tokens, cancellation state, callback drains, and poison state |
 
 ### 4.1 Open and close boundary
@@ -308,7 +308,7 @@ Three pure, side-effect-free boundaries supply the session inputs:
 | Boundary | Input | Output and rejection rule |
 | --- | --- | --- |
 | Pairing crypto | The 32-byte Linux PSK | The 102-byte `BB010003` envelope and its 32-byte `BB020003` SHA-256 validator. Fixed profile shared by APP12509 and APP12508; no USB or persistence surface |
-| CONFIG90 derivation | `chip_id` plus a strict 64-byte OTP record | The complete 224-byte ChicagoHS type-12 configuration plus the calibration record it applied. Rejects unknown chip profiles, OTP CRC failures and ambiguous calibration fields |
+| CONFIG90 derivation | `chip_id` plus a strict 64-byte OTP record | The complete 224-byte Type 12 configuration plus the calibration record it applied. Rejects unknown chip profiles, OTP CRC failures and ambiguous calibration fields |
 | `BB010002` validator | The live 332-byte record | Structural acceptance of the common DPAPI-shaped layout. Treats the protected regions as opaque; neither decrypts nor synthesizes them |
 
 The pairing derivation uses the same fixed producer/KDF key, GCM AAD and
@@ -807,12 +807,12 @@ for ENROLL and requires all of the following:
 - all six shifted raw words are in 1–254, as specified in section 6.4.
 
 The primary is preserved and delivered at most once through ordinary
-ChicagoHS preprocessing, enrollment policy and template processing. Optional
+the native preprocessing, enrollment policy and template processing. Optional
 image-choice `0x20`, auxiliary B0 and final auxiliary `0x34` are skipped. The
 software finger-down state is cleared; a zero mask itself does not count as a
 quality pass. An accepted sample advances at most one stage. Extraction/quality
 failure keeps the existing terminal policy, while a poor-sample rejection can
-produce a visible retry without advancing ChicagoHS enrollment progress.
+produce a visible retry without advancing enrollment progress.
 
 For a nonterminal zero, the graph waits for the ordinary host next-sample
 request. A new `0x32` requires completed host evaluation, libfprint awaiting a
@@ -869,7 +869,7 @@ image. Bounds are fixed and checked before allocation or conversion.
 | Image record | 7,684 bytes | Exactly 7,680 packed bytes plus a strict 4-byte record CRC |
 | TLS application plaintext | 7,693 bytes | Image class/control, declared length, additive/no-check policy, exact outer structure, and no trailing data |
 | Canonical raster | 80 × 64 unsigned 16-bit samples | Values constrained to 12-bit range |
-| ChicagoHS input | 80 × 64 unsigned 16-bit raster | The canonical raster and a separate no-finger background |
+| Biometric input | 80 × 64 unsigned 16-bit raster | The canonical raster and a separate no-finger background |
 
 The decoder unpacks paired 12-bit values and transposes the sensor's wire order
 into the canonical 80 × 64 raster. The image-specific `0x88` no-check marker
@@ -877,13 +877,13 @@ permits omission of the additive image-payload checksum, but the record
 CRC32/MPEG-2 is always verified. That exception must not be interpreted as
 accepting an unchecked record.
 
-### 8.1 ChicagoHS preprocessing contract
+### 8.1 Native preprocessing and calibration
 
-The canonical U16 raster is already oriented for the ChicagoHS backend. No
+The canonical U16 raster is already oriented for the native biometric backend. No
 second regroup, flip, rotation or empirical normalization is applied. The
 12-byte FDT table is protocol state; it is not the 5,120-sample FDT_B0 image.
 
-The adapter generates calibration with the original ChicagoHS `generate` API
+The adapter generates calibration with the native `generate` API
 from the current no-finger background. It validates dimensions, 12-bit values
 and the action generation before accepting images. The background is fixed
 within that generation. Enrollment retains the original preprocessor's temporal
@@ -898,20 +898,20 @@ Owned background, identity, sample and packed-template buffers are cleansed on
 their implemented cleanup paths. The opaque upstream heap is released using its
 original API; complete erasure of all internal allocations is not guaranteed.
 
-## 9. ChicagoHS extraction, serialization, and matching
+## 9. Biometric features, templates, and matching
 
 ### 9.1 Native backend
 
 The computational engine is pinned to upstream revision
-`010a665f54089a1632b1ab7be588b316ace934e2`. It uses original ChicagoHS calibration,
-preprocessing, features, enrollment policy, Type 24 packing and matching.
+`010a665f54089a1632b1ab7be588b316ace934e2`. It provides the calibration, preprocessing, feature extraction, enrollment,
+Type 24 packing and matching used by the current driver.
 The native selector threshold remains 207 and the match decision is `score > 0`.
 No score tuning, alternate matcher or `templateStudy` is enabled. These constants
 are algorithm behavior, not a calibrated FAR/FRR or liveness guarantee.
 
 ### 9.2 Sensor-bound FpPrint
 
-The RAW FpPrint envelope identifies the USB 5125 ChicagoHS backend and format
+The RAW FpPrint envelope identifies the current USB 5125 biometric backend and format
 version. It wraps the original Chicago print data with the SHA-256 of the full
 64-byte OTP record. The original opaque 16-byte `sensor_id` is exactly A6
 OTP bytes 0–15, following the upstream interface convention. The production
@@ -949,7 +949,7 @@ stock host database management, not a command sent to the reader.
 
 ### 10.2 Original twelve-stage enrollment policy
 
-ChicagoHS distinguishes accepted stages from retained subtemplates and physical
+The native enrollment algorithm distinguishes accepted stages from retained subtemplates and physical
 contacts. The unchanged policy can retain a contact while reporting a position
 tip without advancing the stage. Its deferred/drop/restore behavior remains
 native; accepted-stage count must reach exactly twelve before packing the final
@@ -981,7 +981,7 @@ Host pairing state and biometric templates are different data classes:
 | Biometric template | Per local username/finger | Fedora `fprintd` | `/var/lib/fprint/` | No |
 | Raw image | One in-memory action | Driver process | Not intentionally persisted | Not applicable |
 
-fprintd stores an FP3 print containing metadata and the ChicagoHS RAW envelope. The storage hierarchy is conceptually:
+fprintd stores an FP3 print containing metadata and the native RAW envelope. The storage hierarchy is conceptually:
 
 ```text
 /var/lib/fprint/<username>/<driver>/<device-id>/<finger-hex>
@@ -1136,12 +1136,12 @@ mask is runtime-only, a reboot also removes it automatically.
 
 ## 14. SELinux and host integration
 
-SELinux remains Enforcing. Successful ChicagoHS installations and updates do
+SELinux remains Enforcing. Successful project installations and updates do
 not install `goodix_5125_hugepage`; a recognized legacy module is removed.
-ChicagoHS does not link OpenCV/oneTBB, which motivated the old huge-page probe
+The current runtime does not link OpenCV/oneTBB, which motivated the old huge-page probe
 suppression. The legacy rule is only
 `(dontaudit fprintd_t sysctl_vm_t (file (read)))`: it grants no read permission.
-ChicagoHS adds no replacement `allow` or audit suppression policy.
+The driver adds no replacement `allow` or audit suppression policy.
 
 The host pairing state directory needs no project file-context mapping. It lives
 under `/var/lib/fprint/`, so the installer labels it with `restorecon` and then
@@ -1189,7 +1189,7 @@ digests.
 
 ### 15.2 Private and system libraries
 
-The private runtime contains the built libfprint with the pinned ChicagoHS C
+The private runtime contains the built libfprint with the pinned native C
 archive linked into it, source digests, notices and license texts. No separate
 matcher shared object, Milan diagnostic, OpenCV or C++ runtime is required.
 
@@ -1295,7 +1295,7 @@ normal cleanup.
 
 | Path | Owner and purpose |
 | --- | --- |
-| `/usr/local/lib64/goodix-27c6-5125/` | Private ChicagoHS/libfprint runtime, links, notices, and receipts |
+| `/usr/local/lib64/goodix-27c6-5125/` | Private libfprint/biometric runtime, links, notices, and receipts |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Private runtime environment for stock fprintd |
 | `/var/lib/fprint/goodix-5125-state-v2/` | Preserved root-only crash-safe host pairing state |
 | `/usr/local/lib64/goodix-plasma-login/` | PAM selector module and metadata |
@@ -1334,12 +1334,12 @@ The 3.0.0 engine change is an **in-place project-software upgrade**, not
 coexistence of two active biometric engines. The installation and recovery
 contracts recognize supported earlier SIGFM receipts, including those without
 a `matcher` field, and use the same owned-software removal transaction before
-installing the ChicagoHS-only runtime. Old OpenCV-dependent runtime components
+installing the current driver runtime. Old OpenCV-dependent runtime components
 are removed; stock Fedora fprintd/PAM and user-specific stored data remain.
 Templates in the historical `GSF1`/SIGFM format cannot be used by the new
-ChicagoHS driver identity: users must enroll their desired fingers again.
+current driver identity: users must enroll their desired fingers again.
 The migration code is covered by offline simulated tests, but a real populated
-SIGFM 2.x → ChicagoHS 3.0.0 update and failed-update rollback require separate
+2.x → 3.0.0 upgrade and failed-update rollback require separate
 live qualification before release. A clean installation is not evidence of
 that migration.
 
@@ -1365,12 +1365,12 @@ host pairing state. A missing final success marker or an
 `incomplete rollback` result is failure and requires recovery.
 
 Transaction rollback after a failed upgrade is distinct from a deliberate
-**downgrade** to SIGFM. Once ChicagoHS is installed successfully, returning
-to a historical SIGFM implementation requires the ChicagoHS remover, password
+**downgrade** to SIGFM. Once the current driver is installed successfully, returning
+to a historical SIGFM implementation requires the project remover, password
 recovery check and a separate checkout at a pinned old release such as
 [`v2.2.1`](https://github.com/sorguido/goodix-27c6-5125/tree/v2.2.1).
 It must not use the canonical `main` branch after the 3.0.0 merge.
-The older installer is not promised to recognize the new ChicagoHS runtime;
+The older installer is not promised to recognize the current runtime;
 removal must precede an optional downgrade. Protected host state and
 historical template files are preserved by project removal, but reuse is
 conditional on their compatibility with the selected old matcher.
@@ -1502,7 +1502,7 @@ threat boundary.
 | --- | --- |
 | Two recognized applications; one Fedora-qualified APP12509 reader | APP12508 has contributor hardware evidence, not the full Fedora qualification. No compatibility claim for other Goodix devices, unlisted firmware, distributions, desktops, architectures, or multiple readers |
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
-| No FAR/FRR study | Initial genuine and different-finger results were favorable, but the sample is too small to measure FAR/FRR. ChicagoHS selector 207 and score > 0 are not biometric security calibration |
+| No FAR/FRR study | Initial genuine and different-finger results were favorable, but the sample is too small to measure FAR/FRR. Selector 207 and score > 0 are not biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
 | One host-pairing write | The first qualifying fingerprint action may perform exactly one logical `E0`, and a Windows pairing replacement causes one qualified restore write. Same-OS reopens write nothing. Recovery from an interrupted post-`E0`/pre-ACTIVE transaction is offline-qualified only |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
@@ -1515,8 +1515,8 @@ threat boundary.
 | Concurrency beyond stock serialization | Competing low-level clients or bypass of fprintd's claim model is not qualified |
 | Late IRQ0200 after zero-mask recovery | One release before the valid new IRQ2 is consumed passively; same-byte stale/current release in a later compatible slot is not distinguishable (section 7.4) |
 | Fault/stale-traffic boundary | Process crashes, injected faults, and exhaustive late-byte or cross-generation behavior are outside the qualified scope |
-| No legacy SELinux audit suppression | ChicagoHS installs no `goodix_5125_hugepage` `dontaudit` policy; a verified legacy module is removed. The remaining SELinux behavior still requires real-world fault/audit review |
-| Factory/Windows boundary | The operator reported a successful bounded Windows/Linux ping-pong with ChicagoHS on one reader, following an earlier SIGFM baseline. The exact E0/readback/TLS trace has not been independently audited for this sequence; there is no exhaustive factory-state readback or guarantee across other devices, firmware revisions, power-loss scenarios, or OS updates |
+| No legacy SELinux audit suppression | The driver installs no `goodix_5125_hugepage` `dontaudit` policy; a verified legacy module is removed. The remaining SELinux behavior still requires real-world fault/audit review |
+| Factory/Windows boundary | The operator reported a successful bounded Windows/Linux ping-pong with the current driver on one reader, following an earlier SIGFM baseline. The exact E0/readback/TLS trace has not been independently audited for this sequence; there is no exhaustive factory-state readback or guarantee across other devices, firmware revisions, power-loss scenarios, or OS updates |
 
 See [Validation scope and known limitations](docs/VALIDATION.md) for the bounded
 operator-supervised VM and physical-reader results and the remaining release
@@ -1608,10 +1608,10 @@ boundaries unless it explicitly redesigns and requalifies them:
 3. one owner for bulk-IN routing and strict A0/B0 phase validation;
 4. TLS 1.2 PSK with reader as client and host as server;
 5. bounded 80 × 64 image parsing with record CRC verification;
-6. generation-bound no-finger background and original ChicagoHS preprocessing;
-7. strict ChicagoHS envelope parsing, current OTP binding and sensitive template handling;
+6. generation-bound no-finger background and original native preprocessing;
+7. strict biometric-envelope parsing, current OTP binding and sensitive template handling;
 8. one acquisition per explicit verify/identify action;
-9. original twelve-stage ChicagoHS enrollment with unchanged retry/defer policy;
+9. original twelve-stage enrollment with unchanged retry/defer policy;
 10. release/STOP/drain before clean reuse, with poison on uncertainty;
 11. stock fprintd/PAM/KDE ownership and working password fallback;
 12. service quiescence before runtime replacement or removal;
