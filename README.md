@@ -51,8 +51,7 @@ offers **Upgrade to 3.0.0** through the transactional installer, without a
 preliminary uninstall. Host pairing state and existing fingerprint files are
 preserved. **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new
-engine. The real-device upgrade from a populated 2.x installation remains a
-release qualification gate; see [installation](docs/INSTALLATION.md) and
+engine. See [installation](docs/INSTALLATION.md) and
 [validation](docs/VALIDATION.md). An optional return to an older version uses
 a pinned historical release rather than the current `main` branch.
 
