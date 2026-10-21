@@ -22,9 +22,9 @@ does.
 You do not need to read source code. Optional source links are included for
 curious readers, but the story stands on its own.
 
-The project-specific parts describe the supported Goodix USB `27c6:5125` target,
-recognized firmware `GF_ST411SEC_APP_12509` and `GF_ST411SEC_APP_12508`, and
-Fedora 44 KDE setup. Initial ChicagoHS hardware tests concern one reader;
+The project-specific parts describe the canonical Goodix USB `27c6:5125`
+ChicagoHS driver, recognized firmware `GF_ST411SEC_APP_12509` and
+`GF_ST411SEC_APP_12508`, and Fedora 44 KDE setup. Initial ChicagoHS hardware tests concern one reader;
 APP12508 has separate contributor evidence for the historical SIGFM driver,
 not ChicagoHS live qualification. See
 [Validation and limitations](../VALIDATION.md).
