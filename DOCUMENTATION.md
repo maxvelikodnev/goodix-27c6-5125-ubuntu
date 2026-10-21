@@ -69,9 +69,9 @@ technical specification.
 4. **[From finger detection to image](docs/learning/04_from_finger_to_image.md)** —
    Finger detection, capture, TLS-protected image transport, decoding, and release.
 5. **[From image to fingerprint template](docs/learning/05_from_image_to_template.md)** —
-   Image preprocessing, SIGFM features, descriptors, and template samples.
+   ChicagoHS calibration, native feature extraction, and sensor-bound template samples.
 6. **[Enrollment](docs/learning/06_enrollment.md)** — Multiple contacts,
-   fixed-21 acceptance, quality retries, diversity diagnostics, and host-side
+   ChicagoHS twelve-stage policy, quality/position retries, and host-side
    template creation.
 7. **[Verification and matching](docs/learning/07_verification_and_matching.md)** —
    MATCH, NO MATCH, retry, cancellation, and comparison behavior.
@@ -109,7 +109,7 @@ authoritative public technical reference for the current implementation.
 
 - [Finger detection, capture, release, and cancellation](TECHNICAL_MANUAL.md#7-finger-detection-capture-release-and-cancellation)
 - [Image decoding and preprocessing](TECHNICAL_MANUAL.md#8-image-decoding-and-preprocessing)
-- [SIGFM extraction, serialization, and matching](TECHNICAL_MANUAL.md#9-sigfm-extraction-serialization-and-matching)
+- [ChicagoHS extraction, serialization, and matching](TECHNICAL_MANUAL.md#9-chicagohs-extraction-serialization-and-matching)
 - [Enrollment, verification, and identification](TECHNICAL_MANUAL.md#10-enrollment-verification-and-identification)
 - [Templates, storage, and multi-user behavior](TECHNICAL_MANUAL.md#11-templates-storage-and-multi-user-behavior)
 
@@ -171,7 +171,7 @@ not need them for installation or daily use.
   origins, per-file licensing, combined-library terms, source provenance, and
   excluded private material.
 - **[Upstream references](docs/REFERENCES.md)** — libfprint, fprintd, Linux-PAM,
-  Plasma Login, Rockytkg, TLS RFCs, OpenCV, and related upstream references.
+  Plasma Login, ChicagoHS upstream, historical Rockytkg references, TLS RFCs, and related sources.
 - **[Acknowledgements](ACKNOWLEDGEMENTS.md)** — Upstream projects, contributors,
   references, and development-tool acknowledgement.
 - **[Repository license](LICENSE)** — Repository-level licensing notice.
