@@ -61,13 +61,13 @@ Fedora owns fprintd, Plasma, PAM, sudo and PolicyKit. The project adds a private
 library directory, a narrow service environment drop-in and a minimal
 Plasma Login selector. It does not ship a replacement daemon/greeter or freeze
 Fedora's vendor authentication files.
-SELinux remains Enforcing. On Fedora, the installer also adds one project-owned
-`dontaudit` rule for the known non-fatal oneTBB `nr_hugepages` read probe. The
-rule grants no access: it only suppresses audit notifications for denied
-`fprintd_t -> sysctl_vm_t:file read` events. Because SELinux policy is type-based,
-the same suppression can also cover other denied reads with that exact tuple.
-`goodix-uninstall` and `goodix-force-remove` remove the project module and restore
-Fedora's normal audit behavior.
+SELinux remains Enforcing. ChicagoHS installs no huge-page `dontaudit` module
+and no replacement `allow` policy. Updates and both removal commands remove the
+legacy `goodix_5125_hugepage` module only after verifying its single enabled
+priority-400 CIL entry and exact legacy rule content. Ambiguous or foreign policy
+is preserved and reported as an error. Failed updates restore the verified
+pre-existing legacy module; successful updates retain normal Fedora audit
+visibility. Pairing state labeling remains required.
 
 Password access must remain available. A future incompatible Fedora PAM layout
 can affect the selector; compatibility across all future updates has not been

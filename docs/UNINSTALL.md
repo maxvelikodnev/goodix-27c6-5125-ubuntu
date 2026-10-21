@@ -57,13 +57,15 @@ assume that cleanup completed.
 | `/usr/local/lib64/goodix-plasma-login/` | Removes the selector and installation metadata |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
 | `/usr/local/lib64/goodix-27c6-5125/` | Removes project libfprint, matcher dependencies, links, notices and installation metadata |
-| Project-owned SELinux huge-page `dontaudit` module | Removes the project module and restores Fedora's normal audit visibility |
+| Legacy SELinux huge-page `dontaudit` module, if present | Removes only the verified priority-400 project CIL rule and restores Fedora audit visibility; ChicagoHS does not install it |
 | `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
 Removal stops and quiesces fprintd before removing runtime files. It does not
 start authentication, directly access USB, restart the display manager,
 overwrite Fedora-owned files or replay saved Fedora configuration. On incomplete
-cleanup, remaining recovery tooling is retained where possible.
+cleanup, remaining recovery tooling is retained where possible. A policy name,
+priority, state or content collision is left untouched and reported; the module
+name alone does not establish project ownership.
 
 Emergency removal uses fixed project-owned paths and tolerates missing receipts
 or partial software. It does not depend on Fedora vendor layout or version.

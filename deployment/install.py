@@ -185,23 +185,27 @@ def install_tools(source_id):
     command('restorecon', '-F', str(r.RECOVERY), str(r.RECOVERY / 'receipt.json'), str(r.NORMAL), str(r.FORCE))
 
 
-def install_selinux_module():
-    if r.selinux_module_present():
+def install_selinux_module(policy_bytes):
+    """Restore a verified legacy module only during rollback."""
+    current = r.selinux_module_present()
+    if current is not None:
+        require(current == policy_bytes, 'legacy SELinux module changed before rollback')
         return
     with tempfile.TemporaryDirectory(prefix='goodix-selinux-') as directory:
         policy = Path(directory) / (r.SELINUX_MODULE_NAME + '.cil')
         descriptor = os.open(policy, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, 'w', encoding='ascii') as stream:
-            stream.write(r.SELINUX_MODULE_RULE + '\n')
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(policy_bytes)
             stream.flush()
             os.fsync(stream.fileno())
         command('semodule', '-X', r.SELINUX_MODULE_PRIORITY, '-i', str(policy))
-    require(r.selinux_module_present(), 'project SELinux module installation could not be verified')
+    require(r.selinux_module_present() == policy_bytes,
+            'project SELinux module restoration could not be verified')
 
 
 def restore_selinux_module(was_present):
     if was_present:
-        install_selinux_module()
+        install_selinux_module(was_present)
     else:
         r.remove_selinux_module()
 
@@ -440,12 +444,13 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
             print('GOODIX_INSTALL_MODE=' + mode, flush=True)
             saved = snapshot_software(staging)
             rule_before = material_rule()
+            selinux_module_before = r.selinux_module_present()
             try:
                 if saved:
                     with redirect_stdout(io.StringIO()):
                         require(r.remove(force=False) == 0, 'existing installation could not be removed')
                 install_tools(manifest['source_id'])
-                install_selinux_module()
+                r.remove_selinux_module()
                 if bundle is not None and not reuse:
                     materials.install_materials(bundle, r.MATERIAL, native_check=native_check)
                 create_state_root()

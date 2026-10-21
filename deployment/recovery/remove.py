@@ -12,6 +12,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tempfile
 
 CONFIG = Path('/etc/pam.d/plasmalogin')
 SUPPORT = Path('/usr/local/lib64/goodix-plasma-login')
@@ -174,8 +175,8 @@ def normal_preflight():
     return owned_rule
 
 
-def command(*args):
-    result = subprocess.run(args, env=ENV, text=True, capture_output=True, timeout=30)
+def command(*args, cwd=None):
+    result = subprocess.run(args, env=ENV, text=True, capture_output=True, timeout=30, cwd=cwd)
     # An already removed Fedora service has no loaded project code to stop.
     # This is an absent-target result, never a vendor-file/version precondition.
     if args == ('systemctl', 'stop', 'fprintd.service') and result.returncode != 0:
@@ -223,18 +224,26 @@ def remove_label():
 
 
 def selinux_module_present():
+    """Return verified legacy CIL bytes, or None; identity alone is not ownership."""
     lines = []
     for line in command('semodule', '-lfull').splitlines():
         fields = line.split()
         if len(fields) >= 2 and fields[1] == SELINUX_MODULE_NAME:
             lines.append(line)
     if not lines:
-        return False
+        return None
     expected = (len(lines) == 1 and
-                lines[0].split()[:2] == [SELINUX_MODULE_PRIORITY, SELINUX_MODULE_NAME])
+                lines[0].split() == [SELINUX_MODULE_PRIORITY, SELINUX_MODULE_NAME, 'cil'])
     require(expected, 'project SELinux module has an unexpected priority/state; '
             'left untouched: ' + ' | '.join(lines))
-    return True
+    with tempfile.TemporaryDirectory(prefix='goodix-policy-check-') as directory:
+        command('semodule', '-X', SELINUX_MODULE_PRIORITY, '--cil', '--extract',
+                SELINUX_MODULE_NAME, cwd=directory)
+        policy = Path(directory) / (SELINUX_MODULE_NAME + '.cil')
+        data = read(policy)
+    require(data.strip() == SELINUX_MODULE_RULE.encode('ascii'),
+            'project SELinux module content differs; ownership ambiguous; left untouched')
+    return data
 
 
 def remove_selinux_module():

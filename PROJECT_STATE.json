@@ -22,7 +22,7 @@
     "native_tests": 64,
     "optional_OEM_oracles_skipped": 42,
     "adapter_and_stock_storage": 6,
-    "packaging_fixtures": 114,
+    "packaging_fixtures": 121,
     "transport_pairing_normal_tests": 202,
     "corpus_admissions": "35/35",
     "enrollment": "12 stages / 20 contacts",
@@ -30,7 +30,16 @@
     "libfprint_actions": "enroll + 8 verify + 8 identify; simulated transport and identity",
     "sanitizers": "NOT_RUN_MISSING_HOST_LIBRARIES",
     "installer_check": "PASS_READ_ONLY",
-    "independent_review": "ACCEPT_AND_CONTINUE"
+    "independent_review": "ACCEPT_AND_CONTINUE",
+    "selinux_cleanup": {
+      "install": 32,
+      "recovery": 54,
+      "public_builder": 21,
+      "install_selection": 8,
+      "bootstrap": 6,
+      "self_contained_build": "PASS",
+      "runtime_avc_absence": "NOT_RUN"
+    }
   },
   "relevant_artifacts": [
     "production/build-public.py",
@@ -49,5 +58,6 @@
     "FDT_B0 physical equivalence, cross-device identity uniqueness, FAR/FRR and liveness remain unqualified",
     "Opaque native heap is freed; complete zeroization is not guaranteed"
   ],
-  "next_action": "Supervised isolated Fedora KDE VM software installation without USB; live qualification requires separate user authorization"
+  "next_action": "Supervised isolated Fedora KDE VM software installation without USB; live qualification requires separate user authorization",
+  "obsolete_selinux_module_removed": "PASS"
 }

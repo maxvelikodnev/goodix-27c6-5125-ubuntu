@@ -57,6 +57,7 @@ class Installer(unittest.TestCase):
         self.active = True
         self.rule = False
         self.selinux_modules = []
+        self.selinux_policy = m.r.SELINUX_MODULE_RULE.encode() + b'\n'
         self.fail_login = False
         self.ctx.enter_context(patch.object(m, 'command', side_effect=self.command))
         self.ctx.enter_context(patch.object(m.r, 'command', side_effect=self.command))
@@ -118,7 +119,7 @@ class Installer(unittest.TestCase):
         if m.r.MATERIAL.exists():
             self.assertTrue(self.rule)
 
-    def command(self, *args):
+    def command(self, *args, cwd=None):
         args = tuple(str(a) for a in args)
         self.events.append(args)
         self.assertFalse(any('/dev/bus/usb' in a or '/sys/bus/usb' in a for a in args))
@@ -147,13 +148,18 @@ class Installer(unittest.TestCase):
         if args[:3] == ('semanage', 'fcontext', '-d'):
             self.rule = False
             return ''
+        if args == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY,
+                    '--cil', '--extract', m.r.SELINUX_MODULE_NAME):
+            self.assertIsNotNone(cwd)
+            (Path(cwd) / (m.r.SELINUX_MODULE_NAME + '.cil')).write_bytes(self.selinux_policy)
+            return ''
         if args == ('semodule', '-lfull'):
             return '\n'.join(self.selinux_modules)
         if args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i'):
             self.assertEqual(len(args), 5)
             self.assertTrue(m.r.NORMAL.exists() and m.r.FORCE.exists() and m.r.RECOVERY.exists())
             self.assertEqual(Path(args[4]).name, m.r.SELINUX_MODULE_NAME + '.cil')
-            self.assertEqual(Path(args[4]).read_text(), m.r.SELINUX_MODULE_RULE + '\n')
+            self.assertEqual(Path(args[4]).read_bytes(), self.selinux_policy)
             self.selinux_modules.append(
                 f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil')
             return ''
@@ -196,6 +202,9 @@ class Installer(unittest.TestCase):
         self.apply()
         self.assertIn('GOODIX_INSTALL_MODE=FIRST_INSTALL', self.stdout.getvalue())
         receipt = json.loads((m.r.RUNTIME / 'installation.json').read_bytes())
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
         self.assertEqual(receipt['matcher'], 'chicago-type24')
         self.assertFalse(any('opencv' in name.lower() for name in receipt['files']))
         self.assertIn('new enrollment for every finger/user', self.stdout.getvalue())
@@ -270,8 +279,7 @@ class Installer(unittest.TestCase):
         self.assertFalse(self.active)
         self.assertFalse(m.r.MASK.is_symlink())
         self.assertTrue(m.r.CONFIG.exists())
-        self.assertEqual(self.selinux_modules,
-                         [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'])
+        self.assertEqual(self.selinux_modules, [])
         self.assert_preserved()
         self.assertEqual(m.r.remove(), 0)
         self.assert_preserved()
@@ -298,6 +306,7 @@ class Installer(unittest.TestCase):
         self.apply()
         path = m.r.RUNTIME / 'installation.json'
         receipt = json.loads(path.read_bytes())
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
         receipt.pop('matcher')  # Existing main schema-2 receipts have no matcher.
         for part in ('core', 'features2d', 'flann', 'imgproc'):
             name = f'libopencv_{part}.so.413'
@@ -308,6 +317,9 @@ class Installer(unittest.TestCase):
         m.r.normal_preflight()
         self.apply()
         receipt = json.loads(path.read_bytes())
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
         self.assertEqual(receipt['matcher'], 'chicago-type24')
         self.assertFalse(any(name.startswith('libopencv_') for name in receipt['files']))
         m.r.normal_preflight()
@@ -327,6 +339,9 @@ class Installer(unittest.TestCase):
         m.r.normal_preflight()
         self.apply()
         receipt = json.loads(path.read_bytes())
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
         self.assertEqual(receipt['matcher'], 'chicago-type24')
         self.assertFalse(any('milan' in name.lower() for name in receipt['files']))
         self.assertFalse(any('milan' in p.name.lower() for p in m.r.RUNTIME.iterdir()))
@@ -345,6 +360,8 @@ class Installer(unittest.TestCase):
 
     def test_failed_update_restores_prior_project_installation(self):
         self.apply()
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        self.selinux_policy = b'\n' + self.selinux_policy + b'\n'
         shutil.rmtree(self.source)
         before = (m.r.RUNTIME / 'installation.json').read_bytes()
         with patch.object(m, 'install_login', side_effect=RuntimeError('synthetic failed update')):
@@ -357,13 +374,55 @@ class Installer(unittest.TestCase):
                          [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'])
         self.assert_preserved()
 
-    def test_existing_expected_selinux_module_is_not_overwritten(self):
+    def test_recognized_legacy_residual_module_is_removed(self):
         expected = f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'
         self.selinux_modules = [expected]
         self.apply()
-        self.assertEqual(self.selinux_modules, [expected])
+        self.assertEqual(self.selinux_modules, [])
         self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
                              for args in self.events))
+
+    def test_policy_collision_stops_update_before_mutation(self):
+        self.apply()
+        before = (m.r.RUNTIME / 'installation.json').read_bytes()
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        self.selinux_policy = b'(allow fprintd_t sysctl_vm_t (file (read)))\n'
+        self.events.clear()
+        with self.assertRaisesRegex(RuntimeError, 'ownership ambiguous'):
+            self.apply()
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assertTrue(m.r.CONFIG.exists())
+        self.assertFalse(any(args[:2] == ('systemctl', 'stop') or '-r' in args
+                             for args in self.events))
+        self.assert_preserved()
+
+    def test_foreign_policy_appearing_during_rollback_is_not_overwritten(self):
+        self.apply()
+        self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+        def failed_login(*args):
+            self.selinux_modules = [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil']
+            self.selinux_policy = b'(allow fprintd_t sysctl_vm_t (file (read)))\n'
+            self.events.clear()
+            raise RuntimeError('synthetic failure with concurrent policy change')
+        with patch.object(m, 'install_login', side_effect=failed_login):
+            with self.assertRaisesRegex(RuntimeError, 'rollback incomplete.*ownership ambiguous'):
+                self.apply()
+        self.assertTrue(self.selinux_modules)
+        self.assertFalse(any('-i' in args or '-r' in args for args in self.events))
+        self.assertTrue(m.r.NORMAL.exists() and m.r.FORCE.exists())
+        self.assert_preserved()
+
+    def test_failed_chicago_update_does_not_create_legacy_module(self):
+        self.apply()
+        before = (m.r.RUNTIME / 'installation.json').read_bytes()
+        with patch.object(m, 'install_login', side_effect=RuntimeError('synthetic failed update')):
+            with self.assertRaisesRegex(RuntimeError, 'synthetic failed update'):
+                self.apply()
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assertEqual(self.selinux_modules, [])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
+        self.assert_preserved()
 
     def test_unexpected_selinux_module_priority_stops_before_mutation(self):
         unexpected = f'300 {m.r.SELINUX_MODULE_NAME} cil'

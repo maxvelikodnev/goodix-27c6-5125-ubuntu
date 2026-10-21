@@ -42,6 +42,7 @@ class RecoveryTests(unittest.TestCase):
         self.active = True
         self.rule = True
         self.selinux_modules = []
+        self.selinux_policy = self.m.SELINUX_MODULE_RULE.encode() + b'\n'
         self.fail = None
         self.output = io.StringIO()
         self.stack = contextlib.ExitStack()
@@ -80,7 +81,7 @@ class RecoveryTests(unittest.TestCase):
         self.m.parents(path)
         info = path.lstat()
         self.m.require((stat.S_ISDIR if directory else stat.S_ISREG)(info.st_mode)
-                       and (info.st_uid, info.st_gid) == (os.geteuid(), os.getegid())
+                       and (info.st_uid, info.st_gid) == (os.getuid(), os.getgid())
                        and not info.st_mode & 0o022, f'project ownership/type/mode drift: {path}')
 
     def install_fixture(self):
@@ -119,7 +120,7 @@ class RecoveryTests(unittest.TestCase):
             recovery_files[path.name] = m.digest(path.read_bytes())
         self.write(m.RECOVERY / 'receipt.json', json.dumps({'schema': 1, 'files': recovery_files}).encode())
 
-    def command(self, *args):
+    def command(self, *args, cwd=None):
         # Capture whether authentication was detached before any host command.
         self.events.append((args, self.m.present(self.m.CONFIG), self.m.present(self.m.DROPIN)))
         if self.fail and args[:len(self.fail)] == self.fail:
@@ -136,6 +137,11 @@ class RecoveryTests(unittest.TestCase):
                     (self.m.RULE + ' all files system_u:object_r:fprintd_var_lib_t:s0\n' if self.rule else ''))
         if args == ('semanage', 'fcontext', '-d', '-f', 'a', self.m.RULE):
             self.rule = False
+            return ''
+        if args == ('semodule', '-X', self.m.SELINUX_MODULE_PRIORITY,
+                    '--cil', '--extract', self.m.SELINUX_MODULE_NAME):
+            self.assertIsNotNone(cwd)
+            (Path(cwd) / (self.m.SELINUX_MODULE_NAME + '.cil')).write_bytes(self.selinux_policy)
             return ''
         if args == ('semodule', '-lfull'):
             return '\n'.join(self.selinux_modules)
@@ -352,6 +358,52 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn('GOODIX_REMOVAL=INCOMPLETE', self.output.getvalue())
         self.assertNotIn('GOODIX_REMOVAL=PASS', self.output.getvalue())
 
+    def test_same_name_foreign_policy_is_preserved_by_both_removers(self):
+        for force in (False, True):
+            with self.subTest(force=force):
+                if force:
+                    self.install_fixture()
+                self.selinux_policy = b'(allow fprintd_t sysctl_vm_t (file (read)))\n'
+                self.events.clear()
+                self.assertEqual(self.m.remove(force=force), 1)
+                self.assertTrue(self.selinux_modules)
+                self.assertFalse(any('-r' in args for args, _, _ in self.events))
+                self.assertTrue(self.m.FORCE.exists())
+                self.assert_preserved()
+        self.assertIn('ownership ambiguous', self.output.getvalue())
+
+    def test_absent_policy_is_supported_by_both_removers(self):
+        for force in (False, True):
+            with self.subTest(force=force):
+                if force:
+                    self.install_fixture()
+                self.selinux_modules = []
+                self.events.clear()
+                self.assertEqual(self.m.remove(force=force), 0)
+                self.assert_removed()
+                self.assertFalse(any(args[0] == 'semodule' and args != ('semodule', '-lfull')
+                                     for args, _, _ in self.events))
+
+    def test_disabled_duplicate_or_non_cil_policy_is_preserved(self):
+        expected = f'{self.m.SELINUX_MODULE_PRIORITY} {self.m.SELINUX_MODULE_NAME} cil'
+        for rows in ([expected + ' disabled'], [expected, expected],
+                     [expected.replace(' cil', ' pp')]):
+            with self.subTest(rows=rows):
+                self.selinux_modules = rows[:]
+                self.events.clear()
+                with self.assertRaisesRegex(RuntimeError, 'unexpected priority/state'):
+                    self.m.remove_selinux_module()
+                self.assertEqual(self.selinux_modules, rows)
+                self.assertFalse(any('-r' in args for args, _, _ in self.events))
+
+    def test_failed_extraction_cannot_remove_policy(self):
+        self.fail = ('semodule', '-X', self.m.SELINUX_MODULE_PRIORITY, '--cil', '--extract')
+        self.assertEqual(self.m.remove(force=True), 1)
+        self.assertTrue(self.selinux_modules)
+        self.assertFalse(any('-r' in args for args, _, _ in self.events))
+        self.assertTrue(self.m.FORCE.exists())
+        self.assert_preserved()
+
     def test_force_unexpected_selinux_module_priority_is_untouched(self):
         unexpected = f'300 {self.m.SELINUX_MODULE_NAME} cil'
         self.selinux_modules = [unexpected]
@@ -533,10 +585,10 @@ class RecoveryTests(unittest.TestCase):
 
     def test_unquiesced_service_retains_runtime_and_material_labels(self):
         original = self.m.command
-        def active_despite_stop(*args):
+        def active_despite_stop(*args, **kwargs):
             if args[:2] == ('systemctl', 'show'):
                 return 'ActiveState=deactivating\nMainPID=42\n'
-            return original(*args)
+            return original(*args, **kwargs)
         self.m.command = active_despite_stop
         self.assertEqual(self.m.remove(force=True), 1)
         self.assertTrue(self.m.RUNTIME.exists())
@@ -550,10 +602,10 @@ class RecoveryTests(unittest.TestCase):
 
     def test_shadowed_mask_cannot_allow_runtime_mutation(self):
         original = self.m.command
-        def shadowed(*args):
+        def shadowed(*args, **kwargs):
             if args[:2] == ('systemctl', 'show'):
                 return 'ActiveState=inactive\nMainPID=0\nLoadState=loaded\n'
-            return original(*args)
+            return original(*args, **kwargs)
         self.m.command = shadowed
         self.assertEqual(self.m.remove(force=True), 1)
         self.assertTrue(self.m.RUNTIME.exists())
@@ -664,7 +716,7 @@ class RecoveryTests(unittest.TestCase):
                     mock.patch.object(self.m.subprocess, 'run', return_value=result) as run:
                 self.assertEqual(self.real_command('systemctl', 'stop', 'fprintd.service'), '')
                 run.assert_called_once_with(('systemctl', 'stop', 'fprintd.service'),
-                    env=self.m.ENV, text=True, capture_output=True, timeout=30)
+                    env=self.m.ENV, text=True, capture_output=True, timeout=30, cwd=None)
 
     def test_command_other_systemctl_failure_not_misreported_as_absent(self):
         result = self.m.subprocess.CompletedProcess([], 1, '', 'Failed to connect to bus: Host is down\n')
