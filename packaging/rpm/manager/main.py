@@ -224,6 +224,10 @@ class Controller(QObject):
     def documents(self):
         QDesktopServices.openUrl(QUrl(REPOSITORY))
 
+    @Slot()
+    def report_bug(self):
+        QDesktopServices.openUrl(QUrl(REPOSITORY + '/issues'))
+
     @Slot(bool)
     def open_release(self, download):
         if self.release and self.local_package and self.public_status()[0] == 'available':

@@ -63,12 +63,12 @@
   "rpm_distribution": {
     "branch": "rpm",
     "version": "3.0.0",
-    "release": 8,
+    "release": 9,
     "fedora": 44,
     "architecture": "x86_64",
     "signature": "VERIFIED",
     "fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
-    "source_archive_sha256": "e9c19e2abdedaa680922ecf2419010ccd4460f79060354511d36fff8bacd93df",
+    "source_archive_sha256": "c5b0190e06a06ce98f4420c39154b573ac38974dec561549fec0e6f5ff22779f",
     "payload_source_id": "f259f6f10a60e5facc5a8404f951bce3eb18da2aaefebc8c9a167e4540938d97",
     "public_unit_tests_passed": 209,
     "qml_render": "PASS_SYSTEM_LIGHT_DARK_STARTUP_LIVE_DIALOG_DISABLED_COMPACT",
@@ -92,6 +92,12 @@
       "future_vm": "NOT_TESTED_VM_3_0_1",
       "publication_contract": "PASS_LOCAL_CONTRACT_APPROVED_SIGNER; GITHUB_NOT_CHECKED",
       "review": "ACCEPT_AND_CONTINUE"
+    },
+    "ui_bug_report_button": {
+      "placement": "Immediately beside Read Documents",
+      "url": "https://github.com/sorguido/goodix-27c6-5125/issues",
+      "verification": "PASS_QML_CLICK_AND_COMPACT_SYSTEM_PALETTE_RENDER",
+      "delivery": "development/rpm/reports/report-a-bug/delivery.json"
     }
   }
 }

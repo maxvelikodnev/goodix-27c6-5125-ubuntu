@@ -207,6 +207,7 @@ Kirigami.ApplicationWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Controls.Button { implicitHeight: 38; text: "Read Documents"; icon.name: "help-contents"; onClicked: backend.documents() }
+                Controls.Button { implicitHeight: 38; text: "Report a bug"; icon.name: "tools-report-bug"; onClicked: backend.report_bug() }
                 Item { Layout.fillWidth: true }
                 Controls.Button { implicitHeight: 38;
                     text: "Copy diagnostics"
