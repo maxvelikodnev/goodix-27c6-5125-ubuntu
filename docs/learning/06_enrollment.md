@@ -21,9 +21,9 @@ one finger, several views → a reusable reference
 ```
 
 It does **not** average the images into a prettier photograph. Each useful
-view contributes original ChicagoHS features and a native subtemplate.
+view contributes extracted features and a native subtemplate.
 Some retained subtemplates do not advance the visible enrollment progress:
-ChicagoHS has a separate position-guidance policy.
+the engine also checks how the finger is positioned.
 
 ## 🗺️ The enrollment flow
 
@@ -34,11 +34,11 @@ flowchart TD
     C --> D["Prepare sensor and secure session"]
     D --> E["Wait for finger"]
     E --> F["Detect, capture, decode, preprocess"]
-    F --> G["Extract native ChicagoHS features"]
+    F --> G["Extract fingerprint features"]
     G --> H{"Image and features usable?"}
     H -->|Poor or unusable| J["Ask for another touch"]
     H -->|Valid| I["Native subtemplate insertion"]
-    I --> P{"ChicagoHS position policy"}
+    I --> P{"Position and coverage policy"}
     P -->|Position tip / defer| J
     P -->|Advance| K{"12 accepted policy stages?"}
     J --> E
@@ -50,8 +50,9 @@ flowchart TD
 
 ## How many touches?
 
-The current source implements the **original ChicagoHS twelve-stage
-enrollment policy**. Its rules are not the fixed-21 SIGFM policy:
+The driver uses a **twelve-stage enrollment policy**. Stages count
+accepted biometric progress, not simply how many times a finger touches
+the reader:
 
 - Enrollment completes only when twelve native **policy stages** have advanced.
 - The backend can retain a subtemplate even when position guidance asks for
@@ -63,7 +64,7 @@ enrollment policy**. Its rules are not the fixed-21 SIGFM policy:
   than forcing every image into the gallery.
 - The number of physical contacts and the number of retained subtemplates
   therefore need not be twelve. More contacts may be required naturally.
-- The driver does not bypass ChicagoHS quality or position rules to force
+- The driver does not bypass image-quality or position rules to force
   a completed enrollment, nor does it reinterpret rejected images as valid.
 
 The CH0 offline corpus completed twelve policy stages in twenty contacts.
@@ -76,7 +77,7 @@ For historical context only, the prior **SIGFM** driver from older tagged
 releases (such as `v2.2.1`) used a fixed-21 accepted-sample policy and
 measured three all-zero scoring probes
 among 100 in one qualification set (3.00%). That statistic does **not**
-describe ChicagoHS and must not be used to estimate its error rate.
+describe the current engine and must not be used to estimate its error rate.
 
 ## Why lifting the finger matters
 
@@ -101,14 +102,14 @@ unlimited pictures while you hold the finger in place.
 | `fprintd` | Checks permission, claims the reader, starts/stops enrollment, labels the finger, and saves the completed record. |
 | `libfprint` | Builds the host template, reports progress, serializes the result, and coordinates image processing. |
 | Goodix driver | Prepares the reader and performs bounded finger detection, image capture, release, cancellation fences and native twelve-stage progress reporting. |
-| ChicagoHS | Generates calibration from the no-finger image, preprocesses frames, extracts native features and enforces the original twelve-stage policy, including position tips and deferred subtemplates. |
+| Native biometric engine | Generates calibration from the no-finger image, preprocesses frames, extracts features and enforces the original twelve-stage policy, including position tips and deferred subtemplates. |
 | Sensor | Measures the finger and returns device data; it does not save the Linux user's final template in this project. |
 
 ## What happens when a sample is poor or repetitive?
 
 Three outcomes are easy to confuse:
 
-- **accepted:** the contact has usable ChicagoHS features and the native
+- **accepted:** the contact has usable fingerprint features and the native
   position policy advances one of the twelve stages;
 - **position tip:** a usable native subtemplate may be retained without
   advancing the stage; the next touch should cover a different position;
@@ -132,20 +133,20 @@ That division becomes important during uninstall: removing the driver can
 preserve the user's templates for later reinstallation.
 
 > 🔎 **Want to see this in the repository?**
-> ChicagoHS enrollment integration is in
+> The enrollment adapter is in
 > [`goodix_chicago.c`](../../libfprint-driver/goodix_chicago.c), with the
 > unchanged native position policy in
 > [`goodix-chicago-enrollment.c`](../../production/chicago-native/chicago/goodix-chicago-enrollment.c).
 > The device's protocol-stage model remains in
 > [`goodix_enrollment_model.c`](../../libfprint-driver/goodix_enrollment_model.c);
-> the historical SIGFM diversity helper is not the current ChicagoHS
+> the historical SIGFM diversity helper is not the current
 > admission policy.
 
 ## ✅ What to remember
 
 - Enrollment teaches the host using several views of one finger.
-- Usable contacts contribute native ChicagoHS subtemplates to the gallery.
-- The original ChicagoHS policy advances exactly twelve accepted stages;
+- Usable contacts contribute native subtemplates to the gallery.
+- The native policy advances exactly twelve accepted stages;
   physical contacts and retained subtemplate counts can differ. Initial
   enrollment completed on one real reader; longer-term performance is open.
 - Each stage follows its contact-completion rules before requesting another touch.
