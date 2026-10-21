@@ -4,8 +4,11 @@
 `porting_ChicagoHS` contains the ChicagoHS Type 24 driver for **Fedora 44 KDE
 x86_64**, Goodix USB `27c6:5125` and APP12509/APP12508 firmware. The canonical
 source build integrates with Fedora's stock libfprint/fprintd/PAM/KDE interfaces.
-Live biometric and desktop qualification remains **NOT_RUN**; use an isolated
-VM without USB passthrough for initial software validation.
+An initial operator-supervised Fedora KDE VM qualification with USB passthrough
+has completed enrollment, genuine/negative verification, desktop authentication,
+reboot and a bounded Windows/Linux coexistence check. Broader reliability,
+additional hardware profiles and fault scenarios are not yet qualified;
+see [validation evidence and limits](docs/VALIDATION.md).
 
 ChicagoHS replaces the matcher and requires new twelve-stage enrollment for each
 finger/user. Historical SIGFM and Milan templates are preserved but incompatible.
@@ -33,8 +36,9 @@ Manage fingerprints through KDE's fingerprint settings. A nonempty password at
 Plasma Login selects password authentication; an empty submission selects the
 fingerprint path, with at most three attempts and stop on the first match.
 Keep password access available. Fingerprint login does not unlock a
-password-encrypted KWallet. Hardware behavior must be qualified before relying
-on this branch for authentication.
+password-encrypted KWallet. The initial live authentication paths have passed on one reader, but keep
+password access available and do not infer general FAR/FRR, liveness or
+multi-device reliability from the limited trials.
 
 ## Documentation
 
