@@ -3,7 +3,7 @@
 
 ## The question changes
 
-Enrollment asks, "can we build a reference?"
+Enrollment asks, "can the system build a reference?"
 
 Verification asks, "does this new touch match the reference already saved for
 this user?"
