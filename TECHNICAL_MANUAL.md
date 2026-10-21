@@ -8,8 +8,8 @@ image and biometric pipeline, system integration, installation, recovery, and
 qualification boundary.
 
 The Goodix USB `27c6:5125` driver provides native fingerprint acquisition,
-biometric recognition and integration with Fedora KDE. Its current biometric
-engine uses the Type 24 format and replaces the earlier SIGFM implementation.
+biometric recognition and integration with Fedora KDE. Its native biometric
+engine is ChicagoHS (Type 24), which replaces the earlier SIGFM implementation.
 The original USB/TLS, pairing and desktop-integration contracts remain in
 scope. Initial live verification of enrollment, matching and Fedora KDE
 authentication was completed on one reader.
@@ -806,8 +806,8 @@ for ENROLL and requires all of the following:
 - frame, control, checksum and 16-byte body are valid; and
 - all six shifted raw words are in 1–254, as specified in section 6.4.
 
-The primary is preserved and delivered at most once through ordinary
-the native preprocessing, enrollment policy and template processing. Optional
+The primary is preserved and delivered at most once through the normal
+preprocessing, enrollment policy and template-processing path. Optional
 image-choice `0x20`, auxiliary B0 and final auxiliary `0x34` are skipped. The
 software finger-down state is cleared; a zero mask itself does not count as a
 quality pass. An accepted sample advances at most one stage. Extraction/quality
@@ -883,7 +883,7 @@ The canonical U16 raster is already oriented for the native biometric backend. N
 second regroup, flip, rotation or empirical normalization is applied. The
 12-byte FDT table is protocol state; it is not the 5,120-sample FDT_B0 image.
 
-The adapter generates calibration with the native `generate` API
+The adapter generates calibration with the original ChicagoHS `generate` API
 from the current no-finger background. It validates dimensions, 12-bit values
 and the action generation before accepting images. The background is fixed
 within that generation. Enrollment retains the original preprocessor's temporal
@@ -902,22 +902,22 @@ original API; complete erasure of all internal allocations is not guaranteed.
 
 ### 9.1 Native backend
 
-The computational engine is pinned to upstream revision
-`010a665f54089a1632b1ab7be588b316ace934e2`. It provides the calibration, preprocessing, feature extraction, enrollment,
-Type 24 packing and matching used by the current driver.
+The ChicagoHS computational engine is pinned to upstream revision
+`010a665f54089a1632b1ab7be588b316ace934e2`. It provides calibration,
+preprocessing, feature extraction, enrollment, Type 24 packing and matching.
 The native selector threshold remains 207 and the match decision is `score > 0`.
 No score tuning, alternate matcher or `templateStudy` is enabled. These constants
 are algorithm behavior, not a calibrated FAR/FRR or liveness guarantee.
 
 ### 9.2 Sensor-bound FpPrint
 
-The RAW FpPrint envelope identifies the current USB 5125 biometric backend and format
+The RAW FpPrint envelope identifies the USB 5125 biometric backend and format
 version. It wraps the original Chicago print data with the SHA-256 of the full
-64-byte OTP record. The original opaque 16-byte `sensor_id` is exactly A6
-OTP bytes 0–15, following the upstream interface convention. The production
-source is the existing complete CRC-validated A6/CONFIG90 preflight, never a
-Windows file or synthesized identifier. These opaque bytes span the CP and FT OTP CRC groups; their per-field meaning
-and uniqueness are not decoded by this adapter. Neither the prefix nor the
+64-byte OTP record. The original opaque 16-byte `sensor_id` is exactly A6 OTP bytes 0–15,
+following the upstream interface convention. The production source is the
+complete CRC-validated A6/CONFIG90 preflight, never a Windows file or
+synthesized identifier. These opaque bytes span the CP and FT OTP CRC groups;
+their per-field meaning and uniqueness are not decoded by this adapter. Neither the prefix nor the
 complete-record binding proves universal physical uniqueness.
 The additional full-record digest rejects different records sharing a prefix.
 
@@ -949,8 +949,8 @@ stock host database management, not a command sent to the reader.
 
 ### 10.2 Original twelve-stage enrollment policy
 
-The native enrollment algorithm distinguishes accepted stages from retained subtemplates and physical
-contacts. The unchanged policy can retain a contact while reporting a position
+The native enrollment algorithm distinguishes accepted stages from retained
+subtemplates and physical contacts. The unchanged policy can retain a contact while reporting a position
 tip without advancing the stage. Its deferred/drop/restore behavior remains
 native; accepted-stage count must reach exactly twelve before packing the final
 print. The subtemplate count therefore need not equal the stage count.
@@ -1336,7 +1336,7 @@ contracts recognize supported earlier SIGFM receipts, including those without
 a `matcher` field, and use the same owned-software removal transaction before
 installing the current driver runtime. Old OpenCV-dependent runtime components
 are removed; stock Fedora fprintd/PAM and user-specific stored data remain.
-Templates in the historical `GSF1`/SIGFM format cannot be used by the new
+Templates in the historical `GSF1`/SIGFM format cannot be used by the
 current driver identity: users must enroll their desired fingers again.
 The migration code is covered by offline simulated tests, but a real populated
 2.x → 3.0.0 upgrade and failed-update rollback require separate
