@@ -1,22 +1,24 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # ChicagoHS validation and limitations
 
-ChicagoHS live qualification is **NOT_RUN**. Offline build, fixture, synthetic
-and corpus evidence cannot establish live authentication, biometric security,
-Windows coexistence or Fedora desktop behavior. The SIGFM results on `main`
-are a regression reference, not ChicagoHS qualification.
+ChicagoHS has passed an **initial operator-supervised live functional check**
+on one Goodix USB `27c6:5125` reader in a Fedora 44 KDE virtual machine with USB
+passthrough. These observations supplement the offline build and corpus evidence;
+they do not establish FAR/FRR, liveness, multi-device support, or exhaustive
+fault tolerance. The SIGFM results on `main` remain a separate recovery
+reference, not evidence of ChicagoHS performance.
 
 ## Evidence boundaries
 
-| Area | Offline verification | Remaining qualification |
-| --- | --- | --- |
-| Native backend | Pinned original ChicagoHS C sources; calibration, feature, twelve-stage enrollment, Type 24 templates, verify and identify | Real USB no-finger background equivalence to SPI T0/ImageBase |
-| Sensor binding | CRC-checked A6 OTP source; upstream opaque 16-byte identity plus full OTP SHA-256 binding; structural/version/CRC/mismatch rejection | Physical cross-device uniqueness and live stability |
-| Templates and users | Backend identity separation; stock fprintd per-user galleries; historical data preserved | Multiple real users and fingers, genuine/impostor/partial behavior |
-| USB/TLS and pairing | Existing APP12509/APP12508 transport contracts and offline error/cleanup tests | Reader reopen, timeout, cancellation, Windows recovery and reboot |
-| Installer | Canonical source build and payload validation; simulated first-install/update/reinstall/rollback | Real isolated Fedora KDE VM installation |
-| Removal | Temporary-filesystem normal and emergency removal, damaged/missing receipts, state/template preservation | TTY recovery and password login on Fedora VM |
-| Desktop integration | PAM selector and stock fprintd ABI/dependency checks | Plasma Login, KScreenLocker, sudo, PolicyKit and password fallback |
+| Area | Offline verification | Initial live functional observation | Remaining qualification |
+| --- | --- | --- | --- |
+| Native backend | Pinned original ChicagoHS C sources; calibration, features, twelve-stage enrollment, Type 24 templates, verify and identify | KDE enrollment complete using native no-finger calibration; registered finger MATCH; different finger NO_MATCH | Exact physical equivalence of USB FDT_B0 and SPI T0/ImageBase, repeated reliability |
+| Sensor binding | CRC-checked A6 OTP source; opaque 16-byte identity and full OTP SHA-256 envelope; malformed/mismatch rejection | Enrollment, reboot and limited Windows/Linux switching operated on one reader | Cross-device uniqueness, stability across more units and failure histories |
+| Templates and users | Backend identity separation; stock fprintd per-user galleries; historical files preserved by recovery | One local user/finger was enrolled and verified after reboot | Multiple real users/fingers, corrupted gallery live paths, partial-input behavior |
+| USB/TLS and pairing | Existing APP12509/APP12508 transport contracts and offline error/cleanup tests | First-use enrollment from empty host pairing state, reboot and bounded Windows/Linux ping-pong passed as reported by operator | Review live audit for E0/readback/TLS invariants; fault/recovery/timeout and APP12508 ChicagoHS |
+| Installer | Canonical source build and payload validation; simulated install/update/reinstall/rollback | FIRST_INSTALL, UPDATE, reinstall, source identity and SELinux Enforcing verified in Fedora VM | Failed real installation/rollback and upgrades over legacy runtime |
+| Removal | Simulated normal and emergency removal, damaged/missing receipts, state/template preservation | Normal remove and recovery from TTY succeeded; subsequent password login and vendor fprintd restored | Real damaged-install recovery; byte-for-byte before/after comparison of preexisting templates/host state |
+| Desktop integration | PAM selector and stock fprintd ABI/dependency checks | KScreenLocker, sudo, PolicyKit, Plasma Login, reboot login, three failed fingerprint attempts then password fallback PASS | Broader policy/system versions and repeated cold-start latency/reliability |
 
 The existing private CH0 corpus established 35/35 admissions, twelve enrollment
 stages in twenty contacts, three genuine matches, three impostor non-matches and
@@ -30,8 +32,9 @@ OTP and also binds the print envelope to the full OTP SHA-256. This is not a
 claim that a sixteen-byte prefix alone proves physical uniqueness. Missing,
 invalid or mismatched binding fails closed; no synthetic sensorID, Windows file,
 alternate matcher or diagnostic-only flag is accepted in production.
-Current integration limitations must be read alongside the technical manual and
-must not be interpreted as a live PASS.
+The table distinguishes reported, bounded live observations from contracts
+supported only by software checks. A successful initial live path is not a
+general release qualification or proof of every fail-closed recovery path.
 
 ## Reproducible software checks
 
@@ -51,20 +54,35 @@ they neither install on the owner host nor prove Fedora runtime behavior. A real
 canonical build validates actual C compilation, shared-library ABI and dependency
 resolution independently of those fixtures. See [production](../production/README.md).
 
-## First VM and later live checks
+## VM observations and subsequent live checks
 
-First qualify [installation/update/reinstall](INSTALLATION.md) in an isolated
-Fedora 44 KDE VM without USB passthrough, followed by both documented
-[removal/recovery](UNINSTALL.md) paths. Require preserved password login and
-byte-identical preexisting host state/templates. Keep the reader disconnected
-from the VM for software-only testing.
+On 21 October 2026 the operator reported the following **initial bounded
+functional observations** from a clean Fedora 44 KDE VM. Without USB passthrough,
+installation, update, reinstall, normal removal, emergency TTY removal and
+password recovery succeeded; the obsolete `dontaudit` module was absent and
+SELinux remained Enforcing. With the Goodix assigned exclusively to the VM,
+KDE enrollment from an initially empty host pairing state completed; a
+registered finger returned `verify-match` and a different finger returned
+`verify-no-match`. KScreenLocker, sudo, PolicyKit and Plasma Login succeeded.
+Login after reboot, Windows/Linux switching, and password fallback after three
+failed fingerprint attempts were also reported PASS. These are operator
+observations; raw audit traces for E0/readback/TLS and an independent repeat
+of the hardware tests were not supplied with this documentation revision.
 
-Live testing requires supervised authorization and must check sensor binding
-stability and cross-device separation.
-Then exercise enrollment, verify and identify, negative and wrong-user cases,
-errors/cancellation, desktop entry points and Windows/reboot recovery. For each
-verify/match sequence, allow at most three physical attempts, stop at the first
-match and do not hide retries. A timeout, corrupted template, binding mismatch or
-ambiguous state is a STOP, not an instruction to provision or reset the sensor.
-Rollback uses the two ordinary recovery commands and a separate SIGFM `main`
-installation, without deleting templates, host state or factory data.
+For reproducible software-only validation, leave USB passthrough disabled,
+install from the [documented canonical block](INSTALLATION.md), then exercise
+update, reinstall and both [removal/recovery](UNINSTALL.md) paths. Preserve
+password access. For preservation claims involving previously populated
+templates or host state, collect and compare authorized protected before/after
+evidence; a clean VM does not demonstrate byte-level preservation.
+
+Additional live qualification requires supervised authorization and should
+cover sensor binding stability and cross-device separation, multiple users and
+fingers, bad captures and false-positive risk, errors/cancellation, explicit
+reopen, cold starts, and Windows/reboot recovery. For each verify/match series,
+allow at most three physical attempts and stop at the first match. A timeout,
+corrupted template, binding mismatch or ambiguous state is a STOP, not an
+instruction to provision or reset the sensor. The pairing journal/readback/E0
+contract must be audited separately from the observed success of a fingerprint
+action. Rollback uses the two ordinary recovery commands and a separate SIGFM
+`main` installation, without deleting templates, host state or factory data.
