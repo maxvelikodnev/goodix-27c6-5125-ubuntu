@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+[Desktop Entry]
+Type=Application
+Name=Goodix Manager
+GenericName=Fingerprint Driver Manager
+Comment=Install, update and remove the Goodix fingerprint driver
+Exec=goodix-manager
+Icon=io.github.sorguido.GoodixManager
+Terminal=false
+Categories=Settings;HardwareSettings;Qt;KDE;
+Keywords=fingerprint;Goodix;driver;biometric;
+StartupNotify=true

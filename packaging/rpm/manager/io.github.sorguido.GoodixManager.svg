@@ -1,0 +1,12 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs><linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#168aa4"/><stop offset="1" stop-color="#174b94"/></linearGradient></defs>
+  <rect x="5" y="5" width="118" height="118" rx="30" fill="url(#tile)"/>
+  <g fill="none" stroke="#f0fdff" stroke-width="5" stroke-linecap="round">
+    <path d="M29 59c0-19 15-33 35-33 18 0 33 12 35 29"/>
+    <path d="M28 73c-1 10-3 17-7 23M100 69c0 17-3 29-10 39"/>
+    <path d="M41 64c0-14 9-24 23-24s23 10 23 24c0 18-2 30-10 42"/>
+    <path d="M39 79c-1 12-5 20-10 27M53 70v-6c0-7 4-12 11-12s11 5 11 12c0 14-1 27-7 37"/>
+    <path d="M50 85c-2 10-5 17-9 23M64 65c0 17-2 29-8 41"/>
+  </g>
+</svg>

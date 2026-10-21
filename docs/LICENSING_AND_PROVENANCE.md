@@ -21,6 +21,7 @@ change the original copyright or grant of any source file.
 | libgusb | Fedora system library | LGPL-2.1-or-later; USB dependency, not privately bundled |
 | OpenSSL | Fedora system library | Apache-2.0; TLS dependency |
 | Lifecycle and Plasma selector tools | Project source | GPL-2.0-or-later; ordinary Linux-PAM APIs, Python standard library and Fedora tools |
+| Goodix Manager, original fingerprint icon and RPM tooling | Project source | GPL-2.0-or-later; system Qt 6/PySide6 and Kirigami, with MIT AppStream metadata; no bundled Qt/KDE replacement |
 
 The APP12509 component labels retain their original profile/provenance names.
 The current driver also recognizes APP12508, propagating its exact identity

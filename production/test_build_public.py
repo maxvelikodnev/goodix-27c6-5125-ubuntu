@@ -44,6 +44,7 @@ class PublicBuild(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('synthetic source or notice\n')
         (self.root / 'production').mkdir(exist_ok=True)
+        (self.root / 'VERSION').write_text('3.0.0\n')
         (self.root / 'production/build-public.py').write_bytes(SOURCE.read_bytes())
         (self.root / 'production/build-chicago-native.py').write_bytes(
             SOURCE.with_name('build-chicago-native.py').read_bytes())

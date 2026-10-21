@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
 VENDOR = Path('/usr/lib/pam.d/plasmalogin')
 RUNTIME_PACKAGES = ('fprintd', 'fprintd-pam', 'policycoreutils-python-utils')
+UNCHECKED_SOURCE = object()
 
 
 def load(name, path):
@@ -211,6 +212,10 @@ def restore_selinux_module(was_present):
 
 
 def install_runtime(payload, manifest, rule_preexisting, legacy_present):
+    provenance = json.loads((payload / 'runtime/build-provenance.json').read_bytes())
+    version = provenance.get('version')
+    require(isinstance(version, str) and re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version),
+            'payload driver version is missing or invalid')
     r.RUNTIME.mkdir(mode=0o755)
     hashes = {}
     for name, digest in manifest['files'].items():
@@ -232,6 +237,7 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         'rule': r.RULE, 'owned': not rule_preexisting,
         'preexisting': rule_preexisting, 'phase': 'ready'}
     write_json(r.RUNTIME / 'installation.json', {'schema': 2, 'source_id': manifest['source_id'],
+        'version': version,
         'matcher': 'chicago-type24',
         'files': hashes, 'links': links, 'material_selinux': material_selinux,
         'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
@@ -411,7 +417,7 @@ def source_bundle(directory, owner_uid):
     return materials.validate_bundle(directory, source=True, owner_uid=owner_uid)
 
 
-def apply(payload, material_directory, owner_uid, *, explicit=False):
+def apply(payload, material_directory, owner_uid, *, explicit=False, expected_source_id=UNCHECKED_SOURCE):
     require(os.geteuid() == 0, 'administrative installation requires sudo')
     mode, bundle, reuse = select_materials(material_directory, owner_uid, explicit=explicit)
     host_preflight()
@@ -433,6 +439,12 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
             native_check(r.MATERIAL)
             require(installed_bundle().files == bundle.files, 'installed material changed during native validation')
         with lifecycle():
+            if expected_source_id is not UNCHECKED_SOURCE:
+                current_source = None
+                if r.present(r.RUNTIME):
+                    current_source = r.receipt_identity(json.loads(r.read(r.RUNTIME / 'installation.json')))
+                require(current_source == expected_source_id,
+                        'runtime changed since Manager verification; refresh status')
             # The preliminary check is advisory: recheck under the lifecycle
             # lock before replacement, and never recreate a lost installed set.
             if reuse:

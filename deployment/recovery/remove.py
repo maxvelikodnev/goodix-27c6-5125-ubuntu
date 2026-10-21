@@ -92,11 +92,13 @@ def receipt_identity(receipt):
     if receipt.get('schema') == 2:
         require(isinstance(receipt.get('source_id'), str) and
                 re.fullmatch('[0-9a-f]{64}', receipt['source_id']), 'invalid source identity')
+        return receipt['source_id']
     else:
         require(receipt.get('schema') == 1, 'unsupported project receipt')
         identity = receipt.get('source_commit', receipt.get('build_commit'))
         require(isinstance(identity, str) and re.fullmatch('[0-9a-f]{40}', identity),
                 'invalid legacy source identity')
+        return 'git:' + identity
 
 
 def runtime_inventory(receipt):

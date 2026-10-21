@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: MIT -->
+<component type="desktop-application">
+  <id>io.github.sorguido.GoodixManager</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>Goodix Manager</name>
+  <summary>Manage the Goodix fingerprint driver on Fedora KDE</summary>
+  <developer id="io.github.sorguido"><name>Guido Sorarù</name></developer>
+  <description>
+    <p>Goodix Manager installs, updates and removes the Goodix 27c6:5125 fingerprint driver using a verified local payload. Installing this application does not activate the driver.</p>
+    <p>Review driver status, check official public releases and access recovery documentation. Local driver operations remain available without network access.</p>
+  </description>
+  <launchable type="desktop-id">io.github.sorguido.GoodixManager.desktop</launchable>
+  <url type="homepage">https://github.com/sorguido/goodix-27c6-5125</url>
+  <url type="bugtracker">https://github.com/sorguido/goodix-27c6-5125/issues</url>
+  <provides><binary>goodix-manager</binary></provides>
+  <content_rating type="oars-1.1"/>
+</component>

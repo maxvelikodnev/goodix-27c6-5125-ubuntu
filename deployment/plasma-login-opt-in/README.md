@@ -1,8 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Plasma Login fingerprint selection
 
-The root [installer](../../docs/INSTALLATION.md) builds this small Linux-PAM
-module and installs its service entry. Fedora continues to supply the login
+The canonical builder compiles this small Linux-PAM module into the RPM payload.
+Goodix Manager's explicit [Install/Apply Update](../../docs/INSTALLATION.md)
+action applies it and its service entry through the shared installation backend;
+installing the RPM alone does not activate it. Fedora continues to supply the login
 daemon, greeter and current vendor authentication configuration.
 
 A nonempty password selects normal Fedora password authentication immediately.

@@ -28,24 +28,28 @@ not establish general recognition accuracy or cross-device compatibility. See
 ## Installation
 
 > [!WARNING]
-> **Use only official releases or the `main` branch for installation.**
+> **Use only signed RPMs from official releases for installation.**
 
-**[Install using the single copy-paste block](docs/INSTALLATION.md).** The root
-`install.sh` automatically selects first installation (`FIRST_INSTALL`) or update
-(`UPDATE`), builds the runtime from this source tree, and installs the login
-integration and removal commands. It requests normal sudo authentication when
-needed.
+**[Install with the signed RPM and Goodix Manager](docs/INSTALLATION.md).** Verify
+the public signing key and package, open the RPM with **KDE Discover**, then open
+**Goodix Manager** and choose **Install**. Discover installs the application and
+its compiled payload; driver activation is a separate, explicitly authorized step.
 
-You need administrative access. Git must be available to run the bootstrap block.
+You need administrative access. No Git checkout or local compilation is required.
+After installing a newer RPM, reopen the Manager and choose **Apply Update** when
+offered. Driver installation, update and removal use the local payload and work
+offline once Fedora dependencies are installed.
 
-After a successful installation, the repository clone may be removed.
+Use a release with a compatible Fedora 44 x86_64 RPM asset. See
+[validation](docs/VALIDATION.md) for the RPM/Discover qualification boundary.
 
 ### Upgrading from an earlier release
 
 Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
-fingerprint format. The standard installer is designed to replace a recognized 2.x runtime
-without a preliminary manual uninstall, while preserving host pairing state,
-existing fingerprint files and password access. **Previously enrolled fingers
+fingerprint format. For an intact, recognized 2.x installation, Goodix Manager
+offers **Upgrade to 3.0.0** through the transactional installer, without a
+preliminary uninstall. Host pairing state and existing fingerprint files are
+preserved. **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new
 engine. The real-device upgrade from a populated 2.x installation remains a
 release qualification gate; see [installation](docs/INSTALLATION.md) and
@@ -69,8 +73,12 @@ a password-encrypted KWallet.
 
 ## Uninstall and emergency recovery
 
-Run **`goodix-uninstall`** from a working desktop terminal. If graphical login
-is unavailable, follow the [text-console emergency instructions](docs/UNINSTALL.md)
+Choose **Remove** in Goodix Manager to remove the driver while keeping the
+application available. The equivalent `goodix-uninstall` command remains
+available from a working desktop terminal. Removing the Manager RPM itself
+leaves an activated driver and its standalone recovery commands in place.
+If graphical login is unavailable, follow the
+[text-console emergency instructions](docs/UNINSTALL.md)
 and run **`goodix-force-remove`**. Both commands request their own sudo
 authentication, preserve host pairing state and templates, and work after
 the clone is removed.

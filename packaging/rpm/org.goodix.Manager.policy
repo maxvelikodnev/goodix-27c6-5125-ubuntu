@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Goodix fingerprint driver</vendor>
+  <vendor_url>https://github.com/sorguido/goodix-27c6-5125</vendor_url>
+  <action id="org.goodix.Manager.status">
+    <description>Check installed Goodix software</description>
+    <message>Check the integrity and version of installed Goodix software</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>yes</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/goodix-manager-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">status</annotate>
+  </action>
+  <action id="org.goodix.Manager.install">
+    <description>Install the Goodix fingerprint driver</description>
+    <message>Authentication is required to install the Goodix fingerprint driver</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/goodix-manager-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">install</annotate>
+  </action>
+  <action id="org.goodix.Manager.update">
+    <description>Update the Goodix fingerprint driver</description>
+    <message>Authentication is required to update the Goodix fingerprint driver</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/goodix-manager-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">update</annotate>
+  </action>
+  <action id="org.goodix.Manager.remove">
+    <description>Remove the Goodix fingerprint driver</description>
+    <message>Authentication is required to remove the Goodix fingerprint driver</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/goodix-manager-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">remove</annotate>
+  </action>
+</policyconfig>

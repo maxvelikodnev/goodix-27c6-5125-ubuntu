@@ -3,8 +3,8 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — ChicagoHS",
   "candidate": "ChicagoHS",
-  "phase": "CH4",
-  "phase_status": "CHICAGOHS_SOFTWARE_RC_READY_FOR_VM",
+  "phase": "RPM_DISTRIBUTION",
+  "phase_status": "COMPAT_REV3_GATE_A_PASS_AWAITING_OPERATOR_GATE_B",
   "software_rc_ready_for_vm": "PASS",
   "completed_gates": [
     "CH0_SOURCE_BASELINE",
@@ -13,8 +13,8 @@
     "CH3_CANONICAL_BUILD_RECOVERY",
     "CH4_INDEPENDENT_REVIEW"
   ],
-  "live_qualification": "NOT_RUN",
-  "vm_installation": "NOT_RUN",
+  "live_qualification": "PREEXISTING_OPERATOR_REPORTED_FUNCTIONAL_PASS_SEE_DOCS_VALIDATION",
+  "vm_installation": "OPERATOR_REPORTED_RPM5_INSTALL_AND_MENU_ICON_PASS; RPM8_MIGRATION_NOT_TESTED",
   "host_modified": false,
   "implementation_baseline": "ddc09472229bd88d8b4a072039e6f2d5a07579d5",
   "rc_source_id": "bdc3729d6467636d06045190f08e3eb3852dcc84181e080f9182984c3f0cc5a4",
@@ -54,10 +54,50 @@
     "development/private-root/analysis/CHICAGO_RC_2026-10-21/REVIEW.md"
   ],
   "qualification_limits": [
-    "No real USB, host installation, VM installation, Windows recovery or desktop authentication executed",
+    "Owner qualifies ChicagoHS 3.0.0 driver. RPM8 software and synthetic update continuity pass; real Manager 2.x migration, populated-data preservation, PolicyKit/login/reboot and KDE theme propagation still require operator VM qualification.",
     "FDT_B0 physical equivalence, cross-device identity uniqueness, FAR/FRR and liveness remain unqualified",
     "Opaque native heap is freed; complete zeroization is not guaranteed"
   ],
-  "next_action": "Supervised isolated Fedora KDE VM software installation without USB; live qualification requires separate user authorization",
-  "obsolete_selinux_module_removed": "PASS"
+  "next_action": "Operator runs Gate B on a snapshotted disposable Fedora 44 KDE VM with no Goodix USB: recognized populated 2.x to 3.0.0 via Manager, failure rollback, password login/reboot, ordinary removal; CLI status separately. Follow development/rpm/reports/compat-2x-3x/VM-GATE-B.md.",
+  "obsolete_selinux_module_removed": "PASS",
+  "rpm_distribution": {
+    "branch": "rpm",
+    "version": "3.0.0",
+    "release": 10,
+    "fedora": 44,
+    "architecture": "x86_64",
+    "signature": "VERIFIED",
+    "fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
+    "source_archive_sha256": "16555da0e3b3a5268cb1b04dcab851abb0ba9fe38151d461f31b8ef024b3f8aa",
+    "payload_source_id": "f259f6f10a60e5facc5a8404f951bce3eb18da2aaefebc8c9a167e4540938d97",
+    "public_unit_tests_passed": 209,
+    "qml_render": "PASS_SYSTEM_LIGHT_DARK_STARTUP_LIVE_DIALOG_DISABLED_COMPACT",
+    "runtime_modified_on_host": false,
+    "release_published": false,
+    "operator_vm_testing": "RPM5_INSTALL_REPORTED_PASS_RPM8_GATE_B_NOT_TESTED",
+    "report": "development/rpm/reports/compat-2x-3x/REPORT.md",
+    "ui_corrections": {
+      "UI-01": "BLOCKED_DISCOVER_LOCAL_FILE_GENERIC_ICON",
+      "UI-02": "BLOCKED_DISCOVER_LOCAL_FILE_EMPTY_AUTHOR",
+      "UI-03": "PASS_QT_SYSTEM_PALETTE_TESTS; KDE_VM_NOT_TESTED",
+      "packaging_only_no_reapply": "PASS_ACTUAL_5_TO_7_METADATA_FIXTURE"
+    },
+    "compatibility": {
+      "mandate": "REV3",
+      "gate_a": "PASS_SYNTHETIC",
+      "COMPAT-01": "PASS_SYNTHETIC_HISTORICAL_IDENTITY",
+      "COMPAT-02": "PASS_SYNTHETIC_CANONICAL_MIGRATION; NOT_TESTED_VM",
+      "COMPAT-03": "PASS_SYNTHETIC_S1_S2_S3_S4_S5",
+      "gate_b": "HUMAN_REQUIRED_VM_2X_MIGRATION",
+      "future_vm": "NOT_TESTED_VM_3_0_1",
+      "publication_contract": "PASS_LOCAL_CONTRACT_APPROVED_SIGNER; GITHUB_NOT_CHECKED",
+      "review": "ACCEPT_AND_CONTINUE"
+    },
+    "ui_bug_report_button": {
+      "placement": "Immediately beside Read Documents",
+      "url": "https://github.com/sorguido/goodix-27c6-5125/issues",
+      "verification": "PASS_OLD_QML_CACHE_SAME_MTIME_NEW_PROCESS_CLICK_AND_SYSTEM_PALETTE_RENDER",
+      "delivery": "development/rpm/reports/qml-cache-fix/delivery.json"
+    }
+  }
 }

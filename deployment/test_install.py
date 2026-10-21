@@ -187,6 +187,9 @@ class Installer(unittest.TestCase):
             data = (self.clone / 'deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes() \
                 if name == 'login/plasmalogin.pam' else b'SYNTHETIC PUBLIC PAYLOAD ' + name.encode()
             target.write_bytes(data)
+            if name == 'runtime/build-provenance.json':
+                target.write_text(json.dumps({'version': '3.0.0', 'source_id': manifest['source_id']}))
+                data = target.read_bytes()
             target.chmod(0o755 if name == 'check-material' else 0o644)
             manifest['files'][name] = m.r.digest(data)
         for name, target in m.r.LINKS.items():
@@ -197,6 +200,27 @@ class Installer(unittest.TestCase):
     def apply(self):
         with patch.object(m.os, 'geteuid', return_value=0):
             m.apply(self.payload, self.source, os.getuid())
+
+    def test_manager_expected_absent_refuses_changed_runtime(self):
+        self.apply()
+        receipt = (m.r.RUNTIME / 'installation.json').read_bytes()
+        with patch.object(m.os, 'geteuid', return_value=0), \
+                self.assertRaisesRegex(RuntimeError, 'runtime changed since Manager'):
+            m.apply(self.payload, self.source, os.getuid(), expected_source_id=None)
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), receipt)
+        self.assertFalse(m.r.MASK.exists())
+
+    def test_manager_expected_source_refuses_changed_runtime(self):
+        self.apply()
+        receipt = (m.r.RUNTIME / 'installation.json').read_bytes()
+        with patch.object(m.os, 'geteuid', return_value=0), \
+                self.assertRaisesRegex(RuntimeError, 'runtime changed since Manager'):
+            m.apply(self.payload, self.source, os.getuid(), expected_source_id='f' * 64)
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), receipt)
+
+    def test_runtime_receipt_records_payload_version(self):
+        self.apply()
+        self.assertEqual(json.loads((m.r.RUNTIME / 'installation.json').read_bytes())['version'], '3.0.0')
 
     def test_first_install_mode_and_no_protected_output(self):
         self.apply()

@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Generated version/release fields come from VERSION and build.py --release.
+%global debug_package %{nil}
+# Payload hashes are finalized by the canonical builder. Never strip/rewrite them.
+%global __os_install_post %{nil}
+%global __provides_exclude_from ^/usr/lib/goodix-manager/.*$
+Name:           goodix-manager
+Version:        @VERSION@
+Release:        @RELEASE@%{?dist}
+Summary:        Goodix fingerprint driver manager for Fedora KDE
+License:        GPL-3.0-or-later AND GPL-2.0-or-later AND LGPL-2.1-or-later AND MIT AND Apache-2.0
+URL:            https://github.com/sorguido/goodix-27c6-5125
+Source0:        goodix-manager-@VERSION@.tar.gz
+ExclusiveArch:  x86_64
+BuildRequires:  python3 gcc meson ninja-build pkgconf-pkg-config binutils
+BuildRequires:  glib2-devel libgusb-devel libusb1-devel openssl-devel json-glib-devel pam-devel
+BuildRequires:  fprintd desktop-file-utils
+BuildRequires:  python3-pyside6 qt6-qtdeclarative kf6-kirigami
+Requires:       python3 python3-pyside6 kf6-kirigami qt6-qtdeclarative
+Requires:       polkit fprintd fprintd-pam policycoreutils-python-utils
+Requires:       plasma-login-manager systemd rpm sudo
+Requires:       system-release(44)
+
+%description
+Goodix Manager provides explicit installation, update and ordinary removal of
+the Goodix 27c6:5125 fingerprint driver. The verified driver payload is built
+with the package. Installing or removing this RPM does not activate or remove
+the runtime. Existing runtime and standalone recovery commands remain available.
+
+%prep
+%setup -q
+
+%build
+/usr/bin/python3 -I -B packaging/rpm/stage.py build --output ../goodix-payload
+
+%install
+/usr/bin/python3 -I -B packaging/rpm/stage.py install --payload ../goodix-payload --root %{buildroot} --release @RELEASE@
+
+%check
+/usr/bin/python3 -I -B packaging/rpm/test_packaging.py
+/usr/bin/python3 -I -B packaging/rpm/test_helper.py
+/usr/bin/python3 -I -B packaging/rpm/test_compat_transactions.py
+/usr/bin/python3 -I -B packaging/rpm/manager/test_model.py
+/usr/bin/python3 -I -B packaging/rpm/manager/test_network_ui.py
+/usr/bin/python3 -I -B packaging/rpm/manager/test_qml_cache.py
+/usr/bin/python3 -I -B packaging/rpm/test_verify_release.py Metadata PayloadMetadata
+/usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py
+/usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py --initial-palette dark
+desktop-file-validate %{buildroot}%{_datadir}/applications/io.github.sorguido.GoodixManager.desktop
+
+%files
+%license LICENSES/*.txt
+%doc packaging/rpm/README.md docs/LICENSING_AND_PROVENANCE.md
+%{_bindir}/goodix-manager
+%{_libexecdir}/goodix-manager-helper
+/usr/lib/goodix-manager/
+%{_datadir}/applications/io.github.sorguido.GoodixManager.desktop
+%{_datadir}/metainfo/io.github.sorguido.GoodixManager.metainfo.xml
+%{_datadir}/icons/hicolor/scalable/apps/io.github.sorguido.GoodixManager.svg
+%{_datadir}/polkit-1/actions/org.goodix.Manager.policy
+%{_mandir}/man1/goodix-manager.1*
+
+%changelog
+* @DATE@ Guido Sorarù - @VERSION@-@RELEASE@
+- Build the versioned offline payload and Goodix Manager.
