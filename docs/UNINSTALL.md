@@ -109,8 +109,8 @@ cd "$HOME/goodix-5125-sigfm-v2.2.1"
 ```
 
 Choose a new destination if that directory exists. No library is copied
-manually. The current remover recognizes current, legacy Milan and SIGFM
-receipts; remove the newer runtime **before** installing historical SIGFM because
+manually. The current remover recognizes receipts from the installed driver and
+supported legacy Milan/SIGFM versions; remove the newer runtime **before** installing historical SIGFM because
 the older installer/remover is not guaranteed to understand a newer runtime.
 Historical templates remain on disk and are usable only when compatible with
 the selected old driver and reader. Enroll again with SIGFM only if no valid
