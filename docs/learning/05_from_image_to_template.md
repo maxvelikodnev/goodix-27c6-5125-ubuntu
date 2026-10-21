@@ -24,9 +24,8 @@ The path is:
 
 ```mermaid
 flowchart LR
-    A["80 x 64 raw sensor raster"] --> B["Same-session FDT_B0 no-finger image"]
-    B --> C["Generate no-finger calibration"]
-    A --> D["Native image preprocessing"]
+    A["Current 80 x 64 finger raster"] --> D["Native image preprocessing"]
+    B["Same-session no-finger FDT_B0 raster"] --> C["Generate calibration"]
     C --> D
     D --> E["Extract fingerprint features"]
     E --> F["Native feature records and subtemplates"]
@@ -43,9 +42,8 @@ sensor.
 The current driver uses the same-session no-finger `FDT_B0` image as the
 input to calibration generation. The native biometric engine
 generates gain/offset state and processes the 80×64 unsigned 12-bit finger
-raster with its own native preprocessing. The display-ready 8-bit image
-is not an input to the biometric matcher. A separate 8-bit rendering, if supplied to
-libfprint, is for display and is not the matching input.
+raster with its own native preprocessing. A separate 8-bit rendering, if
+supplied to libfprint, is for display and not for biometric matching.
 
 This is closer to preparing a scanned page before optical character recognition
 than to recognizing the person directly. It improves the input; it does not
@@ -78,8 +76,8 @@ inside a sensor-bound `FpPrint` so later touches have useful references.
 The template is not meant to be a normal photograph. `libfprint` serializes
 the native Type 24 representation within a RAW FpPrint envelope,
 including its backend identity and OTP-bound device information. The raw
-fingerprint raster is not the normal stored identity record. Historical
-Templates made by older biometric engines are preserved but cannot be
+fingerprint raster is not the normal stored identity record. Templates made
+by older biometric engines are preserved but cannot be
 matched or converted by the current implementation.
 
 This does not make templates harmless. A biometric template is sensitive
