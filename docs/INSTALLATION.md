@@ -19,7 +19,7 @@ Double-click the downloaded file, open it with **KDE Discover** and choose **Ins
 
 Open **Goodix Manager** from your KDE application menu and click **Install**. Approve the authorization prompt, wait for completion and restart if requested.
 
-![Goodix Manager showing a successfully installed driver](images/goodix-manager.webp)
+<img src="images/goodix-manager.webp" alt="Goodix Manager showing a successfully installed driver" width="800">
 
 *Goodix Manager after installation. On a new installation, the **Install** button is enabled; after installation, the status can show **Up to date**.*
 
