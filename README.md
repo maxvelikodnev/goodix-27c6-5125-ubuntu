@@ -30,10 +30,11 @@ not establish general recognition accuracy or cross-device compatibility. See
 > [!WARNING]
 > **Use only signed RPMs from official releases for installation.**
 
-**[Install with the signed RPM and Goodix Manager](docs/INSTALLATION.md).** Verify
-the public signing key and package, open the RPM with **KDE Discover**, then open
-**Goodix Manager** and choose **Install**. Discover installs the application and
-its compiled payload; driver activation is a separate, explicitly authorized step.
+**[Install with the signed RPM and Goodix Manager](docs/INSTALLATION.md).**
+Download the compatible RPM from the official releases, open it with **KDE Discover**,
+then launch **Goodix Manager** and choose **Install**. The installation guide also
+provides **optional signature-verification instructions** for users who want to
+check the package before installing it.
 
 You need administrative access. No Git checkout or local compilation is required.
 After installing a newer RPM, reopen the Manager and choose **Apply Update** when
