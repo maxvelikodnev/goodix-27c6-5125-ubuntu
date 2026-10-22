@@ -33,7 +33,15 @@ At the Plasma login screen, submit the **empty password field** once to select f
 
 ## Updating the driver
 
-Download and install a newer compatible RPM from [GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases), reopen Goodix Manager and choose **Apply Update** if offered.
+Open **Goodix Manager** occasionally to check for updates. It checks official releases when launched; you can also click **Check again**.
+
+If **Download RPM** appears:
+
+1. Click **Download RPM**. Your browser opens the direct download link for the new RPM.
+2. Close Goodix Manager, then double-click the downloaded RPM and install it with **KDE Discover**.
+3. Reopen Goodix Manager and click **Apply Update**, if offered. Follow any restart instructions.
+
+Installing a newer RPM alone does **not** update the active driver. If the release check reports **Check unavailable**, try **Check again** later.
 
 **Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.0.0**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
 
