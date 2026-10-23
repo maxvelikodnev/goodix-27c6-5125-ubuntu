@@ -9,8 +9,6 @@ and factory data.
 
 ![Fingerprint reader and power-button flex assembly from a Huawei MateBook D15-family replacement part](https://n11scdn.akamaized.net/a1/375_535/11/58/59/10/IMG-8986381352341530689.webp)
 
-*Illustrative hardware photo: [MateBook D15 BoD-WDH9Q replacement part](https://www.n11.com/urun/huawei-matebook-d-15-bod-wdh9q-parmak-izi-okuyucu-acma-kapama-butonu-mavi-109980486). The pictured assembly has not been confirmed as the exact Goodix `27c6:5125` variant.*
-
 ## Supported configuration
 
 - Fedora 44 KDE, x86_64, with local user accounts.
