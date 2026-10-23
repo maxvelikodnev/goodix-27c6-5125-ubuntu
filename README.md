@@ -7,7 +7,9 @@ libfprint library to Fedora's fprintd service and desktop authentication,
 initializing the reader by itself on first use while preserving factory firmware
 and factory data.
 
-<img src="https://n11scdn.akamaized.net/a1/375_535/11/58/59/10/IMG-8986381352341530689.webp" alt="Fingerprint reader and power-button flex assembly from a Huawei MateBook D15-family replacement part" width="50%">
+<p align="center">
+  <img src="https://n11scdn.akamaized.net/a1/375_535/11/58/59/10/IMG-8986381352341530689.webp" alt="Fingerprint reader and power-button flex assembly from a Huawei MateBook D15-family replacement part" width="50%">
+</p>
 
 ## Supported configuration
 
