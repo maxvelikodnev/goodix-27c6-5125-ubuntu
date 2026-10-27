@@ -906,8 +906,17 @@ The ChicagoHS computational engine is pinned to upstream revision
 `010a665f54089a1632b1ab7be588b316ace934e2`. It provides calibration,
 preprocessing, feature extraction, enrollment, Type 24 packing and matching.
 The native selector threshold remains 207 and the match decision is `score > 0`.
-No score tuning, alternate matcher or `templateStudy` is enabled. These constants
+No score tuning or alternate matcher is enabled. These constants
 are algorithm behavior, not a calibrated FAR/FRR or liveness guarantee.
+
+**Adaptive template learning (disabled).** The original Goodix Windows `AlgoChicago.dll`
+contains `templateStudy`, a native routine for adapting enrolled fingerprint
+templates after successful matches. The corresponding ChicagoHS implementation
+is included in this project, but deliberately left inactive. Persisting adaptive
+updates would require additional integration beyond Fedora's stock `fprintd`,
+increasing complexity and maintenance costs without a demonstrated accuracy
+benefit on the 27c6:5125. The driver therefore preserves enrolled templates
+unchanged during authentication.
 
 ### 9.2 Sensor-bound FpPrint
 
