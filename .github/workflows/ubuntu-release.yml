@@ -1,0 +1,101 @@
+name: Ubuntu package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*-ubuntu']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version (major.minor.patch); does not publish a release
+        default: '0.1.0'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Select package version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          ref = os.environ['GITHUB_REF']
+          version = ref.removeprefix('refs/tags/v').removesuffix('-ubuntu') if ref.startswith('refs/tags/') else os.environ.get('REQUESTED_VERSION') or '0.0.0'
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Invalid release version')
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write('PACKAGE_VERSION=' + version + '\n')
+          PY
+      - name: Install Ubuntu build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc meson ninja-build pkgconf libglib2.0-dev libgusb-dev libusb-1.0-0-dev libssl-dev libjson-glib-dev binutils fprintd libfprint-2-dev libpolkit-gobject-1-dev libdbus-1-dev gettext dpkg-dev
+      - name: Offline lifecycle and sensor-protocol tests
+        run: |
+          python3 -B ubuntu/deb/test_lifecycle.py
+          sh libfprint-driver/tests/run_goodix_post_tls_test.sh
+          sh libfprint-driver/tests/run_goodix_pairing_crypto_test.sh
+          sh libfprint-driver/tests/run_goodix_self_state_test.sh
+          sh libfprint-driver/tests/run_goodix_pairing_provision_test.sh
+      - name: Build operational package
+        run: |
+          python3 -B ubuntu/build-ready.py --output "$RUNNER_TEMP/goodix-build" --allow-persistent-pairing
+          python3 -B ubuntu/build-deb.py --build "$RUNNER_TEMP/goodix-build" --output "$GITHUB_WORKSPACE/dist" --version "$PACKAGE_VERSION"
+          git archive --format=tar.gz --output="dist/goodix-5125-ubuntu_${PACKAGE_VERSION}_source.tar.gz" HEAD
+      - name: Test package installation, activation, upgrade guard and removal
+        run: |
+          docker run --rm \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/dist,dst=/packages,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/ubuntu/deb/smoke-container.sh,dst=/smoke.sh,readonly" \
+            ubuntu:24.04 sh /smoke.sh "/packages/goodix-5125-ubuntu_${PACKAGE_VERSION}_amd64.deb"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ubuntu-package
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ubuntu-package
+          path: dist
+      - name: Publish experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          Experimental Ubuntu 24.04 amd64 package for Goodix 27c6:5125.
+
+          Installation leaves the driver disabled and does not access the sensor.
+          Run `sudo goodix-ubuntu enable` explicitly after reading ubuntu/RELEASES.md.
+          First fingerprint use may persist pairing; removing the package does not
+          restore factory pairing. Disable before upgrading. Password/PAM settings
+          and enrolled prints are preserved. Hardware coverage remains limited.
+
+          Based on sorguido/goodix-27c6-5125 by Guido Sorarù, with Ubuntu adaptations.
+          The checksum is not an independent publisher signature; packages are unsigned.
+          EOF
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to replace published assets.' >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --prerelease --title "Ubuntu $RELEASE_TAG" --notes-file /tmp/release-notes.md

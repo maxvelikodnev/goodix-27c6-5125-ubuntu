@@ -1,7 +1,8 @@
 # Ubuntu 24.04 build instructions
 
 This developer preview builds a private libfprint library and a narrowly modified
-fprintd 1.94.3 daemon. It does not publish a supported Ubuntu installer or package.
+fprintd 1.94.3 daemon. Experimental `.deb` packaging is described in
+[RELEASES.md](RELEASES.md); it is not a generally qualified hardware release.
 The original Fedora deployment scripts are not used for Ubuntu.
 
 Follow the [root README](../README.md) for apt dependencies, then run as an
@@ -30,8 +31,8 @@ sh libfprint-driver/tests/run_goodix_pairing_provision_test.sh
 ```
 
 The build also runs the synthetic pairing-write guard test. These checks do not
-access USB or use real fingerprint data. Full daemon integration tests and a
-repeatable Ubuntu installation/rollback workflow remain work to do.
+access USB or use real fingerprint data. Full daemon integration tests remain work to do. The package lifecycle has
+separate mocked and disposable-container checks.
 
 ## Controlled integration boundary
 

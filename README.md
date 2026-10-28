@@ -39,6 +39,8 @@ An earlier enrollment did not match and had to be repeated; reliability still ne
 - A narrow fprintd 1.94.3 change: for this Goodix driver, the verification prompt
   waits for readiness instead of asking for a finger during preparation.
 - Tests for readiness, cancellation and prompt ordering.
+- A regular operational `.deb`, explicit enable/disable commands, and a tag-driven
+  prerelease workflow with container lifecycle checks.
 
 Preparation still takes time. The update removes the need to **count a manual
 pause after the prompt**; it does not make calibration instantaneous. Keep the
@@ -49,8 +51,9 @@ See [Ubuntu changes and validation](ubuntu/CHANGES.md) and the detailed commit h
 
 ## Build on Ubuntu 24.04
 
-**Developer preview: source builds only. No signed Ubuntu package or general-purpose
-Ubuntu installer is published yet. Do not run the Fedora RPM installer on Ubuntu.**
+**Experimental `.deb` packaging and GitHub Actions are available.**
+See [package installation, rollback and releases](ubuntu/RELEASES.md). Packages
+are unsigned and do not activate automatically. Do not run the Fedora RPM installer on Ubuntu.
 
 ```sh
 sudo apt-get install --no-install-recommends gcc meson ninja-build pkgconf \
