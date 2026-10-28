@@ -23,6 +23,7 @@ typedef struct
   guint in_submit_count;
   guint terminal_count;
   guint login_ready_count;
+  guint capture_ready_count;
   gboolean authorize_on_ready;
   guint finger_down_count;
   guint release_tail_count;
@@ -1523,6 +1524,37 @@ test_first_arm_backend_handoff_failure (void)
 }
 
 static void
+capture_ready_callback (GoodixPostTlsLifecycle *lifecycle, gpointer data)
+{
+  Fixture *f = data;
+  f->capture_ready_count++;
+  g_assert_cmpuint (f->audit.baseline_decode_count, ==, 1);
+  g_assert_cmpuint (f->finger_down_count, ==, 0);
+  g_assert_cmpuint (f->image_count, ==, 0);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (lifecycle), ==,
+                   GOODIX_POST_TLS_PHASE_FIRST_ARM);
+}
+
+static void
+test_capture_ready_after_baseline_and_ack (void)
+{
+  Fixture *f = fixture_new ();
+  goodix_post_tls_lifecycle_set_capture_ready (f->lifecycle, capture_ready_callback);
+  run_full_trace (f, 0u);
+  g_assert_cmpuint (f->capture_ready_count, ==, 1);
+  fixture_free (f);
+
+  f = fixture_new ();
+  f->stop_before_first_arm_ack = TRUE;
+  goodix_post_tls_lifecycle_set_capture_ready (f->lifecycle, capture_ready_callback);
+  run_full_trace (f, 0u);
+  g_assert_cmpuint (f->capture_ready_count, ==, 0);
+  goodix_post_tls_lifecycle_cancel (f->lifecycle, "test cancellation before ready");
+  g_assert_cmpuint (f->capture_ready_count, ==, 0);
+  fixture_free (f);
+}
+
+static void
 login_ready_callback (GoodixPostTlsLifecycle *lifecycle, gpointer data)
 {
   Fixture *f = data;
@@ -2184,5 +2216,6 @@ main (int argc, char **argv)
                    test_login_readiness_without_irq2_does_not_capture);
   g_test_add_func ("/post-tls/observed-mask-sequence-learns-without-finger-off",
                    test_observed_mask_sequence_learns_without_finger_off);
+  g_test_add_func ("/ubuntu/capture-ready-after-baseline-and-ack", test_capture_ready_after_baseline_and_ack);
   return g_test_run ();
 }

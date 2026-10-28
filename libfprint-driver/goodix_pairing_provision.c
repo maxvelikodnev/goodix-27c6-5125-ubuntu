@@ -118,6 +118,12 @@ GBytes *
 goodix_pairing_provision_begin_e0 (GoodixPairingProvision *provision,
                                    GError                **error)
 {
+#ifdef GOODIX_UBUNTU_BLOCK_PAIRING
+  /* Preview builds must never construct a persistent reader write. */
+  fail (provision, GOODIX_PAIRING_PROVISION_ERROR_STATE,
+        "Ubuntu preview blocks persistent pairing writes", error);
+  return NULL;
+#endif
   guint8 body[GOODIX_PAIRING_PROVISION_E0_BODY_LENGTH] = { 0 };
   g_autoptr(GBytes) frame = NULL;
   gsize offset = 0;

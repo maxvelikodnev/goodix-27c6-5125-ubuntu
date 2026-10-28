@@ -33,6 +33,7 @@ struct _GoodixPostTlsLifecycle
   GoodixPostTlsImageFunc image;
   GoodixPostTlsEventFunc finger_down;
   GoodixPostTlsEventFunc login_ready;
+  GoodixPostTlsEventFunc capture_ready;
   gboolean login_gate;
   gboolean login_authorized;
   guint login_attempts;
@@ -812,6 +813,12 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
                      lifecycle->first_contact_irq80_count);
           break;
         }
+      if (lifecycle->capture_ready != NULL)
+        {
+          GoodixPostTlsEventFunc ready = lifecycle->capture_ready;
+          lifecycle->capture_ready = NULL;
+          ready (lifecycle, lifecycle->user_data);
+        }
       if (lifecycle->first_arm_handoff != NULL)
         {
           if (lifecycle->out_pending ||
@@ -1341,6 +1348,15 @@ goodix_post_tls_lifecycle_copy_learned_fdt (
   memcpy (table, lifecycle->learned_fdt_table,
           GOODIX_POST_TLS_FDT_TABLE_LENGTH);
   return TRUE;
+}
+
+void
+goodix_post_tls_lifecycle_set_capture_ready (GoodixPostTlsLifecycle *lifecycle,
+                                            GoodixPostTlsEventFunc ready)
+{
+  g_return_if_fail (lifecycle != NULL);
+  g_return_if_fail (lifecycle->phase == GOODIX_POST_TLS_PHASE_NOT_STARTED);
+  lifecycle->capture_ready = ready;
 }
 
 void

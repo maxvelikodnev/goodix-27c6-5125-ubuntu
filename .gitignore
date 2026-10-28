@@ -27,3 +27,17 @@ __pycache__/
 **/target-config-90.bin
 **/gfusb.dll
 **/fdt-cache.bin
+
+# Private, notebook-specific deployment helpers and observations.
+/ubuntu/install-local.py
+/ubuntu/install-ready.py
+/ubuntu/READY-UPDATE.md
+*.log
+*.pcap
+*.pcapng
+**/secret-*.bin
+**/receipt-*.bin
+.env
+.env.*
+.DS_Store
+._*

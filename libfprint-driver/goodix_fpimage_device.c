@@ -527,7 +527,11 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
   ctx->runtime_handoff_views_cleared = TRUE;
   if (!ctx->login_preparing)
+#ifndef GOODIX_UBUNTU_READY_PROMPT
     goodix_device_context_emit_arm_complete (ctx, NULL);
+#else
+    { /* Activation completes only after the baseline and first arm ACK. */ }
+#endif
 }
 
 static gboolean
@@ -2946,6 +2950,11 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
                 G_TYPE_BOOLEAN, G_TYPE_STRING);
 
 
+#ifdef GOODIX_UBUNTU_READY_PROMPT
+  g_signal_new ("goodix-capture-ready", G_TYPE_FROM_CLASS (klass),
+                G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
+#endif
+
   object_class->finalize = goodix_fpimage_device_finalize;
 
 #ifdef GOODIX_LIBFPRINT_CHICAGO
@@ -3882,6 +3891,19 @@ context_secure_phase (GoodixSecureSession *session,
     context_protocol_failure (ctx, error);
 }
 
+#ifdef GOODIX_UBUNTU_READY_PROMPT
+static void
+ubuntu_capture_ready (GoodixPostTlsLifecycle *lifecycle, gpointer data)
+{
+  GoodixDeviceContext *ctx = data;
+  if (ctx->terminal_fence || lifecycle != ctx->post_tls_lifecycle || ctx->login_preparing)
+    return;
+  goodix_device_context_emit_arm_complete (ctx, NULL);
+  g_message ("GOODIX_CAPTURE_READY baseline=complete arm=acknowledged");
+  g_signal_emit_by_name (ctx->device, "goodix-capture-ready");
+}
+#endif
+
 gboolean
 goodix_device_context_configure_post_tls_lifecycle (
   GoodixDeviceContext         *ctx,
@@ -3903,6 +3925,11 @@ goodix_device_context_configure_post_tls_lifecycle (
     context_post_tls_finger_up, context_post_tls_terminal, ctx, audit, error);
   if (ctx->post_tls_lifecycle != NULL && ctx->login_preparing)
     goodix_post_tls_lifecycle_prepare_login (ctx->post_tls_lifecycle, login_ready);
+#ifdef GOODIX_UBUNTU_READY_PROMPT
+  else if (ctx->post_tls_lifecycle != NULL &&
+           goodix_fpimage_device_is_production_usb (ctx->device))
+    goodix_post_tls_lifecycle_set_capture_ready (ctx->post_tls_lifecycle, ubuntu_capture_ready);
+#endif
   return ctx->post_tls_lifecycle != NULL;
 }
 

@@ -1,115 +1,102 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix 27c6:5125 for Fedora KDE
+# Goodix 27c6:5125 fingerprint driver for Ubuntu 24.04 LTS
 
-Fingerprint driver for the Goodix USB reader `27c6:5125` running
-`GF_ST411SEC_APP_12509` or `GF_ST411SEC_APP_12508`. It connects a Goodix-enabled
-libfprint library to Fedora's fprintd service and desktop authentication,
-initializing the reader by itself on first use while preserving factory firmware
-and factory data.
+Experimental Ubuntu adaptation for the **Goodix USB fingerprint reader `27c6:5125`**,
+including the power-button fingerprint sensor found in some **HONOR MagicBook**
+and **Huawei MateBook** laptops. Built around **libfprint**, **fprintd** and GNOME.
 
-<p align="center">
-  <img src="https://n11scdn.akamaized.net/a1/375_535/11/58/59/10/IMG-8986381352341530689.webp" alt="Fingerprint reader and power-button flex assembly from a Huawei MateBook D15-family replacement part" width="50%">
-</p>
+> **Based on [sorguido/goodix-27c6-5125](https://github.com/sorguido/goodix-27c6-5125)**
+> by **Guido Sorarù (@sorguido)**, at commit
+> [`4dff813`](https://github.com/sorguido/goodix-27c6-5125/commit/4dff813bb80ddedb2b801b89ced223e4e4594ca7).
+> This fork adds Ubuntu build support and readiness-driven fingerprint prompts.
+> The original protocol work, driver and ChicagoHS integration belong to upstream
+> and its credited contributors; this is not a driver written from scratch.
 
-## Supported configuration
+## Status: tested on one Ubuntu laptop, still experimental
 
-- Fedora 44 KDE, x86_64, with local user accounts.
-- Goodix USB `27c6:5125`, recognized firmware `GF_ST411SEC_APP_12509` and
-  `GF_ST411SEC_APP_12508`.
-- Fedora-provided fprintd, PAM, Plasma Login, KScreenLocker, sudo and PolicyKit.
+| Configuration | Observed result |
+| --- | --- |
+| Ubuntu 24.04 LTS, x86_64, GNOME; HONOR HYM-WXX | Source builds succeeded |
+| Goodix `27c6:5125`, firmware `APP12508` | Pairing and image acquisition worked |
+| Fingerprint registration | Completed using terminal and GNOME Settings |
+| Registered finger | Successful verification observed after re-enrollment |
+| Unregistered finger | One controlled rejection observed before re-enrollment |
+| Local `sudo` authentication | Successful fingerprint authentication observed |
+| Updated readiness prompt | Local `sudo` matched after the ready event |
+| Lock screen, initial login, suspend/resume and Windows switching | Not yet qualified for this fork |
 
-Within the supported Fedora 44 KDE scope, the project integrates enrollment,
-verification, screen unlocking, ordinary sudo, PolicyKit, Plasma fingerprint
-login and password fallback through Fedora's existing authentication stack.
-An initial live functional check of the current driver passed on one APP12509
-reader in a Fedora KDE VM, including enrollment, verification, authentication,
-reboot, password fallback and bounded Windows coexistence. APP12508 has
-contributor-reported evidence from the earlier driver on Ubuntu GNOME, not full
-Fedora qualification for the current biometric engine. These observations do
-not establish general recognition accuracy or cross-device compatibility. See
-[validation and limitations](docs/VALIDATION.md).
+These are small functional checks, **not** biometric accuracy measurements.
+False-accept/false-reject rates, spoof resistance and liveness have not been established.
+Other HONOR/Huawei models, Ubuntu releases and APP12509 units remain unverified here.
+An earlier enrollment did not match and had to be repeated; reliability still needs work.
 
-## Installation
+## What changed from upstream?
 
-> [!WARNING]
-> **Use only signed RPMs from official releases for installation.**
+- Ubuntu 24.04 dependency checks, build paths and checks against Ubuntu's fprintd ABI.
+- A build-only workflow that uses normal user privileges and never opens the reader.
+- A default build guard blocking new persistent pairing-write commands.
+- A readiness event after baseline calibration and the first arm acknowledgement.
+- A narrow fprintd 1.94.3 change: for this Goodix driver, the verification prompt
+  waits for readiness instead of asking for a finger during preparation.
+- Tests for readiness, cancellation and prompt ordering.
 
-**[Install with the signed RPM and Goodix Manager](docs/INSTALLATION.md).**
-Download the compatible RPM from the official releases, open it with **KDE Discover**,
-then launch **Goodix Manager** and choose **Install**. The installation guide also
-provides **optional signature-verification instructions** for users who want to
-check the package before installing it.
+Preparation still takes time. The update removes the need to **count a manual
+pause after the prompt**; it does not make calibration instantaneous. Keep the
+finger away until requested. The graphical enrollment identify-to-enroll handoff
+still needs qualification with the update.
 
-You need administrative access. No Git checkout or local compilation is required.
-After installing a newer RPM, reopen the Manager and choose **Apply Update** when
-offered. Driver installation, update and removal use the local payload and work
-offline once Fedora dependencies are installed.
+See [Ubuntu changes and validation](ubuntu/CHANGES.md) and the detailed commit history.
 
-Use a release with a compatible Fedora 44 x86_64 RPM asset. See
-[validation](docs/VALIDATION.md) for the RPM/Discover qualification boundary.
+## Build on Ubuntu 24.04
 
-### Upgrading from an earlier release
+**Developer preview: source builds only. No signed Ubuntu package or general-purpose
+Ubuntu installer is published yet. Do not run the Fedora RPM installer on Ubuntu.**
 
-Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
-fingerprint format. For an intact, recognized 2.x installation, Goodix Manager
-offers **Upgrade to 3.0.0** through the transactional installer, without a
-preliminary uninstall. Host pairing state and existing fingerprint files are
-preserved. **Previously enrolled fingers
-must be enrolled again** because the old templates cannot be used by the new
-engine. See [installation](docs/INSTALLATION.md) and
-[validation](docs/VALIDATION.md). An optional return to an older version uses
-a pinned historical release rather than the current `main` branch.
+```sh
+sudo apt-get install --no-install-recommends gcc meson ninja-build pkgconf \
+  libglib2.0-dev libgusb-dev libusb-1.0-0-dev libssl-dev libjson-glib-dev binutils \
+  fprintd libfprint-2-dev libpolkit-gobject-1-dev libdbus-1-dev gettext
 
-## Using fingerprint authentication
+git clone https://github.com/maxvelikodnev/goodix-27c6-5125-ubuntu.git
+cd goodix-27c6-5125-ubuntu
+python3 -B ubuntu/build-ready.py --output "$HOME/goodix-ubuntu-build"
+```
 
-The first fingerprint action initializes the reader by itself. New enrollments
-follow the current native twelve-stage policy; repositioning prompts may require
-additional physical touches.
+Build as your normal user. Output goes to a new directory outside this checkout.
+This command **does not install anything, alter PAM or access the sensor**.
+New pairing writes are blocked by default. A first-time Linux pairing requires a
+separate, explicitly enabled operational build and controlled installation.
 
-Manage enrolled fingers through KDE's fingerprint settings. At Plasma Login,
-a nonempty password uses ordinary password login immediately. Submitting an
-empty password field explicitly selects fingerprint authentication, with at
-most three attempts and a stop on the first match. After selecting fingerprint,
-allow roughly one second before touching the reader.
+[Build details and checks](ubuntu/README.md) · [Upstream Fedora README](docs/UPSTREAM-README.md)
 
-Keep password access available. Fingerprint login does not automatically unlock
-a password-encrypted KWallet.
+## Persistent pairing and privacy
 
-## Uninstall and emergency recovery
+An operational build can write pairing material to the sensor. Uninstalling host
+software does **not** guarantee restoration of the original sensor state. This fork
+has no verified factory-reset or pairing-erasure procedure. The default guarded
+build can reuse existing Linux pairing but fails instead of writing a new key;
+Windows replacing pairing can therefore require separate investigation.
 
-Choose **Remove** in Goodix Manager to remove the driver while keeping the
-application available. The equivalent `goodix-uninstall` command remains
-available from a working desktop terminal. Removing the Manager RPM itself
-leaves an activated driver and its standalone recovery commands in place.
-If graphical login is unavailable, follow the
-[text-console emergency instructions](docs/UNINSTALL.md)
-and run **`goodix-force-remove`**. Both commands request their own sudo
-authentication, preserve host pairing state and templates, and work after
-the clone is removed.
+Never publish pairing-state directories, fingerprints, images, templates, raw USB
+captures, credentials or private logs in an issue. Preserve password access when
+experimenting. Do not relax matching thresholds to make a test pass.
 
-## Learn how it works
+## Credits and licensing
 
-New to Linux fingerprint authentication? **[Goodix Behind the Scenes](docs/learning/README.md)**
-is a beginner-friendly tour from the desktop prompt to the sensor, image,
-template and final match decision. It uses diagrams and plain-language analogies;
-the technical manual remains the canonical specification.
+- **Guido Sorarù / @sorguido**: upstream Goodix `27c6:5125` project and integration.
+- **Maksim Velikodnev / @maxvelikodnev**: this Ubuntu adaptation and supervised testing.
+- **fprintd contributors**: fprintd 1.94.3, obtained from the Ubuntu source archive.
+- Further protocol, libfprint and ChicagoHS contributors are preserved in
+  [upstream acknowledgements](ACKNOWLEDGEMENTS.md) and
+  [licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
 
-## Documentation
+Existing copyright and per-file license notices are retained. The upstream combined
+Goodix-enabled library is conveyed under GPL-3.0-or-later; fprintd retains its
+upstream GPL terms. See [LICENSE](LICENSE), [LICENSES](LICENSES), and
+[fprintd source provenance](ubuntu/FPRINTD-PROVENANCE.md).
 
-- [Contributing and pull-request policy](.github/CONTRIBUTING.md)
-- [Beginner learning guide](docs/learning/README.md)
-- [Installation and updates](docs/INSTALLATION.md)
-- [Uninstall and emergency recovery](docs/UNINSTALL.md)
-- [Technical architecture](TECHNICAL_MANUAL.md)
-- [Security and privacy](docs/SECURITY.md)
-- [Validation scope and known limitations](docs/VALIDATION.md)
-- [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
-- [Upstream references](docs/REFERENCES.md)
-- [Source build and validation checks](production/README.md)
+## Reporting an Ubuntu issue
 
-## License and acknowledgements
-
-Licensing is per file. The Goodix-enabled combined library is conveyed under
-`GPL-3.0-or-later`; individual files retain their original notices and terms.
-See [licensing and provenance](docs/LICENSING_AND_PROVENANCE.md) and
-[acknowledgements](ACKNOWLEDGEMENTS.md).
+Report Ubuntu release, laptop model, `lsusb` device ID, firmware version if known,
+command or interface used, and redacted error text. State whether a finger was
+already touching the sensor before the prompt. Do not attach biometric or pairing data.

@@ -171,6 +171,8 @@ gboolean goodix_post_tls_lifecycle_set_first_arm_handoff (
   GoodixPostTlsLifecycle            *lifecycle,
   GoodixPostTlsFirstArmHandoffFunc   handoff,
   GError                           **error);
+void goodix_post_tls_lifecycle_set_capture_ready (GoodixPostTlsLifecycle *lifecycle,
+                                                 GoodixPostTlsEventFunc ready);
 gboolean goodix_post_tls_lifecycle_start (GoodixPostTlsLifecycle *lifecycle,
                                           GError **error);
 void goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
