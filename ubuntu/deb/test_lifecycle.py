@@ -48,7 +48,8 @@ class Lifecycle(unittest.TestCase):
         p.start(); self.addCleanup(p.stop)
         self.systemd = self.root / 'running-systemd'
         self.systemd.mkdir()
-        p = patch.object(h, 'Path', side_effect=lambda x: self.systemd if x == '/run/systemd/system' else Path(x))
+        self.apparmor = self.root / 'apparmor-profiles'
+        p = patch.object(h, 'Path', side_effect=lambda x: self.systemd if x == '/run/systemd/system' else self.apparmor if x == '/sys/kernel/security/apparmor/profiles' else Path(x))
         p.start(); self.addCleanup(p.stop)
 
     def command(self, *args, check=True):
@@ -98,6 +99,12 @@ class Lifecycle(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'checksum'):
             h.activate()
         self.assertFalse(self.calls)
+
+    def test_custom_apparmor_profile_refuses_before_stop(self):
+        self.apparmor.write_text('/usr/libexec/fprintd (enforce)')
+        with self.assertRaisesRegex(RuntimeError, 'AppArmor profile'):
+            h.activate()
+        self.assertFalse(any(c[1] == 'stop' for c in self.calls))
 
     def test_disabled_remove_is_idempotent(self):
         h.deactivate(); h.deactivate()
