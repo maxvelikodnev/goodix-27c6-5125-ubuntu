@@ -1,20 +1,22 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Contributing to Goodix USB 27c6:5125
+# Contributing to the Ubuntu Goodix 27c6:5125 fork
+
+Adapted from the contribution policy of [sorguido/goodix-27c6-5125](https://github.com/sorguido/goodix-27c6-5125). Ubuntu-specific changes are maintained in this fork.
 
 Thank you for considering a contribution. Please read this policy before opening a pull request.
 
 ## Maintained scope
 
-This repository maintains the Goodix USB `27c6:5125` driver for **Fedora KDE**. Only firmware identities explicitly supported by the current implementation are in scope; a matching USB ID alone does not establish compatibility.
+This repository maintains the Goodix USB `27c6:5125` driver for **Ubuntu 24.04 amd64**. Only firmware identities explicitly supported by the current implementation are in scope; a matching USB ID alone does not establish compatibility.
 
-Focused improvements to the driver, secure session, enrollment and matching, Fedora integration, installation and recovery, tests, and technical documentation are welcome within this scope.
+Focused improvements to the driver, secure session, enrollment and matching, Ubuntu integration, installation and recovery, tests, and technical documentation are welcome within this scope.
 
-**Other Linux distributions and desktop environments are outside this repository's maintenance and pull-request acceptance scope.** Independent ports and forks are welcome, but should be maintained separately. Questions and discussion about them belong in [GitHub Discussions](https://github.com/sorguido/goodix-27c6-5125/discussions), not in cross-distribution integration PRs.
+**Other distributions and devices are not automatically supported.** Independent ports and forks are welcome, but should be maintained separately. Questions and discussion about them belong in [GitHub Discussions](https://github.com/sorguido/goodix-27c6-5125/discussions), not in cross-distribution integration PRs.
 
 ## Before opening a pull request
 
 - Keep changes small, focused, reviewable, and justified by a concrete problem.
-- Discuss substantial changes to the USB/security protocol, PSK or pairing lifecycle, firmware coverage, biometric pipeline, fprintd/PAM integration, installation/recovery, or dependencies in Discussions before implementation.
+- Discuss substantial changes to the USB/security protocol, PSK or pairing lifecycle, firmware coverage, biometric pipeline, fprintd/PAM integration, installation/recovery, or dependencies in an issue in this fork before implementation.
 - Avoid unrelated refactors, distribution auto-detection, or additional system-wide configuration changes.
 
 ## Non-negotiable safety requirements
@@ -22,7 +24,7 @@ Focused improvements to the driver, secure session, enrollment and matching, Fed
 - **Fail closed.** Reject unknown hardware or firmware identities, malformed input, mismatched state, failed integrity/security proofs, or unexpected protocol behavior. Do not bypass validation or fall back to an unverified path.
 - **Preserve the device.** Do not add firmware flashing, IAP, ClearApp, OTP/factory-data writes, or persistent VID:PID/device-mode changes. Any permitted reader-persistent pairing action must stay within the documented, explicitly authorized and bounded path; changes to that path require focused review and qualification.
 - **Preserve interoperability and recoverability.** Protect the established Windows/Linux pairing coexistence, host pairing state, fingerprint templates, password fallback, and safe installation, update, removal, and emergency recovery behavior.
-- **Keep Fedora authentication integration minimal.** Retain the stock fprintd and PAM boundaries; do not replace distribution-wide PAM profiles, disable the stock fprintd PAM profile, or introduce invasive authentication changes.
+- **Keep Ubuntu authentication integration minimal.** Preserve the documented private libfprint/fprintd service boundary, stock distribution files and the password path. Do not replace distribution-wide PAM profiles or introduce unrelated authentication changes.
 - Keep cancellation, retries, timeouts, cleanup, lifecycle fencing, and negative/error paths bounded and auditable. Do not relax security checks or matching decisions merely to make a test pass.
 
 ## Evidence required for review
@@ -36,7 +38,7 @@ Focused improvements to the driver, secure session, enrollment and matching, Fed
 
 ## Documentation discipline
 
-[TECHNICAL_MANUAL.md](../TECHNICAL_MANUAL.md) records **durable technical knowledge** about the device and its Fedora integration. It is not a test diary, execution transcript, or running history of experiments. Keep temporary investigations and step-by-step test logs in development materials; update canonical documentation only with established technical facts and appropriately bounded evidence.
+[TECHNICAL_MANUAL.md](../TECHNICAL_MANUAL.md) records **durable technical knowledge** about the device and its Ubuntu integration. It is not a test diary, execution transcript, or running history of experiments. Keep temporary investigations and step-by-step test logs in development materials; update canonical documentation only with established technical facts and appropriately bounded evidence.
 
 ## Maintainer review
 

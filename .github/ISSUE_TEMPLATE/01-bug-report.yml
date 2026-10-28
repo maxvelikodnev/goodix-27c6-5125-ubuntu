@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-name: Bug report
-description: Report a problem or unexpected behavior with the Goodix 27c6:5125 driver
-title: "[BUG] "
+name: Ubuntu fingerprint bug report
+description: Report detection, enrollment, verification or .deb problems with the Ubuntu fork
+title: "[Ubuntu] "
 labels: ["bug"]
 body:
   - type: markdown
@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for reporting a problem with the Goodix USB `27c6:5125` driver.
 
-        Before filing, check the [supported configuration](https://github.com/sorguido/goodix-27c6-5125#supported-configuration) and [known limitations](https://github.com/sorguido/goodix-27c6-5125/blob/main/docs/VALIDATION.md). Fedora 44 KDE with APP12509 is the qualified target; APP12508 has narrower contributor-reported evidence. Other environments are welcome as reports, but are not automatically supported.
+        Before filing, check the [Ubuntu compatibility table](https://github.com/maxvelikodnev/goodix-27c6-5125-ubuntu#ubuntu-and-laptop-compatibility) and [troubleshooting guide](https://github.com/maxvelikodnev/goodix-27c6-5125-ubuntu/blob/main/ubuntu/TROUBLESHOOTING.md). Testing covers one Ubuntu 24.04 / HONOR HYM-WXX / APP12508 reader. Other environments are reports, not automatically supported configurations. Report Ubuntu-fork problems here rather than to the original author.
 
         **Privacy and safety:** Share only relevant, redacted diagnostics. Do not upload pairing keys or state directories, fingerprint templates/images, firmware dumps, raw USB captures, passwords, or other secrets. Do not flash or reset the reader to reproduce a bug.
 
@@ -18,7 +18,7 @@ body:
     attributes:
       label: Driver version
       description: Release tag or commit hash used to build/install the driver
-      placeholder: "e.g. v2.2.1 or commit SHA"
+      placeholder: "e.g. .deb 0.1.0 or commit SHA"
     validations:
       required: true
 
@@ -38,7 +38,7 @@ body:
     id: os
     attributes:
       label: Linux distribution and version
-      placeholder: "e.g. Fedora 44"
+      placeholder: "e.g. Ubuntu 24.04 LTS, kernel 6.x"
     validations:
       required: true
 
@@ -46,13 +46,13 @@ body:
     id: desktop
     attributes:
       label: Desktop environment
-      placeholder: "e.g. KDE Plasma 6, GNOME, or headless"
+      placeholder: "e.g. GNOME local desktop or SSH"
 
   - type: input
     id: hardware
     attributes:
       label: Laptop / host model
-      placeholder: "e.g. Huawei MateBook D 15"
+      placeholder: "e.g. HONOR HYM-WXX and USB ID 27c6:5125"
 
   - type: dropdown
     id: area
@@ -60,6 +60,7 @@ body:
       label: Affected feature
       options:
         - Installation / update
+        - Sensor readiness / early finger prompt
         - Fingerprint enrollment
         - Fingerprint verification / identification
         - Desktop login / PAM

@@ -5,13 +5,13 @@ Describe the problem, the minimal change proposed, and the affected components. 
 
 ## Maintained scope and safety
 
-Refer to [CONTRIBUTING.md](https://github.com/sorguido/goodix-27c6-5125/blob/main/.github/CONTRIBUTING.md). For non-applicable items, explain why under **Notes**; checked boxes are declarations, not substitutes for evidence.
+Refer to [CONTRIBUTING.md](https://github.com/maxvelikodnev/goodix-27c6-5125-ubuntu/blob/main/.github/CONTRIBUTING.md). For non-applicable items, explain why under **Notes**; checked boxes are declarations, not substitutes for evidence.
 
-- [ ] This contribution is within the **Fedora KDE** and Goodix USB `27c6:5125` maintained scope.
+- [ ] This contribution is within the **Ubuntu 24.04 amd64** and Goodix USB `27c6:5125` maintained scope.
 - [ ] Unknown/unqualified hardware, firmware, protocol responses, and failed security checks remain **fail-closed**.
 - [ ] No firmware flashing, IAP, ClearApp, OTP/factory-data write, persistent USB identity change, or unreviewed pairing write is introduced.
 - [ ] Windows/Linux coexistence, host pairing data, templates, password fallback, and installation/removal/recovery are preserved or the effects are explicitly evaluated.
-- [ ] No invasive changes to Fedora's stock fprintd/PAM configuration are introduced.
+- [ ] Changes remain inside the documented Ubuntu private-daemon/library boundary; stock files and password fallback are preserved.
 
 ## Validation evidence
 
