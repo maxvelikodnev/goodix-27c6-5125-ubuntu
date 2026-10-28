@@ -18,7 +18,7 @@ body:
     attributes:
       label: Driver version
       description: Release tag or commit hash used to build/install the driver
-      placeholder: "e.g. .deb 0.1.0 or commit SHA"
+      placeholder: "e.g. .deb 1.0.0 or commit SHA"
     validations:
       required: true
 

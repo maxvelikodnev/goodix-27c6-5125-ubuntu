@@ -10,8 +10,8 @@ package does not access the reader. Uninstall is not a factory reset.
 Download the `.deb` and its `.sha256` from this fork's GitHub Releases, then:
 
 ```sh
-sha256sum -c goodix-5125-ubuntu_0.1.0_amd64.deb.sha256
-sudo apt install ./goodix-5125-ubuntu_0.1.0_amd64.deb
+sha256sum -c goodix-5125-ubuntu_1.0.0_amd64.deb.sha256
+sudo apt install ./goodix-5125-ubuntu_1.0.0_amd64.deb
 goodix-ubuntu status
 sudo goodix-ubuntu enable
 ```
@@ -55,7 +55,7 @@ Install the README build dependencies plus `dpkg-dev`, then as an ordinary user:
 
 ```sh
 python3 -B ubuntu/build-ready.py --output "$HOME/goodix-release-build" --allow-persistent-pairing
-python3 -B ubuntu/build-deb.py --build "$HOME/goodix-release-build" --output "$HOME/goodix-dist" --version 0.1.0
+python3 -B ubuntu/build-deb.py --build "$HOME/goodix-release-build" --output "$HOME/goodix-dist" --version 1.0.0
 ```
 
 The build verifies the operational flag and binary hashes, computes runtime
@@ -66,7 +66,7 @@ install, activate or communicate with USB.
 
 Pushes and pull requests run the Ubuntu build and offline tests. A manual run
 creates downloadable artifacts without publishing a release. A tag such as
-`v0.1.0-ubuntu` builds that exact commit and publishes a **prerelease**, after checks,
+`v1.0.0-ubuntu` builds that exact commit and publishes a **prerelease**, after checks,
 with `.deb`, checksum and source archive. A tag must be created deliberately;
 adding the workflow does not create one.
 

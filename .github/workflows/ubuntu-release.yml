@@ -9,7 +9,7 @@ on:
     inputs:
       version:
         description: Package version (major.minor.patch); does not publish a release
-        default: '0.1.0'
+        default: '1.0.0'
         required: true
 
 permissions:

@@ -80,11 +80,11 @@ enabling the driver, enrolling fingers or modifying PAM.
 2. Extract the artifact if needed. Verify its checksum, then install the `.deb`.
 3. Enable explicitly after reviewing the pairing and compatibility limits.
 
-For example, for version `0.1.0` (replace filenames with the actual version):
+For example, for version `1.0.0` (replace filenames with the actual version):
 
 ```sh
-sha256sum -c goodix-5125-ubuntu_0.1.0_amd64.deb.sha256
-sudo apt install ./goodix-5125-ubuntu_0.1.0_amd64.deb
+sha256sum -c goodix-5125-ubuntu_1.0.0_amd64.deb.sha256
+sudo apt install ./goodix-5125-ubuntu_1.0.0_amd64.deb
 goodix-ubuntu status
 sudo goodix-ubuntu enable
 ```
@@ -141,7 +141,7 @@ cd goodix-27c6-5125-ubuntu
 python3 -B ubuntu/build-ready.py \
   --output "$HOME/goodix-release-build" --allow-persistent-pairing
 python3 -B ubuntu/build-deb.py \
-  --build "$HOME/goodix-release-build" --output "$HOME/goodix-dist" --version 0.1.0
+  --build "$HOME/goodix-release-build" --output "$HOME/goodix-dist" --version 1.0.0
 ```
 
 Run the build as your normal user with a **new output directory outside the
